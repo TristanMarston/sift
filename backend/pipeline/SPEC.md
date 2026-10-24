@@ -62,6 +62,7 @@ Targets:
 | 17 | eBay is scraped with `condition: used`; its material is `Outer Shell Material` (lining and insulation are excluded); `Product Line`/`Model` feed product-line matching | eBay has no `Material` specific; without `condition` the actor returns new items |
 | 18 | JSON Lines are read on `\n` only and written ASCII-escaped (`jsonl.py`) | Real Mercari descriptions contain U+2028, which `str.splitlines()` treats as a line break: records were cut in half and ~5% of Mercari rows would have been dropped silently |
 | 19 | Titles and descriptions lose zero-width characters and non-breaking spaces at the normalize step; the Mercari actor excludes kids' titles at the source (whole words only) | A zero-width space inside `100%cotton` defeats the composition regex. Kids' listings were 40% of a broad Mercari query and are now ~2% |
+| 20 | Runs are judged by outcome first (rows returned, unusable rows, rows with a description) and by the log second; a block or junk data stops the marketplace at once, a second empty or failed run in a row stops it too; bad runs are quarantined and retried; the run ends with a report and an exit code | An Apify run can end `SUCCEEDED` with `0 failed` requests having collected nothing (the blocked Mercari run did). Healthy logs also contain `HTTP 403` and `blockedStatusCodes`, so log words alone cause false alarms. See `BLOCKING.md` |
 
 ## 4. Repo state and layout
 
@@ -75,6 +76,8 @@ Files, all under `backend/pipeline/` (see `README.md` there for how to use them)
 jsonl.py                read JSON Lines on newline only, write them ASCII-escaped
 listing.py              Pydantic Listing, Normalized (Listing + specifics), Evidence; enums mirror schema/api.schema.json
 scrape.py               actors, charge caps, scrubbing, plan, run loop, cost estimate (01_scrape.py is the CLI)
+health.py               judges a run (ok / short / empty / failed / degraded / blocked) and every saved row
+scrape_report.py        the end-of-run report and the exit code
 normalize/common.py     price -> cents, condition map, category rules, brand names, region, cost block, Drop
 normalize/depop.py      one mapper per marketplace: raw dict -> Normalized, or raises Drop(reason)
 normalize/poshmark.py

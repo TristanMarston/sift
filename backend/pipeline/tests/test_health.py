@@ -130,6 +130,16 @@ def test_expected_filtering_such_as_kids_is_not_a_problem():
     assert v.kind == "ok"
 
 
+def test_a_run_where_almost_every_row_is_filtered_out_is_degraded():
+    """E.g. a proxy in the wrong country: Depop answers in GBP and every row is 'filtered, not USD'."""
+    v = assess(rows=rows(good=1, filtered={"non_usd": 19}))
+    assert (v.kind, v.hard) == ("degraded", True) and any("non_usd 19" in r for r in v.reasons)
+
+
+def test_a_third_of_the_rows_filtered_as_kids_is_normal():
+    assert assess(rows=rows(good=14, filtered={"kids": 6})).kind == "ok"      # a real Mercari run
+
+
 def test_far_fewer_rows_than_asked_is_only_a_warning():
     v = assess(requested=200, rows=rows(good=20))
     assert (v.kind, v.bad) == ("short", False)

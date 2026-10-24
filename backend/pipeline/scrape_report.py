@@ -105,6 +105,11 @@ def render(s: Summary) -> str:
             notes.append("unusable " + ", ".join(f"{r} {c}" for r, c in m.rows.bad.most_common(4)))
         if notes:
             lines.append(f"- {mp}: " + " · ".join(notes))
+    for mp, m in s.markets.items():   # a partial block looks like this: nothing fails, every query is a trickle
+        runs = m.queries_ok + m.queries_short
+        if m.queries_short >= 3 and m.queries_short * 2 >= runs:
+            lines.append(f"- watch: {mp} returned far fewer rows than asked for in {m.queries_short} of {runs} queries "
+                         "(narrow queries do this, and so does a site that cuts us off after a few pages)")
     if s.alerts:
         lines += ["", "## Alerts", ""]
         lines += [f"- {a['at']} **{a['marketplace']}** {a['verdict'].upper()} on '{a['query']}': {'; '.join(a['reasons'])} → {a['action']}"

@@ -22,6 +22,7 @@ BAD, HARD = {"failed", "empty", "blocked", "degraded"}, {"blocked", "degraded"}
 MIN_ROWS_TO_JUDGE = 10          # below this, row quality is too noisy to call
 MAX_UNUSABLE_SHARE = 0.30       # more unusable rows than this = degraded
 MIN_DESCRIBED_SHARE = 0.30      # fewer rows with a real description than this = card data only (Poshmark's baseline is 75%)
+MIN_USABLE_SHARE = 0.10         # fewer usable rows than this (the rest filtered out) = the data is not what we asked for
 SHORT_SHARE = 0.20              # fewer rows than this share of the request = a warning
 MAX_FAILED_REQUEST_SHARE = 0.5  # crawler requests failing more often than this = blocked
 MIN_REQUESTS_TO_JUDGE = 3
@@ -148,6 +149,9 @@ def assess(status: str, status_message: str | None, requested: int, rows: RowCou
     if n >= MIN_ROWS_TO_JUDGE and unusable / n > MAX_UNUSABLE_SHARE:
         top = ", ".join(f"{r} {c}" for r, c in rows.bad.most_common(3))
         reasons.append(f"{unusable} of {n} rows are unusable ({top})")
+    if n >= MIN_ROWS_TO_JUDGE and usable / n < MIN_USABLE_SHARE:
+        top = ", ".join(f"{r} {c}" for r, c in rows.filtered.most_common(3))
+        reasons.append(f"only {usable} of {n} rows are usable, the rest were filtered out ({top}): wrong country or currency?")
     if expects_description and usable >= MIN_ROWS_TO_JUDGE and rows.described / usable < MIN_DESCRIBED_SHARE:
         reasons.append(f"only {rows.described} of {usable} rows have a description: the actor may be returning card data only")
     if reasons:

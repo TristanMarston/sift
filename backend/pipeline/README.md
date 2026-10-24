@@ -74,6 +74,8 @@ Runs one Apify actor per search in `queries.yaml` and saves what comes back.
 | `--test` | The go/no-go run: the first query of each marketplace, 20 items. |
 | `--only depop,ebay` | Only these marketplaces. |
 | `--max-spend 120` | Stop before the *estimated* spend (earlier runs included) would pass this many dollars. |
+| `--stop-all-on-block` | A block or junk data halts every marketplace, not just the one affected. |
+| `--data-dir PATH` | Write somewhere else than `pipeline/data` (or `data/test`). |
 
 How it behaves:
 
@@ -81,9 +83,16 @@ How it behaves:
   every category covered, so **put the best queries first** in each list.
 - **Quotas.** A marketplace stops when its raw rows reach its quota in `queries.yaml`.
 - **Resumable.** Rerun the same command after a crash or Ctrl-C. Queries that already succeeded are skipped, and
-  quotas count the rows already saved. Failed queries are retried.
+  quotas count the rows already saved. Bad runs (blocked, empty, junk, failed) are retried; a query that comes back
+  empty twice is treated as really empty.
 - **Safe on money.** Every actor call carries a hard charge cap (expected cost + 25%, at least $0.05) and a
-  30-minute timeout. A marketplace is abandoned after 3 failures in a row. Progress lines show the estimated spend.
+  30-minute timeout. Progress lines show the estimated spend.
+- **Notices blocks at once.** Each run is judged when it finishes. A bad one prints an `ALERT` line and is appended to
+  `alerts.jsonl`; a block or junk data stops that marketplace immediately, and a second empty or failed run in a row
+  stops it too. The other marketplaces carry on. Create `data/STOP` to halt before the next run. See [`BLOCKING.md`](BLOCKING.md).
+- **Ends with a report** (printed, and saved as `run_report.md` and `.json`): per marketplace the queries that were ok,
+  short or bad, and the rows that were good, duplicate, filtered, unusable or quarantined, plus estimated and wasted spend.
+  The exit code tells a script what happened: 0 finished, 2 a marketplace was stopped, 3 `--max-spend`, 4 `STOP` file, 130 Ctrl-C.
 - **Atomic files.** A raw file appears only when the whole dataset was downloaded.
 
 ### 02 · Normalize — `02_normalize.py` (logic in `normalize/`)
@@ -173,6 +182,8 @@ Everything lands in `pipeline/data/` (ignored by git), except `REPORT.md`.
 ```
 data/
   runs.jsonl                     one line per actor run (the log; also how reruns know what is done)
+  alerts.jsonl                   one line per bad run: marketplace, query, verdict, reasons, run id, what we did
+  run_report.md / .json          the report of the last step-01 invocation
   raw/<marketplace>/<run_id>.jsonl   the actors' records, seller identity removed
   normalized.jsonl               step 02: one row per listing
   listings.jsonl                 step 03: the final catalog
@@ -185,7 +196,8 @@ listings contain characters like U+2028 that `str.splitlines()` treats as a line
 read these files from your own code, split on `\n` (or iterate the open file), not `splitlines()`.
 
 **`runs.jsonl`** line: `{"marketplace", "category", "query", "max_items", "run_id", "status", "status_message",
-"items", "est_charge_usd", "at"}`. `est_charge_usd` is our own estimate (items × price + start fee), checked against
+"items", "est_charge_usd", "at", "verdict", "reasons", "notes", "rows_good", "rows_duplicate", "rows_filtered", "rows_bad"}`.
+`verdict` is `ok`, `short`, `empty`, `failed`, `blocked` or `degraded`; step 02 skips the rows of `empty`, `failed`, `blocked` and `degraded` runs. `est_charge_usd` is our own estimate (items × price + start fee), checked against
 the real Apify bills in the test run.
 
 **`listings.jsonl`**: one JSON object per line, validated by `listing.py`. It mirrors the static part of

@@ -157,3 +157,12 @@ def test_a_stopped_marketplace_exits_2_ahead_of_a_budget_stop():
     s = R.Summary(budget_stop=True)
     s.markets["depop"] = R.MarketStats(stopped="BLOCKED at 'x'")
     assert R.exit_code(s) == 2
+
+
+def test_the_report_flags_a_marketplace_whose_queries_mostly_come_back_short():
+    """A site that serves a few pages and then cuts us off looks like this: nothing fails, everything is a trickle."""
+    s = R.Summary()
+    s.markets["depop"] = R.MarketStats(queries_ok=1, queries_short=4)
+    s.markets["ebay"] = R.MarketStats(queries_ok=9, queries_short=3)
+    text = R.render(s)
+    assert "watch: depop" in text and "watch: ebay" not in text
