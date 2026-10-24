@@ -1,10 +1,10 @@
 import type { Viewport } from 'next';
 import { Landing } from '@/components/landing/landing';
 
-// Safari's bars match the cobalt stage.
-export const viewport: Viewport = { themeColor: '#2b4bf2' };
+// Safari's bars match the forest landing.
+export const viewport: Viewport = { themeColor: '#103520' };
 
-/** Home: the wear dial landing. Its lens opens the camera. The other prototypes live at /landing/flip and /landing/race. */
+/** Home: the receipt wall on forest. The other landing designs live at /landing/<name> for demos. */
 export default function Home() {
-    return <Landing variant='dial' home />;
+    return <Landing variant='wall' />;
 }

@@ -47,7 +47,7 @@ export function HeroFlip() {
                     {!compact && (
                         <>
                             <motion.div layoutId={`photo-${i}`} transition={spring.ui} className='absolute inset-x-0 top-[2%] mx-auto aspect-square h-[78%] max-w-full'>
-                                <GarmentFigure g={photo} scanning={step === 1} traced={step >= 2} lifted={step >= 2} line='#ffffff' />
+                                <GarmentFigure g={photo} scanning={step === 1} traced={step >= 2} lifted={step >= 2} line='var(--stage-accent)' />
                             </motion.div>
                             <AnimatePresence>
                                 {step === 3 && (
@@ -70,7 +70,7 @@ export function HeroFlip() {
                         <div className='absolute inset-0 flex flex-col gap-2.5 lg:justify-center lg:gap-3'>
                             <div className='flex items-center gap-3 lg:gap-4'>
                                 <motion.div layoutId={`photo-${i}`} transition={spring.ui} className='size-14 shrink-0 lg:size-20'>
-                                    <GarmentFigure g={photo} traced line='#ffffff' />
+                                    <GarmentFigure g={photo} traced line='var(--stage-accent)' />
                                 </motion.div>
                                 <motion.div className='flex-1' initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={{ ...spring.ui, delay: 0.15 }}>
                                     <SortToggle perWear={flipped} tapping={step === 5} />
@@ -107,7 +107,7 @@ export function HeroFlip() {
 /** The results screen's sort control, played by itself: a touch lands on "Cost per wear" and the pill slides over. */
 function SortToggle({ perWear, tapping }: { perWear: boolean; tapping: boolean }) {
     return (
-        <motion.div className='relative grid h-11 grid-cols-2 rounded-pill bg-white/15 p-1' animate={{ scale: tapping ? 0.97 : 1 }} transition={spring.snappy}>
+        <motion.div className='relative grid h-11 grid-cols-2 rounded-pill bg-stage-foreground/10 p-1' animate={{ scale: tapping ? 0.97 : 1 }} transition={spring.snappy}>
             <motion.span className='absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-pill bg-stage-foreground shadow-float' animate={{ x: perWear ? '100%' : '0%' }} transition={spring.ui} />
             {['Price', 'Cost per wear'].map((t, k) => (
                 <span key={t} className={cn('relative grid place-items-center type-callout whitespace-nowrap transition-colors duration-300', (k === 1) === perWear ? 'text-stage' : 'text-stage-foreground')}>
@@ -117,7 +117,7 @@ function SortToggle({ perWear, tapping }: { perWear: boolean; tapping: boolean }
             <AnimatePresence>
                 {tapping && (
                     <motion.span
-                        className='absolute top-1/2 left-3/4 size-11 -translate-1/2 rounded-full bg-white/60'
+                        className='absolute top-1/2 left-3/4 size-11 -translate-1/2 rounded-full bg-stage-foreground/25'
                         initial={{ scale: 0.3, opacity: 0 }}
                         animate={{ scale: 1.5, opacity: [0, 0.9, 0] }}
                         exit={{ opacity: 0 }}

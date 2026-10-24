@@ -3,6 +3,7 @@
 import { ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { Logo } from './logo';
 import { ThemeToggle } from './theme-toggle';
 
 /** Content-screen header: back (or the name), and the theme toggle. Never on camera screens. */
@@ -15,7 +16,9 @@ export function TopBar({ onBack, title = 'Sift', className }: { onBack?: () => v
                     Back
                 </Button>
             ) : (
-                <span className='px-3 type-wordmark'>{title}</span>
+                <span className='px-3'>
+                    <Logo className='h-7' title={title} />
+                </span>
             )}
             <ThemeToggle />
         </header>

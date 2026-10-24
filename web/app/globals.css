@@ -6,3 +6,4 @@
 @import "./tokens.css";
 /* Tailwind mapping, type styles, Sift effects and base styles */
 @import "./theme.css";
+@import "./palettes.css";

@@ -1,0 +1,14 @@
+/* The landing sits on forest (tokens.json). The /landing comparison pages can switch to "Ink": a light landing
+   that follows the theme (components/landing/comparison-bar.tsx sets data-palette="ink" on <html>). The home page
+   always uses forest. Only the landing changes; every other screen reads the same tokens. */
+:root[data-palette='ink'] {
+  --stage: #f3f4f2;
+  --stage-foreground: #103520;
+  --stage-accent: #798f64;
+}
+:root[data-palette='ink'].dark,
+:root[data-palette='ink'][data-theme='dark'] {
+  --stage: #0c0d0d;
+  --stage-foreground: #f1efe6;
+  --stage-accent: #a9bc93;
+}
