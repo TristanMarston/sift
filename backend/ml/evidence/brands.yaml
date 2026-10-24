@@ -15,8 +15,18 @@
 # Rule (2026-10-24): only promises that reach a secondhand buyer count. Time-limited guarantees for the original buyer
 # (Nike 2-year warranty, Smartwool 2-year, KUHL 18-month, L.L.Bean 1-year satisfaction) were sourced but left out: they
 # almost never apply to a resold item, and a guarantee here adds +2 quality to every item of the brand.
-# Carhartt is missing because carhartt.com blocks automated fetches: add its row by hand (tests/test_brands.py).
 brands:
+  - name: Carhartt
+    # "We know that well-worn, passed-down Carhartts can hold a lot of sentimental value, so we'll always treat your
+    # gear with great care while we make repairs" / "this repair service is available only within the United States" /
+    # "For normal wear and tear, a reasonable and transparent charge may be applied for our repair services."
+    # (read 2026-10-24 in a browser; carhartt.com blocks automated fetches). Counts: it reaches passed-down gear.
+    # Left out: "repair, replacement, or credit" if a product fails expectations, which excludes normal wear and does
+    # not say whether a second owner is covered. Carhartt WIP is a separate licensee and is not an alias.
+    repair_program: {value: "Repairs zippers, buttons, straps, patches (US; fee for normal wear)", url: "https://www.carhartt.com/our-commitment"}
+    as_of: 2026-10-24
+    verified_by: "Anthony + Claude (page read in Anthony's browser)"
+
   - name: Patagonia
     aliases: [patagonia inc]
     # "Customers can return items to the store you bought it from or to Patagonia for a repair, replacement, or refund." /

@@ -40,13 +40,12 @@ def test_no_two_brands_claim_the_same_listing_name():
     assert len(keys) == len(set(keys))
 
 
-@pytest.mark.parametrize("listing_brand", ["Patagonia", "The North Face", "THE NORTH FACE", "Levi's", "LEVIS",
+@pytest.mark.parametrize("listing_brand", ["Carhartt", "CARHARTT", "Patagonia", "The North Face", "THE NORTH FACE", "Levi's", "LEVIS",
                                            "Arc'teryx", "Filson"])
 def test_demo_and_top_catalog_brands_are_covered(listing_brand):
     assert markers.brand_key(listing_brand) in ranker.load_config().brands
 
 
-@pytest.mark.xfail(strict=True, reason="carhartt.com blocks automated fetches: add the row by hand, then delete this mark")
 def test_carhartt_the_main_demo_prop_is_covered():
     assert markers.brand_key("Carhartt") in ranker.load_config().brands
 
