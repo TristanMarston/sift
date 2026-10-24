@@ -125,6 +125,7 @@ export function ReceiptSheet({ r, typical, onClose }: Props) {
                         </Section>
 
                         <Section title='Eco' value={<LevelValue level={r.eco.level} />}>
+                            <Lines lines={[`Greener than ${r.eco.percentile}% of these matches`]} />
                             {r.eco.facts.length ? <Facts facts={r.eco.facts} /> : <Lines lines={['No eco facts stated.']} />}
                         </Section>
 
