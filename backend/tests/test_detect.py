@@ -143,7 +143,6 @@ def test_haiku_only_fallback_when_segmentation_finds_nothing(monkeypatch):
     resp = D.detect(IMG, llm=fake)
     validate(resp)
     assert [g["label"] for g in resp["garments"]] == ["dress"]
-    assert D.detect(IMG, llm=None)["garments"] == []
 
 
 def test_exif_rotation_is_applied_before_boxes_are_measured():
@@ -185,7 +184,7 @@ def test_unsure_segmentation_counts_as_nothing_so_product_shots_go_to_haiku_or_t
     fake = lambda crop, hint: [{"label": "sneakers", "category": "sneakers",  # noqa: E731
                                "box": {"x": 0.2, "y": 0.3, "w": 0.6, "h": 0.4}}]
     assert [g["label"] for g in D.detect(IMG, llm=fake)["garments"]] == ["sneakers"]
-    assert D.detect(IMG, llm=None)["garments"] == []
+    monkeypatch.setattr(D, "name", fake_name)
     monkeypatch.setattr(D, "segformer", lambda im: [*unsure, {**TOP, "label": "top", "confidence": 0.95}])
     assert [g["confidence"] for g in D.detect(IMG, llm=None)["garments"]] == [0.95]
 
@@ -194,3 +193,35 @@ def test_a_garment_split_by_an_arm_keeps_both_halves():
     # a hand on the knee cuts the jeans into two blobs: the box must cover both legs
     rs = D.seg_regions(*seg((PANTS, 10, 50, 40, 90), (PANTS, 45, 50, 70, 90)))
     assert box(rs[0]) == [0.1, 0.5, 0.6, 0.4]
+
+
+# --- FashionSigLIP zero-shot category ---------------------------------------------------
+
+def test_zero_shot_picks_the_closest_category_text_among_the_allowed_ones():
+    texts = np.eye(len(D.CATEGORIES), 4, dtype=np.float32)  # category i points along axis i (first 4)
+    vec = np.array([0.1, 0.2, 0.9, 0.3], np.float32)          # closest to category 2 (tshirts)
+    cat, conf = D.zero_shot(vec, texts)
+    assert cat == D.CATEGORIES[2] and 0.5 < conf <= 1
+    cat, _ = D.zero_shot(vec, texts, allowed=["jackets_outerwear", "hoodies_sweatshirts"])
+    assert cat == "hoodies_sweatshirts"  # axis 1 beats axis 0 once tshirts is not allowed
+
+
+def fake_name(im, allowed):
+    return allowed[-1], 0.8
+
+
+def test_without_haiku_a_segformer_top_gets_its_category_from_fashionsiglip(monkeypatch):
+    monkeypatch.setattr(D, "segformer", lambda im: [TOP, PANTS_R])
+    monkeypatch.setattr(D, "name", fake_name)
+    tops = [g for g in D.detect(IMG, llm=None)["garments"] if g["box"] == TOP["box"]]
+    assert [(g["label"], g["category"]) for g in tops] == [("shirt", "shirts")]  # last of UPPERS
+
+
+def test_a_product_shot_with_nothing_sure_becomes_one_whole_photo_garment(monkeypatch):
+    monkeypatch.setattr(D, "segformer", lambda im: [{**TOP, "confidence": 0.5}])
+    monkeypatch.setattr(D, "name", lambda im, allowed: ("sneakers", 0.9))
+    resp = D.detect(IMG, llm=None)
+    validate(resp)
+    assert resp["garments"] == [{"id": "g0", "label": "sneakers", "category": "sneakers",
+                                 "box": {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0}, "confidence": 0.9}]
+    assert D.detect(IMG, llm=lambda c, h: [])["garments"][0]["category"] == "sneakers"  # Haiku found nothing

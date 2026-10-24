@@ -10,6 +10,7 @@ import json
 import os
 from concurrent.futures import ThreadPoolExecutor
 from functools import cache
+from pathlib import Path
 
 import numpy as np
 import onnxruntime as ort
@@ -21,6 +22,11 @@ YOLOS = ("onnx-community/yolos-fashionpedia-ONNX", "onnx/model.onnx")
 HAIKU = "claude-haiku-5-5"
 CATEGORIES = ["jackets_outerwear", "hoodies_sweatshirts", "tshirts", "sneakers", "jeans_pants", "sweaters_knitwear",
               "shirts", "dresses_skirts"]
+UPPERS = ["jackets_outerwear", "hoodies_sweatshirts", "tshirts", "sweaters_knitwear", "shirts"]
+LABEL = {"jackets_outerwear": "jacket", "hoodies_sweatshirts": "hoodie", "tshirts": "t-shirt", "sneakers": "sneakers",
+         "jeans_pants": "pants", "sweaters_knitwear": "sweater", "shirts": "shirt", "dresses_skirts": "dress or skirt"}
+CATEGORY_TEXT = Path(__file__).with_name("category_text.npy")  # FashionSigLIP text vectors, CATEGORIES order
+SCALE = 100.0      # cosine -> logits for the zero-shot softmax
 MEAN, STD = np.array([0.485, 0.456, 0.406], np.float32), np.array([0.229, 0.224, 0.225], np.float32)
 MIN_AREA = 0.005   # share of the image a garment must cover
 MIN_SCORE = 0.5    # YOLOS class probability
@@ -246,6 +252,48 @@ def _haiku_only(im: Image.Image, llm) -> list[dict]:
     return [_region(g["label"], g["category"], [g["box"][k] for k in "xywh"], 0.5) for g in found]
 
 
+# --- FashionSigLIP zero-shot category -----------------------------------------------------
+
+def zero_shot(vec: np.ndarray, texts: np.ndarray, allowed: list[str] = CATEGORIES) -> tuple[str, float]:
+    """The allowed category whose text vector is closest to the image vector, with its softmax share."""
+    idx = [CATEGORIES.index(c) for c in allowed]
+    logits = SCALE * (texts[idx] @ vec)
+    p = np.exp(logits - logits.max())
+    p /= p.sum()
+    return allowed[int(p.argmax())], float(p.max())
+
+
+@cache
+def _texts() -> np.ndarray:
+    return np.load(CATEGORY_TEXT)
+
+
+def name(im: Image.Image, allowed: list[str] = CATEGORIES) -> tuple[str, float]:
+    """Our category for a garment photo: the same FashionSigLIP model /search embeds with, no API call."""
+    from backend.embed import embed_image
+    return zero_shot(embed_image(im), _texts(), allowed)
+
+
+def _name_top(im: Image.Image, r: dict) -> dict:
+    """SegFormer only knows "upper clothes": pick which upper when Haiku did not."""
+    if r["category"] is not None or r["label"] != "top":
+        return r
+    try:
+        cat, _ = name(_crop(im, r["box"], 0.1)[0], UPPERS)
+    except Exception:  # noqa: BLE001  no model: the region stays an unnamed top
+        return r
+    return {**r, "label": LABEL[cat], "category": cat}
+
+
+def _whole(im: Image.Image) -> list[dict]:
+    """A product shot (one item, nothing worn): the whole photo is the garment."""
+    try:
+        cat, conf = name(im, CATEGORIES)
+    except Exception:  # noqa: BLE001  no model: an empty list tells the app to search the whole photo
+        return []
+    return [_region(LABEL[cat], cat, (0, 0, 1, 1), conf)]
+
+
 # --- response --------------------------------------------------------------------------
 
 def response(im: Image.Image, regions: list[dict]) -> dict:
@@ -262,4 +310,6 @@ def detect(image: Image.Image, backend: str = "segformer", llm=DEFAULT_LLM) -> d
     if backend == "yolos":
         return response(im, yolos(im))
     regions = [r for r in segformer(im) if r["confidence"] >= SURE]
-    return response(im, relabel(im, regions, llm) if regions else _haiku_only(im, llm))
+    if regions:
+        return response(im, [_name_top(im, r) for r in relabel(im, regions, llm)])
+    return response(im, _haiku_only(im, llm) or _whole(im))
