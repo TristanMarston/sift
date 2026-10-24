@@ -1,7 +1,7 @@
 # Sift — Scraping and Ingest Spec (for coding agents)
 
-Location: `pipeline/SCRAPING.md`.
-Audience: an AI coding agent (or Andy) working in `pipeline/` and `supabase/`.
+Location: `backend/pipeline/SCRAPING.md`. How these fields surface to the web is defined in `schema/API.md`.
+Audience: an AI coding agent (or Andy) working in `backend/pipeline/` and `backend/database/`.
 Read fully before writing code. Facts marked **verified** were read off the actor
 page or docs on Fri Oct 23, 2026. Facts marked **assumption** must be confirmed by
 the 20-item test run before the full scrape.
@@ -65,15 +65,15 @@ Per category, ~25 queries per marketplace mixing:
   Nike Dunk Low) so the first scan always hits;
 - ~10% of tee queries aimed at "conference tee" / "hackathon shirt".
 
-Queries live in `pipeline/queries.yaml` keyed by category then marketplace.
+Queries live in `backend/pipeline/queries.yaml` keyed by category then marketplace.
 Cap each query with `maxItems` (200–500) so the long tail of one query cannot
 eat the budget.
 
 ## 3. Fields to capture per listing
 
 Normalize every actor record into this shape (Pydantic `Listing` in
-`contract/`). Field names differ per actor; the mapping lives in
-`pipeline/normalize/<marketplace>.py`.
+`backend/src/backend/models.py`). Field names differ per actor; the mapping lives in
+`backend/pipeline/normalize/<marketplace>.py`.
 
 ### Identity and linking (required)
 
@@ -170,7 +170,7 @@ composition is kept but flagged `composition_suspect=true`.
 2. `02_normalize.py` — raw → `Listing`; drop records without `url`, `title`, `price`, or at least one image; dedupe on `(marketplace, external_id)`.
 3. `03_extract.py` — §4 rules; writes `materials`, `synthetic_share`, `certifications`, flags, evidence.
 4. `04_thumbs.py` — download `image_urls[0]`, resize to 384 px JPEG (256 px if the index passes 40k), upload to Supabase bucket `thumbs/<marketplace>/<external_id>.jpg`, set `thumb_url`. Thread pool of 16; retry twice; skip on failure (`thumb_url=null`, still indexed).
-5. `05_embed.py` — embed the thumbnail with `sift_contract.embed.embed_image` (Marqo-FashionSigLIP, 768-d, `normalize=True`). Batches of 64. Run on a Modal T4 (minutes) or laptop CPU (~40 min per 20k).
+5. `05_embed.py` — embed the thumbnail with `backend.embed.embed_image` (Marqo-FashionSigLIP, 768-d, `normalize=True`). Batches of 64. Run on a Modal T4 (minutes) or laptop CPU (~40 min per 20k).
 6. `06_upsert.py` — `supabase.table("listings").upsert(rows, on_conflict="marketplace,external_id")` in chunks of 500.
 7. `07_report.py` — prints per marketplace: rows, % with description, % with any material, % with composition pct, % with certification, median price, thumbs failed. Paste the output into the Devpost write-up.
 
@@ -195,7 +195,7 @@ Poshmark to `xtracto`; if those fail too, raise it to the team (pivot rule).
 - Every row has a 768-d embedding and a `thumb_url` or a working `image_urls[0]`.
 - ≥ 25% of rows have at least one stated material; ≥ 10% have percentages (expect eBay and Grailed to carry this; if below, add material-rich queries).
 - The three demo props return themselves in the top 3 of a `/search`.
-- `07_report.py` output committed to `pipeline/REPORT.md`.
+- `07_report.py` output committed to `backend/pipeline/REPORT.md`.
 
 ## 8. Things that will bite
 

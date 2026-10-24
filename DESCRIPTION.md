@@ -1,14 +1,14 @@
 # Sift - Project Description
 
-*Working title. The repo may still be called `thrift-lens`. Rename freely.*
+*Working title. Rename freely.*
 
-> **Purpose of this file:** the single source of truth for what we are building, why, and how the pieces fit together. It describes intent, goals, and concepts. It does not pick a tech stack. Read it before writing any code.
+> **Purpose of this file:** what we are building, why, and how the pieces fit together. It describes intent, goals, and concepts. Specifics live in other docs, and they win on conflict: the API contract is `schema/api.schema.json` + `schema/API.md`, and the data is `backend/pipeline/SCRAPING.md`. See `README.md` for the doc map. Read this before writing any code.
 
 ---
 
 ## 1. One-line pitch
 
-**Take a photo of clothing you like. We find the best matches across new and secondhand markets, and rank them by cost per wear instead of price. Every result comes with a "Wear Receipt" that shows the evidence.**
+**Take a photo of clothing you like. We find the best look-alikes across secondhand marketplaces, and rank them by cost per wear instead of price. Every result comes with a "Wear Receipt" that shows the evidence: cost, quality, and eco facts.**
 
 Tagline candidates:
 - *Every shopping agent sorts by price. We sort by cost per wear.*
@@ -49,7 +49,7 @@ Make **"how long will this last?"** as easy to see as **"how much does it cost?"
 | Curated "buy it for life" shops | BuyMeOnce | Hand-picked durable items | A small catalog, not a search over everything |
 | Wardrobe apps | Whering, Indyx | Tracking cost per wear of things you already own | Nothing at the moment of buying |
 
-**Our difference:** we search by photo, across new and secondhand, and rank using *evidence from real-world outcomes* (what owners say, what the resale market shows). We then show the evidence in a receipt, with sources and sample sizes.
+**Our difference:** we search by photo across five secondhand marketplaces and rank by *cost per wear*, not price. Every number traces to evidence we can show: declared materials (with how sure we are of them), known product lines, and sourced brand facts such as repair programs and certifications. We show that evidence in a receipt, and we say "unknown" when we do not have it. Owner reviews and community evidence are the next layer (stretch).
 
 ---
 
@@ -57,10 +57,10 @@ Make **"how long will this last?"** as easy to see as **"how much does it cost?"
 
 1. **Open the website.** No sign-up, no typing. The camera is the front page.
 2. **Take a photo** of a piece of clothing or a whole outfit. (Upload also works.)
-3. **We find the garments** in the photo. For an outfit, each garment gets its own tab. The user can tap to pick one if detection struggles.
-4. **We show look-alikes**, ranked by value for wear, from a large pre-collected catalog of new and secondhand items.
-5. **Each result has a Wear Receipt**: what you get, what it costs per wear, and why we think so.
-6. **The user can explore.** Switch between *Sort by price* and *Sort by cost per wear*. Slide between *closer match* and *better value*. Open any receipt to see sources.
+3. **We find the garments** in the photo. For an outfit, each garment gets its own tab. The user can draw a box if detection struggles.
+4. **We show look-alikes**, ranked by cost per wear, from a pre-collected catalog of secondhand listings (Depop, Poshmark, Grailed, Mercari, eBay).
+5. **Each result has a Wear Receipt**: what it costs, how it rates on quality and eco, its cost per wear, and why we think so.
+6. **The user can explore.** Sort by *cost per wear*, *price*, *look match*, or *eco*. Slide between *closer match* and *better value*. Open any receipt to see sources.
 
 **Signature moment:** the user flips the sort from price to cost per wear. The cards visibly reshuffle. The headline reads something like *"The cheapest match drops to #14."*
 
@@ -68,76 +68,77 @@ Make **"how long will this last?"** as easy to see as **"how much does it cost?"
 
 ## 5. Key concepts (plain definitions)
 
-- **Look match.** How visually close an item is to the user's photo. We only rank items that are close enough to be a real alternative.
-- **Evidence.** Facts gathered from the real world about how an item or brand holds up. Each piece of evidence has a source and a sample size.
-- **Quality score.** A summary of how strong the evidence is that an item will last, compared with similar items. It is a *summary of evidence*, not a lab test.
-- **Confidence.** How much evidence sits behind a score. Low evidence gives low confidence, and we say so.
-- **Expected wears.** A *range*, not a promise. Better evidence moves the range up. The team sets a baseline per garment type from public benchmarks and labels it as an assumption.
-- **Cost per wear.** Price ÷ expected wears. Shown at a few wear counts (for example 30, 60, 100), so the user can pick the one that fits them.
-- **Break-even wears.** How many times you must wear the pricier item for it to beat a cheaper one. This is the honest "buy less" message: *if you will not wear it that often, buy the cheaper or used one.*
-- **Resale outlook.** What the item is likely to be worth after use. This lowers the *net* cost.
+- **Look match.** How visually close an item is to the user's photo. Items below a similarity cutoff are dropped, so we only rank real alternatives.
+- **Evidence.** Facts about an item or its brand. Each fact has a source, a status (*verified*, *claimed*, *inferred*, *unknown*), and a date.
+- **The three markers.** Each one is a *level* (high / medium / low / unknown) plus the facts behind it. A hidden 0–1 score exists only for sorting, and the UI never shows it.
+  - **Cost:** price, shipping, markdown, and "vs retail" when known.
+  - **Quality:** how strong the evidence is that the item will last: materials, known product line, maker support. It is a *summary of evidence*, not a lab test.
+  - **Eco:** stated facts only: secondhand, vintage/deadstock/upcycled, recycled or organic fibers, certifications, synthetic share. It is not a sustainability grade.
+- **Confidence.** How much evidence sits behind an item's expected wears. Low evidence gives low confidence, and we say so.
+- **Expected wears.** A *range*, not a promise. Each garment type has a baseline from public benchmarks, labeled as an assumption. Quality evidence moves the range.
+- **Cost per wear.** Price ÷ expected wears. Shown at a few wear counts (30, 60, 100), so the user can pick the one that fits them.
+- **Break-even wears.** How many times you must wear a pricier item for it to beat the typical match. This is the honest "buy less" message: *if you will not wear it that often, buy the cheaper one.*
+- **Resale outlook** *(later, not in v1).* What the item is likely to be worth after use.
 - **Wear Receipt.** The card that shows all of the above for one item.
-- **Value rank.** The final ordering of results.
 
 ---
 
 ## 6. How the ranking works
 
-Your plan has three indexes: **quality, price, resale**. We keep that, with these rules.
-
-| Index | Question it answers | Evidence it uses | Priority |
+| Index | Question it answers | Evidence it uses (v1) | Priority |
 |---|---|---|---|
-| **Quality** | How long will this likely last? | Owner reviews, community discussion, maker guarantees, declared materials | **Core. Must work.** |
+| **Quality** | How long will this likely last? | Declared materials, known product lines, brand facts (repair program, published supplier list, certifications) | **Core. Must work.** Owner reviews and community evidence are stretch. |
 | **Price** | What does it cost me now? | Listed price (plus shipping if available) | **Core.** |
-| **Resale** | What can I get back later? | Sold prices vs. original prices, speed of sale | **Last. Build only if time allows.** |
+| **Eco** | What do we know about its footprint? | Stated facts (§5). Shown and sortable, **not** part of cost per wear | **Core.** |
+| **Resale** | What can I get back later? | Sold prices vs. original prices | **Later, not in v1.** |
 
 **How they combine, in words:**
-1. Start with the look matches (the top set of close look-alikes).
+1. Start with the look matches (up to 50 close look-alikes).
 2. Use the quality evidence to set an expected-wears range for each item.
-3. Divide price by expected wears to get cost per wear. If resale is available, subtract the expected resale value from the price first.
-4. Sort by cost per wear. The user's slider can shift weight toward closeness of match or toward price.
+3. Divide price by expected wears to get cost per wear.
+4. Sort by cost per wear by default. The backend computes every number. The website does all the sorting and slider weighting locally, so the reshuffle is instant (see `schema/API.md` §3).
 
 **Rules for the ranking:**
 - It must be explainable. Anyone can open a receipt and see why an item ranked where it did.
 - Never hide a component inside one opaque number.
 - If we lack evidence, the item stays in the list but gets no boost. It is labeled *"Not enough evidence yet."* We do not guess.
-- Two caveats on resale numbers. Cheap items look better when you measure "% of original price kept", so compare items **within a price band**. And resale price reflects looks and trends as much as durability, so it is a supporting clue, not the main score.
+- Declared materials are weak evidence (labels are often wrong, and fiber only loosely predicts durability). Show them, and give them modest weight.
 
 ---
 
 ## 7. The Wear Receipt
 
-One card per result. Example (illustrative numbers):
+One card per result. Example (illustrative numbers). The exact fields are `Result` in `schema/API.md` §2.
 
 ```
 ┌──────────────────────────────────────────────┐
-│ Carhartt chore jacket · Poshmark · Size M    │
-│ Look match: 91%                              │
+│ Carhartt Detroit jacket · Poshmark · Size M  │
+│ Look match: 91% · Good condition             │
 ├──────────────────────────────────────────────┤
-│ PRICE                                $48.00  │
+│ COST                                 $48.00  │
+│  Seller marked down from $60                 │
 │                                              │
-│ EVIDENCE                                     │
-│  Owner reviews   4.6★ · 1,240 reviews        │
-│                  3% mention wear-out issues  │
-│                  (typical for category: 9%)  │
-│  Community       38 mentions as long-lasting │
-│  Maker support   Repair program offered      │
-│  Materials       100% cotton, as declared    │
+│ QUALITY                               High   │
+│  Materials      Cotton duck (likely:         │
+│                 known product line)          │
+│  Maker support  Repair program (brand site)  │
+│                                              │
+│ ECO                                 Medium   │
+│  Secondhand     Already in use (vintage)     │
+│  Synthetic      0% (as declared)             │
 │                                              │
 │ EXPECTED WEARS            120–200 (high conf)│
 │ COST PER WEAR  @30 $1.60 · @60 $0.80 · @100 $0.48 │
 │                                              │
 │ VS. TYPICAL MATCH                            │
-│  Typical match costs $0.95/wear at 40 wears  │
-│  Break-even: wear this 51+ times to win      │
-│                                              │
-│ RESALE OUTLOOK (if built)    ~55% of price   │
+│  Typical match: $40, $0.67/wear              │
+│  Break-even: wear this 72+ times to win      │
 │                                              │
 │ CONFIDENCE  High · Sources ▸ · Date ▸        │
 └──────────────────────────────────────────────┘
 ```
 
-Every line is clickable for its source and sample size. Anything we could not verify is shown as *"unknown"*, not hidden.
+Every line is clickable for its source, status, and date. Anything we could not verify is shown as *"unknown"*, not hidden.
 
 ---
 
@@ -145,39 +146,43 @@ Every line is clickable for its source and sample size. Anything we could not ve
 
 ### 8.1 Two kinds of data
 
-1. **The Catalog.** Many items from many markets. Each item has: photo, title, brand, garment type, size, condition (new or used), price, link, market name, and materials when the listing gives them.
-2. **The Evidence Tables.** A much smaller set of facts, collected **per brand and garment type** (for example, "Carhartt jackets"). Each listing in the Catalog inherits the evidence for its brand and garment type.
+1. **The Catalog.** 20,000 listings at first, growing to ~50,000, from five US secondhand marketplaces (Depop, Poshmark, Grailed, Mercari, eBay) across 8 categories: jackets and outerwear, hoodies and sweatshirts, t-shirts, sneakers, jeans and pants, sweaters and knitwear, shirts, dresses and skirts. Each listing has: photos, title, brand, category, size, condition, price, link, marketplace, the full description, and materials when the listing states them. Details are in `backend/pipeline/SCRAPING.md`.
+2. **The Evidence Tables.** Small and hand-curated:
+   - a `brands` table of ~40 brands (repair program, published supplier list, material commitments, certifications), where every claim has a source URL;
+   - `product_lines.yaml` (for example Carhartt Detroit → cotton duck);
+   - `backend/ml/wear_baselines.yaml`: the expected-wear range per category, labeled as an assumption.
 
-**Why this split matters:** quality evidence is about *makers*, not individual listings. We only need evidence for about 100–200 brands across about 5 garment types. That keeps collection small, cheap, and doable in a day. The Catalog can be large, but the Evidence Tables are what make us different.
+**Why this split matters:** much of the quality evidence is about *makers*, not individual listings. Each listing inherits the facts for its brand. That keeps the evidence work small and doable in a day.
 
 ### 8.2 Where evidence comes from
 
-| Source | What we learn | Main limits |
-|---|---|---|
-| **Customer reviews on retail sites** | Rating, review count, and how many reviews praise or complain about lasting power (fading, pilling, shrinking, seams failing, holes). An AI reads review text and counts these. | New items only. Coverage differs by retailer. Reviews are mostly written early, so slow wear-out is under-reported. |
-| **Community discussion** (for example "buy it for life" forums) | Which brands people say last for years, and which disappoint | Popular brands only. Opinions are noisy. |
-| **Resale markets** *(last priority)* | How much value items keep, and how fast they sell | Only items that survived are listed. Price reflects looks and trends too. |
-| **Maker promises** | Lifetime guarantees, repair programs | A guarantee often excludes normal wear. Treat as a modest signal. |
-| **Declared materials** (fiber, and fabric weight when published) | Facts to display | Research shows a weak link to lasting power. Labels are also wrong often (an EU test found 37% mislabeled). Show it, give it little weight. |
+| Source | What we learn | Main limits | Status |
+|---|---|---|---|
+| **Declared materials** (listing text, eBay item specifics) | Fiber, %, organic/recycled, certifications | A weak link to lasting power. Labels are often wrong (an EU test found 37% mislabeled). Show it, give it little weight. | **v1** |
+| **Known product lines** | The material of well-known models | A small hand-made table. Marked *inferred* | **v1** |
+| **Maker promises** (brand table) | Repair programs, guarantees, supplier lists | A guarantee often excludes normal wear. A modest signal | **v1** |
+| **Care-tag photos** | The real fiber content from tag images | OCR coverage varies | **P1, after the golden path** |
+| **Customer reviews on retail sites** | Rating, count, durability complaints | New items only. Wear-out is under-reported | **Stretch** |
+| **Community discussion** ("buy it for life") | Which brands people say last | Popular brands only. Noisy | **Stretch** |
+| **Resale markets** | Value kept, speed of sale | Survivorship. Price tracks looks | **Later** |
 
 **What we do not use as a quality signal:** price alone. Research shows it does not predict durability.
 
 ### 8.3 Scale
-- **Catalog:** tens of thousands of items is plenty (about 20,000–50,000). Variety across garment types matters more than raw size. More items add cost and blocking risk without improving the demo.
-- **Evidence Tables:** about 100–200 brands × about 5 garment types.
-- **Budget:** typical collection tools cost about $1.50–$9 per 1,000 records. Expect roughly $100–$400 total. We will ask the sponsor for event credits.
+- **Catalog:** 20,000 → ~50,000 listings. Variety across categories matters more than raw size.
+- **Evidence:** ~40 brands × 8 categories, plus the product-line table.
+- **Budget:** ~$67 of Apify credits for 20k listings, ~$150 for 50k (SCRAPING.md §1).
 
 ### 8.4 Timing
-- **Friday evening:** small test collection from every planned source. Go or no-go on which sources are reliable.
-- **Friday night to Saturday morning:** full collection. This leaves Saturday to build evidence tables, tune, and fix gaps.
-- **Saturday evening:** optional refresh. Keep a **backup snapshot** in case a source is blocked later.
-- **Demo day:** **never collect live.** All searches use the pre-built data.
+- **Friday evening:** a 20-item test run per marketplace. Go or no-go on each source.
+- **Friday night to Saturday morning:** full collection. This leaves Saturday to build the evidence tables, tune, and fix gaps.
+- **Demo day:** **never collect live.** All searches use the pre-built data. Keep a backup snapshot.
 
 ### 8.5 Data rules
-- Public data only. No seller or reviewer personal information is stored.
+- Public data only. No seller or reviewer personal information is stored (no usernames, no profile URLs).
 - Record the source and the collection date for every fact.
 - Some markets restrict automated access in their terms. We note this in our trust section and use only public listing data.
-- Include the demo props (specific clothes we will scan) in the catalog so the first scan is guaranteed to hit.
+- Include the demo props in the catalog so the first scan is guaranteed to hit.
 
 ---
 
@@ -186,37 +191,38 @@ Every line is clickable for its source and sample size. Anything we could not ve
 ```
  COLLECT              CLEAN & ORGANIZE          BUILD EVIDENCE
  ───────              ───────────────           ──────────────
- Market listings  ─┐   Standardize brand,        Read reviews → count
- Retail reviews   ─┼─▶ garment type, price,  ─▶  durability praise/complaints
- Community posts  ─┤   size, condition.          Summarize community opinion
- Resale sales     ─┘   Remove duplicates.        Compute resale stats (last)
+ Secondhand       ─┐   Normalize brand,          Extract materials,
+ listings (5 mkts) ├─▶ category, price,      ─▶  certifications, flags
+ Brand facts      ─┘   condition. Dedupe.        Brand table, product lines
+ (hand-curated)        Thumbs + embeddings.      Wear baselines
                                 │                       │
                                 ▼                       ▼
                         ┌──────────────┐        ┌────────────────┐
                         │   CATALOG    │        │ EVIDENCE TABLES│
-                        │ (items, photos)      │ (brand × type) │
+                        │ (listings +  │        │ (brands, lines,│
+                        │  embeddings) │        │  baselines)    │
                         └──────┬───────┘        └────────┬───────┘
                                │                         │
-   USER PHOTO ─▶ FIND GARMENTS ─▶ LOOK MATCHER ─▶ VALUE RANKER ◀┘
-                                   (close look-alikes)  (cost per wear, receipt data)
+   USER PHOTO ─▶ /detect ─▶ crop ─▶ /search: LOOK MATCHER ─▶ VALUE RANKER ◀┘
+                                         (top 50 look-alikes)  (markers, CPW, receipt)
                                                  │
                                                  ▼
-                                      WEBSITE: results + Wear Receipts
+                                  WEBSITE: sorts, slider, Wear Receipts
 ```
 
 ### The parts
 
-1. **Collectors.** Gather listings, reviews, community posts, and sale records on a schedule we control. This is where Apify is the core of the product.
-2. **Cleaner.** Makes data from different markets comparable: same brand names, garment types, currencies, and size formats. Removes junk and duplicates. Brand names are messy, and this step decides how much of the catalog can use evidence.
-3. **Evidence Builder.** Turns raw reviews and posts into the Evidence Tables. It counts and summarizes. It does not invent.
-4. **Catalog.** The searchable collection of items. It must answer: "what looks like this photo?" with optional filters (size, max price, market).
-5. **Garment Finder.** Finds each garment in the user's photo and crops it.
-6. **Look Matcher.** Returns the closest look-alike items from the Catalog.
-7. **Value Ranker.** Looks up evidence for each match, estimates expected wears and cost per wear, and produces the ordered list plus all the fields needed for each receipt.
-8. **Website.** Camera, results, sort and slider controls, receipts, the reshuffle animation.
+1. **Collectors.** Apify actors gather listings once, during the build. Apify is the core of the data layer.
+2. **Cleaner.** Makes data from different markets comparable: the same brand names, categories, currencies, and conditions. Removes junk and duplicates. Brand names are messy, and this step decides how much of the catalog can use evidence.
+3. **Evidence Builder.** Extracts materials and flags from listing text, and joins brand facts and product lines. It counts and summarizes. It does not invent.
+4. **Catalog.** The searchable collection of listings with image embeddings. It answers "what looks like this photo?" with optional filters (max price, marketplace, size, condition).
+5. **Garment Finder** (`/detect`). Finds each garment in the user's photo.
+6. **Look Matcher** (`/search`). Returns the closest look-alikes from the Catalog.
+7. **Value Ranker** (inside `/search`). Builds the three markers, expected wears, cost per wear, break-even, and every receipt line.
+8. **Website.** Camera, tabs, results, sorts and slider (computed locally), receipts, the reshuffle animation.
 
 ### One agreement the whole team keeps
-The Value Ranker returns **the same shape of data for every item**: item facts, scores, receipt lines (each with a source, sample size, and date), and a confidence level. The website is built first against **sample data in that shape**, so it never waits on the backend. Changing that shape requires a quick team huddle.
+The API contract is **`schema/api.schema.json`** (the source of truth) and **`schema/API.md`** (its explanation). Every result has the same shape: item facts, three markers, wear numbers, and receipt facts (each with a source, status, and date). The website is built against sample data in that shape, so it never waits on the backend. Changing the schema requires a quick team huddle.
 
 ---
 
@@ -224,33 +230,36 @@ The Value Ranker returns **the same shape of data for every item**: item facts, 
 
 These are product features, not extras. They support the trust criteria of our sponsor tracks.
 
-1. **No fake precision.** We never present a score as a lab measurement. We say "evidence suggests."
-2. **Show the work.** Every receipt line has a source, a sample size, and a date.
+1. **No fake precision.** We never present a score as a lab measurement. Markers show a level and their facts, never a number. We say "evidence suggests."
+2. **Show the work.** Every receipt line has a source, a status, and a date.
 3. **"Not enough evidence" is a valid answer.** We show it clearly.
 4. **Ranges, not promises.** Expected wears are ranges. Cost per wear is shown at several wear counts.
 5. **Break-even honesty.** If a cheaper option wins for the user's likely use, we say so.
-6. **No eco-grade.** We do not claim an item is "sustainable". We make one claim: how long it is likely to stay in use.
-7. **Privacy.** No personal data about sellers or reviewers. No accounts. Photos are used for the search.
+6. **Eco means facts, not a grade.** The eco marker summarizes stated facts (secondhand, recycled, deadstock, certifications, synthetic share). We never call an item "sustainable." Our one outcome claim is how long it is likely to stay in use.
+7. **Privacy.** No personal data about sellers or reviewers. No accounts. Photos are used only for the search.
 
 ---
 
 ## 11. Scope
 
 ### Must work (the golden path)
-- Photo in → garments found → look-alikes from several markets → ranked by cost per wear → Wear Receipt on each.
-- Evidence from reviews and community sources for the demo brands and garment types.
-- Sort toggle (price ↔ cost per wear) with the reshuffle animation.
-- "Not enough evidence" state.
-- Break-even line.
+- Photo in → garments found → look-alikes from several marketplaces → ranked by cost per wear → Wear Receipt on each.
+- Quality evidence from materials, product lines, and brand facts for the demo brands.
+- The three markers (cost, quality, eco) on every receipt.
+- Four sorts (cost per wear, price, look match, eco) with the reshuffle animation.
+- The "Not enough evidence" state.
+- The break-even line.
 
 ### Should work if time allows
-- Resale outlook (price-band-adjusted).
-- "Closer match ↔ better value" slider.
-- Optional "what you have" input (brand and price) to compare the item in the photo with the alternatives.
+- The "Closer match ↔ better value" slider.
+- Care-tag OCR to verify materials (SCRAPING.md §4, P1).
 
 ### Later or stretch
+- Owner-review and community evidence (these slot in as new receipt facts, with no schema change).
+- Resale outlook (price-band-adjusted).
+- Optional "what you have" input (brand and price) to compare against the alternatives.
+- New-retail listings alongside secondhand.
 - Watch a look and alert when a better cost-per-wear item appears.
-- A photo of the clothing tag to confirm brand and materials.
 - Spending limits for a buying agent and real checkout.
 - "What is my own item worth?" selling flow.
 - A wear log for real user retention data.
@@ -258,7 +267,7 @@ These are product features, not extras. They support the trust criteria of our s
 ### Not doing
 - Lab claims or testing.
 - A predicted wear count for an individual person.
-- A sustainability or eco score.
+- A sustainability grade or claim.
 - Collecting data during the demo.
 
 ---
@@ -268,13 +277,13 @@ These are product features, not extras. They support the trust criteria of our s
 | Time | Beat |
 |---|---|
 | 0:00–0:15 | **Hook.** "Every shopping agent sorts by price. Watch what happens when you sort by cost per wear." |
-| 0:15–0:45 | **Teammate scan.** A prop jacket. Results appear in seconds. Open one Wear Receipt and show the evidence lines. |
+| 0:15–0:45 | **Teammate scan.** A prop jacket. Results appear in seconds. Open one Wear Receipt and show the quality and eco facts with their sources. |
 | 0:45–1:10 | **The flip.** Toggle price → cost per wear. Cards reshuffle. "The cheapest drops to #14." Show the break-even line. |
 | 1:10–1:40 | **"Now you."** Scan a judge's clothing. Show a receipt for a look-alike of their piece. If we have thin evidence, show *"Not enough evidence yet"* and explain why that is a feature. |
-| 1:40–2:00 | **How it is built and why it matters.** Large multi-market catalog collected with Apify, evidence from real owners, a transparent receipt. Cost-per-wear framing and longer garment life as the impact. |
+| 1:40–2:00 | **How it is built and why it matters.** A multi-market secondhand catalog collected with Apify, sourced evidence, a transparent receipt. Cost-per-wear framing and longer garment life as the impact. |
 
 **Demo preparation:**
-- 2–3 props with strong evidence, already in the catalog.
+- 2–3 props with strong evidence (Carhartt Detroit jacket, Patagonia Better Sweater, Nike Dunk Low), already in the catalog.
 - Clip light and white board for the table (lighting will be bad).
 - Phone hotspot (venue wifi will be slow).
 - Cached results for the props, an upload fallback if the camera fails, and a backup demo video.
@@ -285,8 +294,9 @@ These are product features, not extras. They support the trust criteria of our s
 
 - A scan returns ranked results in about 5 seconds on pre-built data.
 - Every result has a complete receipt with real sources, or an honest "unknown" label.
-- Sanity checks pass: within the same garment type, makers widely seen as durable generally rank above makers widely seen as disposable.
-- Evidence exists for every brand in the demo.
+- Sanity checks pass: within the same category, makers widely seen as durable generally rank above makers widely seen as disposable.
+- Every demo brand has a row in the brands table.
+- The demo props return themselves in the top 3.
 - The sort flip works smoothly on a phone and a laptop.
 - Nothing in the product claims more than the evidence supports.
 
@@ -296,14 +306,13 @@ These are product features, not extras. They support the trust criteria of our s
 
 | Risk | Fallback |
 |---|---|
-| A market blocks collection | Use a second tool for that market. Collect early and keep a backup snapshot. |
-| Review sources are thin for some brands | Show "Not enough evidence". Focus evidence work on demo brands and garment types first. |
-| Brand names are messy in listings | Invest early in the Cleaner. Group by brand and garment type, not exact titles. |
-| Quality evidence feels subjective | Show raw counts and sources. Use only evidence we can trace. |
-| Quality-first only surfaces expensive items | Show break-even wears. Keep the match-closeness gate. Compare against the "typical match", not against an ideal. |
-| Venue wifi is slow | Small cached index, cached prop results, phone hotspot. |
+| A market blocks collection | Use the fallback actor for that market (SCRAPING.md §1). Collect early and keep a backup snapshot. |
+| Few listings state materials | Add material-rich queries. Lean on product lines and brand facts. Show "Not enough evidence". |
+| Brand names are messy in listings | Invest early in the Cleaner. Group by brand and category, not exact titles. |
+| Quality evidence feels subjective | Show the facts, with their status and sources. Use only evidence we can trace. |
+| Quality-first only surfaces expensive items | Show break-even wears. Keep the similarity cutoff. Compare against the "typical match", not against an ideal. |
+| Venue wifi is slow | Sorting is local. Small cached index, cached prop results, phone hotspot. |
 | Camera fails | Upload fallback. |
-| Resale numbers look too good for cheap items | Compare within price bands. If unsure, leave resale out. |
 
 ---
 
@@ -312,34 +321,43 @@ These are product features, not extras. They support the trust criteria of our s
 - **Event:** Cal Hacks 13.0 · Fri Oct 23 – Sun Oct 25, 2026 · Palace of Fine Arts, San Francisco.
 - **Key times:** Hacking starts about 6 PM Friday. **Submission is due 9 AM Sunday.** Judging is 10:30 AM–12:30 PM Sunday, and the whole team must be at the table. All work must start during the event.
 - **Primary track, Reimagining Shopping (Visa):** shopping that optimizes value over time instead of the lowest price. The Wear Receipt gives users transparency and trust. If the sponsor offers access, a controlled-spending agent can be added as a stretch.
-- **Data track (Apify):** Apify is the data layer. We could also publish a reusable Actor (for example, brand durability evidence from reviews).
+- **Data track (Apify):** Apify is the data layer. We could also publish a reusable Actor (for example, material and brand-fact extraction from listings).
 - **Planet track:** the goal is longer garment life. We make it visible and comparable, without claims we cannot back up.
 - **Questions to ask sponsors on Friday:** How many tracks can one project enter? Can we get Apify credits for about 50,000 records? Are there marketplace tools they recommend or warn against? Is there any sandbox access for a spending-limits stretch?
 
 ---
 
-## 16. Workstreams (suggested)
+## 16. Workstreams
 
-| Workstream | Owns | Suggested owner |
+| Workstream | Owns | Owner |
 |---|---|---|
-| **Data collection and cleaning** | Collectors, cleaning, the Catalog | Andy |
-| **Evidence and ranking** | Evidence Builder, expected wears, cost per wear, Value Ranker | Anthony |
-| **Matching** | Garment Finder, Look Matcher | Anthony (with Andy) |
-| **Web experience** | Camera, results, receipts, sort flip, animation | Tristan |
+| **Data collection and cleaning** | Collectors, cleaning, extraction, the Catalog (`backend/pipeline`, `backend/database`) | Andy |
+| **Evidence and ranking** | Brand table, product lines, wear baselines, markers, cost per wear, Value Ranker | Anthony |
+| **Matching** | Garment Finder, Look Matcher (`backend/ml`) | Anthony (with Andy) |
+| **API contract** | `schema/`: any change needs a huddle | Anthony + Tristan |
+| **Web experience** | Camera, results, sorts, slider, receipts, animation (`web/`) | Tristan |
 | **Story and demo** | Pitch, props, video, submission write-up, sanity-check examples | Haram |
 
-Work in separate areas. Agree on the data shape first (section 9). Build the website against sample data from the start.
+Work in separate areas. Build the website against sample data in the schema's shape from the start.
 
 ---
 
-## 17. Open decisions
+## 17. Decisions
 
+### Made
+- [x] Markets: Depop, Poshmark, Grailed, Mercari, eBay, US only (subject to the Friday test).
+- [x] 8 categories and ~40 curated brands.
+- [x] Three markers (cost, quality, eco) + cost per wear. Eco is facts, not a grade.
+- [x] v1 evidence = materials, product lines, brand facts. Reviews and community are stretch.
+- [x] Resale is not in v1.
+- [x] "What you have" comparison is stretch.
+- [x] Secondhand only in v1.
+- [x] API contract: `schema/api.schema.json` (FastAPI backend, Python 3.12).
+
+### Open
 - [ ] Product name.
-- [ ] Which 5 garment types to cover, and which 100–200 brands.
-- [ ] Which markets and sources pass the Friday test.
-- [ ] Baseline expected wears per garment type, and the assumptions we label.
-- [ ] Whether resale makes it into the first version.
-- [ ] Whether we include the optional "what you have" comparison.
+- [ ] Expected-wear baselines per category and their labeled assumptions: Anthony, in `backend/ml/wear_baselines.yaml`.
+- [ ] Mocks strategy and receipt image gallery: Tristan (`schema/API.md` §5).
 - [ ] Whether a spending-limits agent is in scope for the Visa track.
 
 ---
@@ -351,6 +369,6 @@ Work in separate areas. Agree on the data shape first (section 9). Build the web
 - WRAP: nine extra months of use cuts footprints by about 20–30% — https://sustainablebrands.com/read/behavior-change/trending-while-wrap-scottish-designers-tout-merits-of-durable-fashion-mango-has-a-different-idea
 - Yale study on secondhand and overconsumption — https://news.yale.edu/2025/12/08/second-thoughts-secondhand-why-resale-market-expanding-fashions-carbon-footprint
 - EU test of fiber labels (37% inaccurate) — https://www.eureporter.co/business/consumers-2/2026/06/22/inaccurate-clothing-labels-a-systemic-issue-eu-testing-finds/
-- Lower-priced goods retain more of their price in resale (why we compare within price bands) — https://proceedings.emac-online.org/pdfs/A2025-125270.pdf
+- Lower-priced goods retain more of their price in resale (why resale must compare within price bands) — https://proceedings.emac-online.org/pdfs/A2025-125270.pdf
 - Resale price falls faster than measured jacket performance (price tracks looks) — https://xreiss.efri.uniri.hr/article.php?id=23529
 - Review-based quality and durability analysis for fashion goods — https://www.climatechange.ai/blog/2024-01-27-absa-article

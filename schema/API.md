@@ -19,8 +19,10 @@ Decided in the interview on Fri Oct 23, 2026.
 | Ranking | The backend computes every number (expected wears, CPW, break-even). The **client** sorts and applies the slider locally, with no extra calls. |
 | Result set | A fixed top 50 with no paging. Items below the similarity cutoff are dropped, so the list may be empty. |
 | Receipt | Embedded in each search result. There is no per-item endpoint. |
-| Evidence in v1 | Listing materials (SCRAPING.md §4) and brand facts (the curated `brands` table). There are no owner reviews or community counts yet. |
-| Money | Integer cents, USD only (the index is US-only). |
+| Evidence in v1 | Listing materials (backend/pipeline/SCRAPING.md §4) and brand facts (the curated `brands` table). There are no owner reviews or community counts yet. |
+| Money | Integer cents, USD only (the index is US-only, secondhand marketplaces only). |
+| Not in v1 | Resale, owner reviews, community evidence, "what you have" input. Reviews/community will arrive as new `fact.kind`s with no schema change. |
+| Backend models | Pydantic models are hand-written in `backend/src/backend/`. A pytest validates real responses against `api.schema.json`. Python 3.12. |
 
 ## 1. Endpoints
 
@@ -87,7 +89,7 @@ Any non-2xx response has the body `{"error": {"code": "...", "message": "..."}}`
 ```json
 {
   "query": {"category": "jackets_outerwear", "filters": {}},
-  "typical": {"price_cents": 6500, "expected_wears_mid": 60, "cpw_cents": 108},
+  "typical": {"price_cents": 4000, "expected_wears_mid": 60, "cpw_cents": 67},
   "results": [ /* Result × 0–50 */ ]
 }
 ```
@@ -156,7 +158,7 @@ on the receipt and the reference for `break_even_wears`. It is `null` when `resu
     "expected_wears": {"low": 120, "high": 200, "mid": 160},
     "basis": "evidence_adjusted",
     "cpw_cents": {"at_30": 160, "at_60": 80, "at_100": 48, "at_mid": 30},
-    "break_even_wears": 45
+    "break_even_wears": 72
   },
 
   "confidence": "high",
@@ -190,7 +192,7 @@ on the receipt and the reference for `break_even_wears`. It is `null` when `resu
   `supplier_list`, `secondhand`, `recycled`, `deadstock`, `animal_materials`,
   `synthetic_share`, `country_of_manufacture`). The frontend should render any unknown
   `kind` generically using `label` + `value`.
-- The seller block never contains a username, profile URL or full location (SCRAPING.md §3).
+- The seller block never contains a username, profile URL or full location (backend/pipeline/SCRAPING.md §3).
 
 ## 3. Client-side sorting
 
@@ -212,7 +214,7 @@ The "cheapest match drops to #N" headline is computed by the client.
 
 - `marketplace`: `depop poshmark grailed mercari ebay`
 - `category`: `jackets_outerwear hoodies_sweatshirts tshirts sneakers jeans_pants
-  sweaters_knitwear shirts dresses_skirts` (the 8 categories in SCRAPING.md §2)
+  sweaters_knitwear shirts dresses_skirts` (the 8 categories in backend/pipeline/SCRAPING.md §2)
 - `condition`: `new_with_tags like_new good fair` (`null` if it can't be mapped)
 - `level` / `confidence`: `high medium low unknown`
 - `seller.type`: `individual small_shop large_reseller`

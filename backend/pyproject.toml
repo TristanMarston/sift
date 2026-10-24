@@ -1,9 +1,9 @@
 [project]
 name = "backend"
 version = "0.1.0"
-description = "Add your description here"
+description = "Sift backend: pipeline, ranking, API"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = []
 
 [project.scripts]
