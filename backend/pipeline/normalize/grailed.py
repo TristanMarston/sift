@@ -26,4 +26,5 @@ def map_item(raw: dict, category: str, scraped_at) -> Normalized:
         cost=make_cost(raw.get("price"), shipping=us.get("amount") if us.get("enabled") else None,
                        original=max(drops, default=None)),
         seller=dict(type=seller_type(count), rating=round(rating, 2) if rating is not None else None,
-                    region=normalize_region(profile.get("country_code") or raw.get("location")), listing_count=count))
+                    region=normalize_region(profile.get("country_code") or raw.get("location")), listing_count=count),
+        specifics={"Styles": ", ".join(raw["styles"])} if raw.get("styles") else {})

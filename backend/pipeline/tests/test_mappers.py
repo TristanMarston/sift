@@ -132,6 +132,11 @@ def test_grailed_free_shipping_no_markdown_and_foreign_seller_kept():
     assert (n.seller.region, n.condition) == ("CN", "like_new")
 
 
+def test_grailed_style_tags_are_passed_on_for_the_vintage_flag():
+    assert mapped("grailed", 0, styles=["vintage", "gorpcore"]).specifics == {"Styles": "vintage, gorpcore"}
+    assert mapped("grailed", 0, styles=[]).specifics == {}
+
+
 def test_grailed_without_us_shipping_has_unknown_shipping():
     n = mapped("grailed", 0, shipping={"us": {"amount": 20, "enabled": False}})
     assert n.cost.shipping_cents is None and n.cost.total_cents == 8500

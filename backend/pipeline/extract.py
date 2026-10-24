@@ -23,10 +23,13 @@ _PCT = re.compile(rf"(?<![\d.])(\d{{1,3}}(?:\.\d+)?)\s*%\s*(organic\s+|recycled\
 _BARE_RE = re.compile(rf"\b(organic\s+|recycled\s+)?({_BARE})\b", re.I)
 # A dedicated material field is unambiguous, so there "leather", "down" and "poly" are fibers too.
 _BARE_FIELD_RE = re.compile(rf"\b(organic\s+|recycled\s+)?({_BARE}|leather|down|poly)\b", re.I)
+_DOWN = re.compile(r"(?<!button )(?<!button-)\b(?:down\s+(?:jacket|coat|vest|parka|puffer|hooded|hoodie|sweater|fill(?:ed)?|"
+                   r"insulat\w+)|(?:goose|duck|feather)\s+down|down-filled)\b", re.I)
 _FAUX_LEATHER = re.compile(r"\b(?:vegan|faux|synthetic)\s+leather\b", re.I)
 _REAL_LEATHER = re.compile(r"\b(?:genuine|real|full[- ]grain|top[- ]grain)\s+leather\b", re.I)
 _SYNTHETIC = {"polyester", "nylon", "acrylic", "elastane"}
 # Structured specifics we trust for composition. Lining and insulation are left out: they would add up past 100%.
+FLAG_KEYS = ("styles", "style", "era")
 MATERIAL_KEYS = ("material", "outer shell material", "fabric type", "fabric", "composition")
 
 _CERTS = {
@@ -80,6 +83,9 @@ def parse_fibers(text: str, field: bool = False) -> tuple[list[Fiber], str]:
     text = _PCT.sub(" ", text)
     for m in _REAL_LEATHER.finditer(text):
         add("leather", None, "", m[0])
+    for m in _DOWN.finditer(text):
+        if "down" not in {f.fiber for f in out}:
+            add("down", None, "", m[0])
     for m in (_BARE_FIELD_RE if field else _BARE_RE).finditer(text):
         if _CANON.get(m[2].lower(), m[2].lower()) not in {f.fiber for f in out}:
             add(m[2], None, m[1] or "", m[0])
@@ -138,9 +144,17 @@ def extract(n: Normalized, lines: list[ProductLine] = PRODUCT_LINES) -> Listing:
                 certs[cert] = snippet
                 note("materials.certifications", "claimed", source, snippet)
 
-    flags = _hits(_FLAGS, text)
-    for flag, snippet in flags.items():
-        note(f"flags.{flag}", "claimed", "listing_text", snippet)
+    # Flags come from the title and structured style fields only: descriptions carry shop-wide boilerplate
+    # ("especially for pre-owned or vintage goods") that says nothing about this item.
+    flags = {}
+    for source, where in (("listing_text", n.title), ("specifics", " ".join(spec.get(k, "") for k in FLAG_KEYS))):
+        for flag, snippet in _hits(_FLAGS, where).items():
+            if flag not in flags:
+                flags[flag] = snippet
+                note(f"flags.{flag}", "claimed", source, snippet)
+    if spec.get("vintage", "").lower() in {"yes", "true"} and "is_vintage" not in flags:
+        flags["is_vintage"] = "Vintage: Yes"
+        note("flags.is_vintage", "claimed", "specifics", "Vintage: Yes")
 
     cost = n.cost.model_dump()
     if cost["retail_price_cents"] is None and (m := _RETAIL.search(text)):

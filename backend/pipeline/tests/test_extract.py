@@ -55,6 +55,14 @@ def test_percent_compositions(text, expected):
     ("Cotton On tee", []),
     ("silk screen graphic tee", []),
     ("button down shirt", []),
+    ("The North Face Down Jacket", [("down", None, None, None)]),
+    ("Nuptse Down Vest", [("down", None, None, None)]),
+    ("Himalayan Down Hooded Puffer", [("down", None, None, None)]),
+    ("700 fill goose down", [("down", None, None, None)]),
+    ("High-fill down insulation", [("down", None, None, None)]),
+    ("button down jacket", []),
+    ("button-down jacket", []),
+    ("walked down the street", []),
     ("vegan leather jacket", [("synthetic_leather", None, None, None)]),
     ("faux leather pants", [("synthetic_leather", None, None, None)]),
     ("genuine leather jacket", [("leather", None, None, None)]),
@@ -125,8 +133,25 @@ def test_certifications(text, expected):
     ("plain tee", False, False, False),
 ])
 def test_flags(text, vintage, deadstock, upcycled):
-    f = ex(text).flags
+    f = X.extract(norm(title=text)).flags
     assert (f.is_vintage, f.is_deadstock, f.is_upcycled) == (vintage, deadstock, upcycled)
+
+
+def test_shop_boilerplate_in_the_description_does_not_make_an_item_vintage():
+    boilerplate = "We curate authentic vintage and archive pieces. Wear is normal for pre-owned/vintage items."
+    out = ex(boilerplate, title="Nike windbreaker")
+    assert not out.flags.is_vintage and all(e.field != "flags.is_vintage" for e in out.evidence)
+
+
+@pytest.mark.parametrize("specifics, vintage", [
+    ({"Vintage": "Yes"}, True), ({"Vintage": "No"}, False), ({"Styles": "gorpcore, vintage"}, True),
+    ({"Styles": "gorpcore"}, False), ({}, False),
+])
+def test_structured_vintage_signals(specifics, vintage):
+    out = X.extract(norm(title="Nike windbreaker", specifics=specifics))
+    assert out.flags.is_vintage is vintage
+    if vintage:
+        assert [(e.status, e.source) for e in out.evidence if e.field == "flags.is_vintage"] == [("claimed", "specifics")]
 
 
 @pytest.mark.parametrize("text, cents", [
@@ -171,7 +196,7 @@ def test_product_line_matches_on_brand_and_title():
 # --- extract() ------------------------------------------------------------------------------
 
 def test_extract_from_description_records_claimed_evidence():
-    out = X.extract(norm(title="Nike tee", description="Soft. 100% cotton. Vintage. Retails for $40. Made in Mexico"))
+    out = X.extract(norm(title="Vintage Nike tee", description="Soft. 100% cotton. Retails for $40. Made in Mexico"))
     assert isinstance(out, Listing)
     assert [(f.fiber, f.pct) for f in out.materials.fibers] == [("cotton", 100)]
     assert out.materials.synthetic_share == 0
