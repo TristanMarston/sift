@@ -139,6 +139,7 @@ def query(photo: str, name: str = "test", k: int = 10, category: str = ""):
 
 
 @app.function(image=api_image, volumes={"/vol": vol}, cpu=2, memory=4096, timeout=60, scaledown_window=600,
+              region="us-west", routing_region="us-west",   # the demo is in Berkeley; the volume is read once per cold start
               min_containers=int(os.getenv("SIFT_MIN_CONTAINERS", "0")),
               # SIFT_HAIKU=1: /detect names and splits garments with Claude Haiku. Needs the Modal secret once:
               #   modal secret create sift-anthropic ANTHROPIC_API_KEY=...
