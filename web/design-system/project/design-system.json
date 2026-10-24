@@ -1,0 +1,17 @@
+{
+  "v": 3,
+  "layout": "files",
+  "createdOnFiles": { "v": 1, "at": "2026-10-23T06:32:02Z" },
+  "title": "Sift",
+  "namespace": "Sift",
+  "libraries": [
+    { "name": "react", "version": "18.3.1", "global": "React", "file": "components/lib/react.production.min.js" },
+    { "name": "react-dom", "version": "18.3.1", "global": "ReactDOM", "file": "components/lib/react-dom.production.min.js" }
+  ],
+  "sections": {},
+  "groups": [],
+  "assetGroups": {},
+  "blobs": {},
+  "docs": { "sections": [] },
+  "lastChange": { "by": "Tristan", "at": "2026-10-23T06:32:02Z", "via": "Claude Code", "note": "Created the Sift design system from the /web components" }
+}
