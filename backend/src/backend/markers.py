@@ -37,6 +37,7 @@ DURABLE = {
 FABRIC = {"denim": "cotton", "corduroy": "cotton", "chambray": "cotton", "canvas": "cotton", "suede": "leather",
           "nubuck": "leather"}
 _FABRIC_RE = re.compile(r"\b(denim|corduroy|chambray|canvas|suede|nubuck)\b", re.I)
+_SHOE_RE = re.compile(r"\b(denim|canvas|suede|nubuck|leather)\b", re.I)   # a sneaker title's "leather" is its upper
 FLAGS = [("is_vintage", "vintage", "Vintage", "Already had a first life"),
          ("is_deadstock", "deadstock", "Deadstock", "Old unsold stock, never worn"),
          ("is_upcycled", "upcycled", "Upcycled", "Remade from existing garments")]
@@ -113,11 +114,12 @@ def quality(row: dict, brands: dict) -> tuple[dict, list[dict]]:
             points -= 1
             scored.append(f)
     as_of = row["scraped_at"][:10]
-    if not fibers and (m := _FABRIC_RE.search(row["title"] or "")):
-        fabric, fiber = m[0].lower(), FABRIC[m[0].lower()]
+    if not fibers and (m := (_SHOE_RE if row["category"] == "sneakers" else _FABRIC_RE).search(row["title"] or "")):
+        fabric, fiber = m[0].lower(), FABRIC.get(m[0].lower(), m[0].lower())
         good, _ = DURABLE.get(row["category"], (set(), 101))
         if fiber in good:
-            f = _fact("fabric", "Fabric", f"{fabric.capitalize()} ({fiber})", as_of=as_of, snippet=m[0])
+            value = fabric.capitalize() if fabric == fiber else f"{fabric.capitalize()} ({fiber})"
+            f = _fact("fabric", "Fabric", value, as_of=as_of, snippet=m[0])
             facts.append(f)
             scored.append(f)
             points += 1

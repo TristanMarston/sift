@@ -232,3 +232,12 @@ def test_a_fabric_named_in_the_title_counts_when_it_implies_a_fiber_that_suits_t
     assert [f["kind"] for f in q["facts"]] == ["fabric"]           # the title names it once; the description does not add
     q, _ = M.quality(row(category="jeans_pants", title="Grey sweatpants", description="goes with denim jackets"), {})
     assert q["facts"] == []                                        # only the title counts: descriptions mention other clothes
+
+
+def test_sneakers_named_leather_in_the_title_get_the_fiber_point(row):
+    """Sneaker titles say "leather" plainly (no trims or patches to confuse, unlike jeans); 81% of sneakers had no
+    quality evidence at all."""
+    q, _ = M.quality(row(category="sneakers", title="Nike Air Force 1 '07 white leather"), {})
+    assert q["level"] == "medium" and q["facts"][0]["value"] == "Leather"
+    q, _ = M.quality(row(category="jeans_pants", title="Levi's 501 with leather patch"), {})
+    assert q["facts"] == []
