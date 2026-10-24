@@ -31,6 +31,10 @@ Longer background: [`SPEC.md`](SPEC.md) (decisions, costs, test-run results) and
                        ▼
                   04_report ────▶ REPORT.md                                 coverage per marketplace and
                                                                             the acceptance checklist
+                       │
+                       ▼
+                  05_embed ─────▶ data/index/                               one image vector per active
+                  FashionSigLIP     embeddings.npy + rows.jsonl             listing: what /search loads
 ```
 
 Each step reads the previous step's file, so you can rerun any step without repeating the earlier ones.
@@ -51,12 +55,15 @@ uv run python pipeline/01_scrape.py --test         # go/no-go: 20 items per mark
 uv run python pipeline/02_normalize.py --test
 uv run python pipeline/03_extract.py --test
 uv run python pipeline/04_report.py --test --min-rows 80
+uv run python pipeline/05_embed.py --test           # needs the model weights; downloads one small photo per row
+uv run python pipeline/06_query.py some_photo.jpg --test   # eyeball the top matches
 
 # the real run (spends money; start it in the background, it takes a while; progress goes to scrape.log)
 uv run python pipeline/01_scrape.py --max-spend 125 > scrape.log 2>&1 &
 uv run python pipeline/02_normalize.py
 uv run python pipeline/03_extract.py
 uv run python pipeline/04_report.py                # writes pipeline/REPORT.md
+uv run python pipeline/05_embed.py                 # resumable; rerun after a crash
 ```
 
 `--test` makes every step work in `pipeline/data/test/` instead of `pipeline/data/`, so a test run never mixes
@@ -135,6 +142,21 @@ median price, plus the acceptance checklist (≥ 20,000 active rows, ≥ 4 marke
 material, ≥ 10% percentages, the three demo props present, a region on every row). `--min-rows` changes the
 row target for small test runs.
 
+### 05 · Embed — `05_embed.py` (logic in `embed_index.py`)
+
+Builds the search index from `listings.jsonl`. For each **active** listing it downloads the first photo (the second
+if the first fails), asking each CDN for a small variant that is still ≥ 224 px (Depop `P5`, Poshmark `s_`,
+Grailed `?w=320`, eBay as is: about 10× fewer bytes than the originals, with a fallback to the original URL). It
+embeds the photos with `backend.embed` (Marqo-FashionSigLIP, 768-d unit vectors) and writes `data/index/`:
+`embeddings.npy` (row *i* ↔ line *i* of `rows.jsonl`), `rows.jsonl` and `manifest.json` (model, count, stats).
+
+- **Resumable.** Finished chunks of 512 are saved in `data/index/parts/`. A rerun skips them, retries listings whose
+  photos failed, and picks up new listings.
+- **Network-bound.** Photo downloads dominate (≈10 s each on venue wifi, 32 in parallel). Run the full 20k on a
+  fast connection.
+- `src/backend/index.py` loads `data/index/` for `/search`: exact cosine search plus the API filters.
+- `06_query.py photo.jpg` prints the top matches for a photo, as a quick check.
+
 ## Inputs
 
 | Input | What it is |
@@ -172,6 +194,7 @@ data/
   raw/<marketplace>/<run_id>.jsonl   the actors' records, seller identity removed
   normalized.jsonl               step 02: one row per listing
   listings.jsonl                 step 03: the final catalog
+  index/                         step 05: embeddings.npy, rows.jsonl, manifest.json, parts/ (resume state)
   test/                          the same layout for --test runs
 REPORT.md                        step 04 (committed with the PR)
 ```
@@ -294,7 +317,7 @@ that is not mirrored in `listing.py` fails a test.
   feedback are large resellers).
 - Material coverage depends on the queries. The first test (one generic jacket query) gave 41% with a stated material
   and 6% with percentages; the material-rich queries are meant to lift that. Check `REPORT.md` after the run.
-- Not built yet: thumbnails, image embeddings, the Supabase upload, care-tag OCR, the LLM fallback for odd material
+- Not built yet: hosted thumbnails, the Supabase upload, care-tag OCR, the LLM fallback for odd material
   text, sold-price comps, and the hand-curated brand facts table.
 - Scraping marketplaces may break their terms of service (Poshmark prohibits automated collection). We use public
   listing data only, store no seller identity and link out.

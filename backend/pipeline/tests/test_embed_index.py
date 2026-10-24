@@ -73,6 +73,34 @@ def test_only_the_first_two_photos_are_tried(tmp_path):
     assert calls == urls[:2]
 
 
+def test_small_url_asks_each_cdn_for_a_small_variant():
+    assert E.small_url("https://media-photos.depop.com/b1/1/2_ab/P0.jpg") == "https://media-photos.depop.com/b1/1/2_ab/P5.jpg"
+    assert (E.small_url("https://di2ponv0v5otw.cloudfront.net/posts/2026/10/11/x/l_abc.jpg")
+            == "https://di2ponv0v5otw.cloudfront.net/posts/2026/10/11/x/s_abc.jpg")
+    assert (E.small_url("https://media-assets.grailed.com/prd/listing/temp/abc")
+            == "https://media-assets.grailed.com/prd/listing/temp/abc?w=320")
+    for same in ["https://i.ebayimg.com/images/g/x/s-l400.jpg", "https://media-assets.grailed.com/a?w=800",
+                 "https://img.example/1.jpg"]:
+        assert E.small_url(same) == same
+
+
+def test_falls_back_to_the_original_when_the_small_variant_fails(tmp_path):
+    calls = []
+    fetch = fake_fetch(calls)
+
+    def only_original(url):
+        if url.endswith("P5.jpg"):
+            calls.append(url)
+            raise OSError("404")
+        return fetch(url)
+
+    write_listings(tmp_path / "listings.jsonl", [listing(1, image_urls=["https://media-photos.depop.com/b1/1/2/P0.jpg"])])
+    E.build_index(tmp_path / "listings.jsonl", tmp_path / "index", only_original, fake_embed, dim=DIM)
+    _, rows, _ = load(tmp_path)
+    assert [r["id"] for r in rows] == ["depop:1"]
+    assert calls == ["https://media-photos.depop.com/b1/1/2/P5.jpg", "https://media-photos.depop.com/b1/1/2/P0.jpg"]
+
+
 def test_invalid_lines_are_counted_not_fatal(tmp_path):
     write_listings(tmp_path / "listings.jsonl", [listing(1), {"id": "nope"}], junk=1)
     stats = build(tmp_path)
