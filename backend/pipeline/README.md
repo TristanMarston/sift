@@ -353,10 +353,13 @@ that is not mirrored in `listing.py` fails a test.
 
 - `seller.region` mixes formats: `US` for any US place, otherwise whatever the marketplace reports (a code like `CN`
   from Grailed, a name like `China` from eBay).
-- Poshmark gives no condition, so it is null. Depop gives no shipping and no seller details. Mercari gives no color.
-- Sellers sometimes put the wrong category on an item; a mislabeled item passes through. A tank top under a
-  `Shirts` or `Tops & blouses` parent (Poshmark men's, Mercari women's) is filed as a shirt; eBay's and Poshmark
-  women's tank tops and crop tops are dropped.
+- Poshmark's actor gives no condition and no shipping, so both are null (poshmark.com shows both on the listing page).
+  Depop gives no shipping and no seller details. Mercari gives no color.
+- Sellers sometimes put the wrong category on an item; a mislabeled item passes through (a tee filed as `Blouses`
+  is a shirt). Tank tops, camis, crop tops, jumpsuits and rompers are dropped on every marketplace, also when their
+  parent is one of ours (`Tops & blouses > Tank, cami`, `Pants & Jumpsuits > Jumpsuits & Rompers`). Depop calls a tank
+  top a `vest`; under its `tops` group that is not a jacket.
+- A Poshmark item with only a generic parent (`Women > Tops`, no subcategory) is dropped as `unmapped_category`.
 - Grailed resellers cross-list one item as several listings (same title and price, different ids). Deduping by id
   cannot catch this; it needs image-based dedupe later.
 - The duplicate counts in `run_report.md` ignore rows from earlier invocations of step 01 (step 02 still dedupes
