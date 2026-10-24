@@ -54,3 +54,8 @@ def test_time_limited_first_buyer_guarantees_stay_out():
     # they almost never reach a secondhand buyer, and a guarantee adds +2 quality to every item of the brand
     names = {b["name"] for b in BRANDS}
     assert not names & {"Nike", "Smartwool", "KÜHL"} and all("guarantee" not in b for b in BRANDS if b["name"] == "L.L.Bean")
+
+
+def test_patagonia_is_a_b_corp():
+    pat = ranker.load_config().brands[markers.brand_key("Patagonia")]
+    assert "b_corp" in {c["name"] for c in pat["certifications"]}

@@ -35,6 +35,9 @@ brands:
     # "We guarantee everything we make." (fetched 2026-10-24)
     guarantee: {value: "Ironclad Guarantee on everything it makes", url: "https://www.patagonia.com.au/pages/ironclad-guarantee"}
     certifications:
+      # B Lab's directory lists Patagonia, Inc. as a Certified B Corporation (active): opened by Anthony on 2026-10-24;
+      # bcorporation.net blocks automated fetches, so the page was read by hand.
+      - {name: b_corp, url: "https://www.bcorporation.net/en-us/find-a-b-corp/company/patagonia-inc/"}
       # "PATAGONIA USA" (fetched 2026-10-24)
       - {name: bluesign, url: "https://www.bluesign.com/wp-content/uploads/2026/09/bluesign-System-Partner-list-Brands_2026.09.01.pdf"}
     as_of: 2026-10-24

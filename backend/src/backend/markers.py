@@ -16,6 +16,8 @@ CONSTRUCTION = re.compile(
     r"chain[- ]?stitch(?:ed)?|full[- ]grain(?: leather)?|goodyear[- ]welt(?:ed)?|gore-?tex|ripstop|"
     r"waxed (?:cotton|canvas)|boiled wool|heavyweight)\b", re.I)
 ANIMAL = {"wool", "cashmere", "alpaca", "mohair", "silk", "leather", "down"}
+NATURAL = ANIMAL | {"cotton", "linen", "hemp"}   # viscose and lyocell are regenerated, not natural
+NATURAL_SHARE = 95
 CERT_LABEL = {"gots": "GOTS", "oeko_tex": "OEKO-TEX", "bluesign": "bluesign", "fair_trade": "Fair Trade",
               "rws": "Responsible Wool Standard", "rds": "Responsible Down Standard", "b_corp": "B Corp"}
 # Fibers that suit each category, and the share needed (0 = any amount, used when pct is unknown).
@@ -147,6 +149,15 @@ def eco(row: dict, brands: dict) -> dict:
         facts.append(_fact("certification", "Certification", CERT_LABEL.get(c, c),
                            source="brand_table" if url else "listing_text", source_url=url, as_of=when))
     points += min(2, len(certs))
+    fibers = m["fibers"]
+    known = [f for f in fibers if f["pct"] is not None]
+    natural = (sum(f["pct"] for f in known if f["fiber"] in NATURAL) >= NATURAL_SHARE if known
+               else bool(fibers) and all(f["fiber"] in NATURAL for f in fibers))
+    if natural:  # the mirror of the synthetic-share penalty; the fact states the fibers, never "sustainable"
+        e = _evidence(row, "materials.fibers") or {}
+        facts.append(_fact("natural_fibers", "Natural fibers", _composition(fibers), status=e.get("status", "claimed"),
+                           source=e.get("source", "listing_text"), as_of=e.get("as_of", as_of), snippet=e.get("snippet")))
+        points += 1
     if (m["synthetic_share"] or 0) > SYNTHETIC_LIMIT:
         facts.append(_fact("synthetic_share", "Synthetic fibers", f"{m['synthetic_share']:g}% synthetic", as_of=as_of))
         points -= 1
