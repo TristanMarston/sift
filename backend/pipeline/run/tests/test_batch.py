@@ -41,6 +41,23 @@ def test_a_marketplace_with_no_queries_left_gives_its_share_to_the_others():
     assert {mp: l.rows for mp, l in B.plan_batch(cfg(), used_up, 400).items()} == {"depop": 400}
 
 
+def test_a_cheap_marketplaces_share_never_buys_expensive_rows():
+    """Depop ($0.001 a row) runs out first. Its share must not turn into eBay ($0.005) or Grailed ($0.012) rows: a
+    5,000-row batch would cost 45% more, and Grailed's cut of the money would climb from 31% to 55% as the cheap
+    marketplaces ran dry. Freed rows go only to marketplaces no dearer per row; otherwise they stay unspent."""
+    depop_done = [ran("depop", c, q, items=10) for c, q in (("tshirts", "t1"), ("tshirts", "t2"), ("tshirts", "t3"),
+                                                            ("sneakers", "s1"), ("sneakers", "s2"))]
+    assert {mp: l.rows for mp, l in B.plan_batch(cfg(), depop_done, 400).items()} == {"ebay": 100}
+
+
+def test_a_dear_marketplaces_share_goes_to_the_cheaper_ones_only():
+    q = {"tshirts": {"depop": [("t1", 100)], "ebay": [("e1", 50)], "grailed": [("g1", 50)]}}
+    three = S.Config({"depop": 600, "ebay": 300, "grailed": 300}, q)
+    ebay_done = [ran("ebay", "tshirts", "e1", items=10)]
+    assert {mp: l.rows for mp, l in B.plan_batch(three, ebay_done, 1200).items()} == {"depop": 900, "grailed": 300}
+    assert {mp: l.rows for mp, l in B.plan_batch(three, [], 1200).items()} == {"depop": 600, "ebay": 300, "grailed": 300}
+
+
 def test_a_zero_quota_keeps_a_marketplace_out_of_batches():
     assert list(B.plan_batch(cfg({"depop": 900, "ebay": 0}), [], 400)) == ["depop"]
     assert B.plan_batch(cfg({"depop": 0, "ebay": 0}), [], 400) == {}
