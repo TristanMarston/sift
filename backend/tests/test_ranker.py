@@ -131,3 +131,10 @@ def test_load_config_reads_the_repo_files():
     assert set(cfg.baselines["categories"]) == {"tshirts", "hoodies_sweatshirts", "shirts", "sweaters_knitwear",
                                                 "jeans_pants", "jackets_outerwear", "sneakers", "dresses_skirts"}
     assert isinstance(cfg.brands, dict)
+
+
+@pytest.mark.parametrize("sim, band", [(0.95, "exact"), (0.9, "exact"), (0.8986, "close"), (0.8, "close"), (0.72, "similar")])
+def test_three_match_bands(sim, band):
+    """0.90 and 0.72 both read "similar" before; a 0.80-0.90 match looks like the same garment in another colour or
+    cut, so it gets its own band."""
+    assert R.band(sim) == band

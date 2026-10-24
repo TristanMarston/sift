@@ -89,7 +89,7 @@ export function ReceiptSheet({ r, typical, onClose }: Props) {
                             <h2 className='line-clamp-3 type-headline text-pretty'>{r.title}</h2>
                             <p className='type-footnote text-muted-foreground'>{marketLine(r)}</p>
                             <p className='type-footnote text-muted-foreground'>
-                                {Math.round(r.match.similarity * 100)}% look match{r.match.band === 'exact' ? ' · Exact match' : ''}
+                                {Math.round(r.match.similarity * 100)}% look match{r.match.band === 'exact' ? ' · Exact match' : r.match.band === 'close' ? ' · Close match' : ''}
                             </p>
                             <p className='mt-auto flex items-baseline gap-1.5'>
                                 <span className='font-serif text-[34px] leading-9 tracking-tight tabular'>{perWearText(w.cpw_cents.at_mid)}</span>

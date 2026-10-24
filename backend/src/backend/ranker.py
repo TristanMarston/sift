@@ -10,6 +10,7 @@ from backend.images import small_url
 
 ML = Path(__file__).resolve().parents[2] / "ml"
 EXACT = 0.9  # similarity at or above this is shown as an exact match
+CLOSE = 0.8  # same garment in another colour or cut; below this it is only the kind of thing
 PASS_THROUGH = ["id", "marketplace", "url", "title", "brand", "category", "subcategory", "size", "color", "condition",
                 "condition_raw", "image_urls", "flags", "cost", "materials"]
 
@@ -26,6 +27,10 @@ def load_config(ml: Path = ML) -> Config:
     return Config(baselines, markers.index_brands(brands))
 
 
+def band(sim: float) -> str:
+    return "exact" if sim >= EXACT else "close" if sim >= CLOSE else "similar"
+
+
 def _result(row: dict, sim: float, cfg: Config) -> dict:
     q, scored = markers.quality(row, cfg.brands)
     wears = W.expected_wears(cfg.baselines["categories"][row["category"]], q["level"], row["condition"])
@@ -33,7 +38,7 @@ def _result(row: dict, sim: float, cfg: Config) -> dict:
     return {
         **{k: row[k] for k in PASS_THROUGH},
         "thumb_url": small_url(row["image_urls"][0]),
-        "match": {"similarity": sim, "band": "exact" if sim >= EXACT else "similar"},
+        "match": {"similarity": sim, "band": band(sim)},
         "quality": q,
         "eco": markers.eco(row, cfg.brands),
         "wear": {
