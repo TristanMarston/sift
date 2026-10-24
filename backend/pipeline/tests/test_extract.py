@@ -238,6 +238,12 @@ def test_product_line_matches_on_brand_and_title():
     assert X.match_product_line("Nike", "Nike detroit jacket", X.PRODUCT_LINES) is None
 
 
+def test_pendleton_board_shirt_is_a_known_wool_line():
+    hit = X.match_product_line("Pendleton", "Vintage Pendleton Board Shirt plaid M", X.PRODUCT_LINES)
+    assert hit and [(f.fiber, f.pct) for f in hit.fibers] == [("wool", 100)]
+    assert X.match_product_line("Pendleton", "Pendleton wool blanket", X.PRODUCT_LINES) is None
+
+
 # --- extract() ------------------------------------------------------------------------------
 
 def test_extract_from_description_records_claimed_evidence():

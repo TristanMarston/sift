@@ -25,3 +25,9 @@
   title_has: [nuptse]
   note: The North Face Nuptse → nylon shell, down fill
   fibers: [{fiber: nylon}, {fiber: down}]
+# "The versatile medium weight, 100% virgin wool, plain weave is perfect for indoor and outdoor adventures."
+#   https://www.pendleton-usa.com/men/mens-featured/the-board-shirt/ (line page, fetched 2026-10-24)
+- brand: Pendleton
+  title_has: [board, shirt]
+  note: Pendleton Board Shirt → 100% virgin wool
+  fibers: [{fiber: wool, pct: 100}]
