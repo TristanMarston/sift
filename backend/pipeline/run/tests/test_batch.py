@@ -66,6 +66,7 @@ def test_fit_shrinks_the_batch_until_its_worst_case_fits_the_money():
 
 import _thread
 import json
+import signal
 import threading
 import time
 
@@ -170,7 +171,11 @@ def test_ctrl_c_lets_the_lanes_finish_their_current_run_then_stops(tmp_path):
             time.sleep(0.01)
         return full_rows(mp, q, n)
     client = FakeApify(rows=interrupt)
-    code, lines = go(client, tmp_path, only={"depop"})
+    old = signal.signal(signal.SIGINT, signal.default_int_handler)   # `pytest &` starts with Ctrl-C ignored
+    try:
+        code, lines = go(client, tmp_path, only={"depop"})
+    finally:
+        signal.signal(signal.SIGINT, old)
     assert code == 130 and len(client.calls) == 1 and not (tmp_path / "STOP").exists()
     assert len(jsonl.load(tmp_path / "runs.jsonl")) == 1 and len(batch_dirs(tmp_path)) == 1
 

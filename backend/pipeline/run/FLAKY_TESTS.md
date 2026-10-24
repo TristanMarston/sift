@@ -33,7 +33,8 @@ main thread checks that set every 0.2 s.
 ## Tests that used to depend on timing
 
 - The Ctrl-C test now sends Ctrl-C while the main thread is waiting (the case that broke), and the fake run waits for
-  the STOP file instead of sleeping 0.3 s.
+  the STOP file instead of sleeping 0.3 s. It also sets Python's normal Ctrl-C handler while it runs: a shell starts
+  `uv run pytest &` with Ctrl-C ignored, and then the fake Ctrl-C does nothing.
 - `test_lanes_run_side_by_side_and_every_entry_lands_whole` used a 0.05 s sleep to make the lanes overlap. Now each
   lane's first run waits at a `threading.Barrier(2)`. If the lanes ran one at a time, the barrier would time out and the
   run would fail.
