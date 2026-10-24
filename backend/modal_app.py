@@ -78,10 +78,21 @@ def build(listings: bytes, name: str, workers: int = 64) -> dict:
     return dict(stats)
 
 
+@app.function(volumes={"/vol": vol}, cpu=4, memory=4096, timeout=3 * 3600)
+def build_colors(name: str, workers: int = 64) -> dict:
+    """Step 05b: colors.npy next to the index, from the same listing photos (resumable, like the embeddings)."""
+    sys.path.insert(0, "/root/pipeline")
+    colors, step05 = importlib.import_module("colors"), importlib.import_module("05_embed")
+    stats = colors.build_colors(Path("/vol") / name / "index", step05.fetch, workers=workers)
+    vol.commit()
+    return dict(stats)
+
+
 @app.function(volumes={"/vol": vol})
 def index_files(name: str) -> dict:
     d = Path("/vol") / name / "index"
-    return {f: (d / f).read_bytes() for f in ["embeddings.npy", "rows.jsonl", "manifest.json"]}
+    return {f: (d / f).read_bytes() for f in ["embeddings.npy", "rows.jsonl", "manifest.json", "colors.npy"]
+            if (d / f).exists()}
 
 
 @app.function(volumes={"/vol": vol}, cpu=2, memory=2048)
@@ -111,6 +122,12 @@ def embed(test: bool = False, listings: str = "", name: str = "", download: bool
             (out / f).write_bytes(b)
         print(f"index copied to {out}")
         print(json.loads((out / "manifest.json").read_text()))
+
+
+@app.local_entrypoint()
+def colors(name: str = "full", workers: int = 64):
+    """uv run modal run modal_app.py::colors --name full   (after ::embed; the API picks colors.npy up on redeploy)"""
+    print(build_colors.remote(name, workers))
 
 
 @app.local_entrypoint()

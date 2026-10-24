@@ -200,3 +200,23 @@ def test_vercel_preview_urls_can_be_allowed_by_pattern():
     ok = c.get("/health", headers={"Origin": "https://sift-git-main-tristan.vercel.app"})
     assert ok.headers["access-control-allow-origin"] == "https://sift-git-main-tristan.vercel.app"
     assert "access-control-allow-origin" not in c.get("/health", headers={"Origin": "https://evil.vercel.app"}).headers
+
+
+def test_search_passes_the_crops_colour_to_the_index():
+    """A green crop: the index gets its CIELAB colour, so a grey look-alike no longer out-ranks a green one."""
+    from backend import color as C
+    grey, green = (C.srgb_to_lab(np.array([c], np.float32))[0] for c in [(128, 128, 128), (20, 90, 40)])
+    rows = [make_row("grey", **price(1000)), make_row("green", **price(1000))]
+    index = Index(np.array([[1.0, 0.0, 0.0], [0.94, 0.34, 0.0]], np.float32), rows, colors=np.stack([grey, green]))
+    app = A.create_app(index=index, cfg=CFG, embed=lambda im: np.array([1.0, 0.0, 0.0], np.float32),
+                       categorize=lambda vec: "jackets_outerwear")
+    c = TestClient(app)
+    body = c.post("/search", files={"image": ("crop.jpg", jpeg(fmt="JPEG", size=(64, 64)) if False else _green_jpeg(), "image/jpeg")}).json()
+    assert body["orders"]["match"] == ["depop:green", "depop:grey"]
+    assert {r["id"]: r["match"]["similarity"] for r in body["results"]} == {"depop:grey": 1.0, "depop:green": 0.94}
+
+
+def _green_jpeg():
+    buf = io.BytesIO()
+    Image.new("RGB", (64, 64), (20, 90, 40)).save(buf, "JPEG")
+    return buf.getvalue()
