@@ -1,6 +1,6 @@
 # Sift — Scraping Pipeline Spec (v1 build)
 
-Location: `backend/pipeline/SPEC.md`. Status: **planned, nothing built yet**.
+Location: `backend/pipeline/SPEC.md`. Status: **built on branch `pipeline-scraping`; the 20-item test run is done (§13a); the 20k scrape waits for approval**.
 Companion to `SCRAPING.md` (Anthony's original spec). Where the two differ, **this file reflects the
 decisions made on Fri Oct 23, 2026** and the findings from checking the actor pages. Update
 `SCRAPING.md` or this file if either changes.
@@ -54,6 +54,12 @@ Targets:
 | 9 | Raw files have seller identity keys scrubbed at write time | SCRAPING.md says "keep raw" and "store no seller identity", which conflict |
 | 10 | Pipeline steps renumbered 01–04 | Steps for thumbs, embed, and upsert are dropped |
 | 11 | Time estimates are ignored; build in the order in §14 | User instruction |
+| 12 | **No location filter.** USD is the only hard filter; the seller's country is stored in `seller.region` on every row | `api.schema.json` requires USD, not US. In the test run only 4 of 20 Grailed items were US-located, so a filter would waste ~80% of that spend. A US-only view is a one-line filter on `seller.region` later. SCRAPING.md §2 and API.md §0 ("the index is US-only") still say US-only: the team should reconcile |
+| 13 | Mercari failed the go/no-go and has no mapper (§13a) | No description, one image, no size/location/shipping. Needs a decision (§16) |
+| 14 | Seller blocks are scrubbed by **allowlist** (rating/count/location only); eBay records keep a top-level key whitelist | The test run showed Grailed `sellerProfile` (account id, PayPal id) and eBay page modules (seller handle, buyer feedback) slipping past a denylist |
+| 15 | Category: the marketplace label wins; a present label that maps to none of the 8 drops the record instead of using the query's category; eBay's root "Clothing, **Shoes** & Accessories" is ignored; kids' labels are dropped | A hat must not inherit "jackets"; the root made every eBay item "sneakers"; children's clothes are outgrown, not worn out |
+| 16 | `is_vintage` / `is_deadstock` / `is_upcycled` come from the **title** and structured style fields, never the description | Shop-wide boilerplate ("especially for pre-owned or vintage goods") made most Grailed items look vintage |
+| 17 | eBay is scraped with `condition: used`; its material is `Outer Shell Material` (lining and insulation are excluded); `Product Line`/`Model` feed product-line matching | eBay has no `Material` specific; without `condition` the actor returns new items |
 
 ## 4. Repo state and layout
 
@@ -151,13 +157,10 @@ Cost controls (Apify's guidance):
 Categories (exactly the API enum): `jackets_outerwear`, `hoodies_sweatshirts`, `tshirts`, `sneakers`,
 `jeans_pants`, `sweaters_knitwear`, `shirts`, `dresses_skirts`.
 
-US only. Keep a listing only when the item or seller is in the US:
-- Depop: `country == "US"` (to confirm it exists in the output).
-- eBay: marketplace `ebay.com` and an item location in the US.
-- Mercari: US by construction; also check `item_location`.
-- Poshmark: US by construction.
-- Grailed: filter on `location` when present.
-- Drop any record whose currency is not USD.
+No location filter (decision 12). Drop a record only when its currency is not USD (no FX conversion);
+store the seller's country as `seller.region` (`US` for any US place; otherwise the country or region the
+actor reports). Where the actor reports no location, Poshmark is `US` by construction and the field stays null
+elsewhere.
 
 Per category, up to ~25 queries per marketplace, mixing:
 - Brands judges wear: Carhartt, Patagonia, The North Face, Nike, New Balance, Levi's, Uniqlo, Arc'teryx,
@@ -329,6 +332,29 @@ fields carry seller identity (for scrubbing).
 If Depop and Poshmark both fail, switch to `123webdata/depop-scraper` (detail mode) and
 `xtracto/poshmark-detail-scraper`. If those fail too, raise it with the team.
 
+## 13a. Test-run results (Oct 24, 2026, 1 query × 20 items per actor, measured cost $0.535)
+
+| Actor | Core fields | Description > 40 chars | Images avg | Location | Cost | Verdict |
+| --- | --- | --- | --- | --- | --- | --- |
+| Depop | 20/20 | 18/20 | 4.0 | `country` US 20/20 | $0.020 | pass |
+| Poshmark | 20/20 | 15/20 (at the threshold) | 6.8 | none (US only) | $0.060 | pass |
+| Grailed | 20/20 | 20/20 | 8.2 | listing location US 4/20, seller country US 6/20 | $0.240 | pass |
+| eBay | 20/20 | 20/20 | 7.3 | US 20/20 | $0.120 | pass |
+| Mercari | 20/20 | **0/20** | **1.0** | none | $0.095 | **fail** |
+
+- The price table in §6 was right for every actor except Mercari, which also bills **$0.04 per search request**
+  (SCRAPING.md had this; §5 did not). eBay's `includeDescription` costs nothing extra. A run's
+  `usage_total_usd` is a stale snapshot when `call()` returns, so the log records our own estimate instead.
+- Depop returns `description`, `originalPrice` and `country`. Poshmark returns no condition and no location.
+  Grailed returns `location` as a region ("Asia"), the seller country in `sellerProfile.country_code`, a per-region
+  shipping rate and `priceDrops` (earlier prices). eBay has `itemSpecifics` but no `Material` key.
+- Seller identity found and removed by the scrubber: Grailed `sellerProfile`, eBay `about_this_seller_section_module`
+  and feedback modules. Depop product URLs and slugs begin with the seller's handle: they are kept in `url` for the
+  link-out, and replaced in the committed fixtures. Sellers also sometimes write their own store name into the
+  description text, which is kept.
+- Coverage on this single generic query (north face jackets): stated material 41%, percentages 6%. Material-rich
+  queries should lift both; check after the 20k run.
+
 ## 14. Order of work
 
 1. Branch `pipeline-scraping`; deps, `.gitignore`, pytest config.
@@ -345,7 +371,7 @@ If Depop and Poshmark both fail, switch to `123webdata/depop-scraper` (detail mo
 
 - ≥ 20,000 active rows over ≥ 4 marketplaces; no marketplace above 50%.
 - Every line of `data/listings.jsonl` validates against `Listing`.
-- Every row has ≥ 1 image URL, a USD price, and a US region.
+- Every row has ≥ 1 image URL, a USD price, and a recorded region.
 - ≥ 25% of rows have at least one stated material; ≥ 10% have percentages. If below, add material-rich
   queries.
 - The three demo props are present (Carhartt Detroit jacket, Patagonia Better Sweater, Nike Dunk Low).
@@ -354,14 +380,14 @@ If Depop and Poshmark both fail, switch to `123webdata/depop-scraper` (detail mo
 
 ## 16. Open items and risks
 
-- `apify-client` access style: SCRAPING.md uses `run.default_dataset_id` (typed, ≥3.3); Apify's doc
-  uses `run['defaultDatasetId']`. Check against the installed version.
-- Depop actor: reliability (7 monthly users), proxy default, missing `description`.
-- Whether Mercari and eBay charge extra per search; the Mercari page is ambiguous ($2.05 vs $2.99 per
-  1,000).
+- **Mercari** (§13a): fails the go/no-go. Options: drop it and move its quota to Depop/Poshmark/eBay (the
+  other four marketplaces satisfy "≥ 4, none above 50%"), or probe whether pasting listing URLs into
+  `startUrls` returns details (each URL may bill as a $0.04 search request, so this is likely too expensive).
+- Grailed costs $0.012 per row and is the biggest line; its quota is where to trim.
+- Depop returned US items 20/20 in the test run; check the country spread on the full run.
 - 50k may exceed the ~$200 credits (§6). Decide quotas after the 20k run.
-- US filtering for Depop, Grailed, and Poshmark depends on which location fields actually come back.
-- `seller.type` thresholds are guesses until the test run shows real listing counts.
+- `seller.type`: Grailed and Depop have no common scale. Grailed uses the seller's listing count (≤20 / ≤200 / more); eBay uses
+  account type and feedback score (business with ≥ 5000 feedback is a large reseller); Depop and Poshmark give none (null). All guesses.
 - Material coverage may fall short of the 25% / 10% targets; the fix is more material-rich queries.
 - Terms of service (see §5).
 - The two product specs differ (new+used vs secondhand-only; eco score vs eco facts). Decision 1 and 2
