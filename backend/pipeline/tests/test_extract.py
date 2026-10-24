@@ -238,6 +238,12 @@ def test_product_line_matches_on_brand_and_title():
     assert X.match_product_line("Nike", "Nike detroit jacket", X.PRODUCT_LINES) is None
 
 
+def test_pendleton_board_shirt_is_a_known_wool_line():
+    hit = X.match_product_line("Pendleton", "Vintage Pendleton Board Shirt plaid M", X.PRODUCT_LINES)
+    assert hit and [(f.fiber, f.pct) for f in hit.fibers] == [("wool", 100)]
+    assert X.match_product_line("Pendleton", "Pendleton wool blanket", X.PRODUCT_LINES) is None
+
+
 # --- extract() ------------------------------------------------------------------------------
 
 def test_extract_from_description_records_claimed_evidence():
@@ -315,6 +321,16 @@ def test_product_line_fills_in_only_when_nothing_is_stated():
     assert (ev.field, ev.status, ev.source) == ("materials.fibers", "inferred", "product_line")
     stated = X.extract(norm(brand="Patagonia", title="Patagonia Better Sweater", description="100% wool"))
     assert [f.fiber for f in stated.materials.fibers] == ["wool"]
+
+
+def test_a_known_product_line_is_evidence_even_when_the_material_is_stated():
+    # the quality marker credits a known durable line; a seller who also states "100% cotton" must not lose that
+    out = X.extract(norm(brand="Carhartt", title="Carhartt Detroit Jacket", category="jackets_outerwear",
+                         description="100% cotton duck, blanket lined"))
+    assert [f.fiber for f in out.materials.fibers] == ["cotton"]
+    lines = [e for e in out.evidence if e.field == "product_line"]
+    assert [(e.status, e.source, e.snippet) for e in lines] == [("inferred", "product_line", "Carhartt Detroit → cotton duck")]
+    assert [e for e in X.extract(norm(title="Plain tee", description="100% cotton")).evidence if e.field == "product_line"] == []
 
 
 def test_missing_material_is_null_with_unknown_evidence():
