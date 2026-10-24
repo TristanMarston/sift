@@ -162,6 +162,14 @@ def test_the_ebay_whitelist_keeps_every_field_the_mapper_needs():
     assert needed <= S.ACTORS["ebay"].keep
 
 
+def test_depop_raw_files_drop_the_city_and_the_slug_that_starts_with_the_seller_handle(tmp_path):
+    row = {"id": 1, "title": "TNF jacket", "country": "US", "location": "Hattiesburg, United States",
+           "slug": "somehandle-tnf-jacket-23c6", "url": "https://www.depop.com/products/somehandle-tnf-jacket-23c6/"}
+    S.run_plan(FakeClient(rows=[row]), [t("depop")], None, tmp_path)
+    (path,) = (tmp_path / "raw" / "depop").glob("*.jsonl")
+    assert json.loads(path.read_text()) == {"id": 1, "title": "TNF jacket", "country": "US", "url": row["url"]}
+
+
 def test_scrub_does_not_touch_item_ids_outside_seller_blocks():
     assert S.scrub({"id": 9, "name": "Detroit jacket"}) == {"id": 9, "name": "Detroit jacket"}
 
@@ -196,6 +204,20 @@ def test_bad_runs_are_logged_not_saved_and_do_not_stop_the_others(tmp_path, stat
     assert first["status_message"] and second["status"] == "SUCCEEDED"
     assert not (tmp_path / "raw" / "depop" / "run0.jsonl").exists()
     assert len(client.calls) == 2
+
+
+@pytest.mark.parametrize("status", ["FAILED", "TIMED-OUT", "ABORTED"])
+def test_a_run_that_started_but_did_not_succeed_is_booked_at_its_charge_cap(tmp_path, status):
+    """Its rows were billed but are not saved, so we cannot count them: assume the worst so --max-spend stays safe."""
+    S.run_plan(FakeClient(statuses={0: status}), [t(n=100)], None, tmp_path)
+    (log,) = read_jsonl(tmp_path / "runs.jsonl")
+    assert log["est_charge_usd"] == pytest.approx(0.13)
+
+
+def test_a_call_that_never_started_a_run_costs_nothing(tmp_path):
+    S.run_plan(FakeClient(statuses={0: "RAISE"}), [t(n=100)], None, tmp_path)
+    (log,) = read_jsonl(tmp_path / "runs.jsonl")
+    assert log["est_charge_usd"] == 0
 
 
 def test_rerun_skips_successful_queries_and_retries_failed_ones(tmp_path):

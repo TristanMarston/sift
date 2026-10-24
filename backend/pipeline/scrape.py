@@ -31,6 +31,7 @@ class Actor:
     start_usd: Decimal         # price per run start
     build_input: Callable[[str, int], dict]
     keep: frozenset | None = None   # if set, only these top-level keys of a record are written
+    drop: frozenset = frozenset()   # top-level keys never written (on top of the identity keys scrub() removes)
     is_item: Callable[[dict], bool] | None = None   # if set, other rows (free summary rows) are not written or counted
     expects_description: bool = True   # rows with no real description mean the actor returned card data only
 
@@ -47,8 +48,9 @@ EBAY_KEEP = frozenset({
 
 
 ACTORS = {
+    # Depop records carry the seller's city (`location`) and a `slug` that starts with their handle.
     "depop": Actor("jongoose/depop-scraper", Decimal("0.001"), Decimal("0"),
-                   lambda q, n: {"query": q, "maxItems": n}),
+                   lambda q, n: {"query": q, "maxItems": n}, drop=frozenset({"location", "slug"})),
     "poshmark": Actor("123webdata/poshmark-scraper", Decimal("0.00199"), Decimal("0.02"),
                       lambda q, n: {"categoryUrls": [f"https://poshmark.com/search?query={quote_plus(q)}&type=listings&src=dir"],
                                     "maxResultsPerScrape": n, "usePagination": True, "scrapeProductDetails": True}),
@@ -189,8 +191,8 @@ def _execute(client, task: Task, cap: Decimal, data_dir: Path, classify, seen: s
         return Outcome({**entry, "status": "NO_RUN", "status_message": "call() returned no run"}, counts, "", ids)
     entry.update(run_id=run.id, status=run.status, status_message=run.status_message, est_charge_usd=float(actor.start_usd))
     log = _fetch_log(client, run)
-    if run.status != OK:
-        return Outcome(entry, counts, log, ids)
+    if run.status != OK:   # its rows were billed but are not saved: book the worst case so --max-spend stays safe
+        return Outcome({**entry, "est_charge_usd": float(cap)}, counts, log, ids)
     path = data_dir / "raw" / task.marketplace / f"{run.id}.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
     n = 0
@@ -199,7 +201,7 @@ def _execute(client, task: Task, cap: Decimal, data_dir: Path, classify, seen: s
             for item in client.dataset(run.default_dataset_id).iterate_items():
                 if actor.is_item is not None and not actor.is_item(item):
                     continue
-                clean = scrub(item, keep=actor.keep)
+                clean = scrub({k: v for k, v in item.items() if k not in actor.drop}, keep=actor.keep)
                 f.write(jsonl.dumps(clean) + "\n")
                 n += 1
                 if classify is None:
