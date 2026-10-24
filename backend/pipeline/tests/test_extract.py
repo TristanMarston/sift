@@ -160,6 +160,10 @@ def test_certifications(text, expected):
     ("Vtg Carhartt Detroit Jacket", True, False, False),
     ("VTG J.Crew merino sweater", True, False, False),
     ("upcycled flannel", False, False, True),
+    ("Reworked Carhartt Detroit Jacket", False, False, True),        # "reworked" = remade from an existing garment
+    ("Carhartt J001 NWT NOS Size M", False, True, False),           # NOS = new old stock
+    ("Nos Amis graphic tee", False, False, False),                    # a word, not the acronym: only all-caps NOS counts
+    ("work jacket, not reworked", False, False, False),
     ("Up-cycled patchwork", False, False, True),
     ("plain tee", False, False, False),
 ])
