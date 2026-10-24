@@ -125,7 +125,7 @@ Known risks per actor:
   `max_total_charge_usd` is hit, some rows may not be delivered. `Material` comes from
   `itemSpecifics` in detail mode.
 - **Mercari** (`automation_craft`): created Oct 13 and used by only a few accounts, so reliability beyond the ~220 listings we tested
-  (§13b) is unproven. Mercari serves at most 1,000 results per search, so use several queries. `color` is never
+  (§13b) is only proven up to 150 items per run. Mercari serves at most 1,000 results per search, so use several queries. `color` is never
   filled. The dataset also holds free `search`/`status`/`summary` rows, which the runner drops (`type != listing`).
   The buyer's total includes a buyer-protection fee (~3.5%) that `cost` does not model.
 - **Terms of service**: Poshmark's terms prohibit automated collection; Depop sits behind
@@ -374,20 +374,21 @@ If Depop and Poshmark both fail, switch to `123webdata/depop-scraper` (detail mo
 identical descriptions, photo counts and shipping fees for the same three listings. `parsebird/mercari-us-scraper`
 was not probed: its public stats show only 155 of 221 runs succeeding.
 
-**`automation_craft` through the real pipeline (20-item smoke test + 200 items over three queries: `carhartt detroit
-jacket`, `100% wool sweater`, `nike dunk low`; billed $0.625, equal to our estimate):**
+**`automation_craft` through the real pipeline** (a 20-item smoke test, then 80 + 80 + 40 + 150 items for `carhartt detroit
+jacket`, `100% wool sweater`, `nike dunk low` and `100% wool coat`; 370 raw rows; billed $1.04, equal to our estimate):
 
 | Measure | Result |
 | --- | --- |
-| Core fields (url, title, price, photo) | 206/206 |
-| Description > 40 chars | 190/206 (92%) |
-| Photos | 7.7 on average, none with a single photo |
-| Size / condition / shipping known / seller type | 205 / 206 / 206 / 206 of 206 |
-| Seller rating (0 reviews = unknown) | 185/206 |
-| Stated material / with percentages | 103/206 (50%) / 64/206 (31%) |
+| Core fields (url, title, price, photo) | 346/346 |
+| Description > 40 chars | 326/346 (94%) |
+| Photos | 8.0 on average, none with a single photo |
+| Size / condition / shipping known / seller type | 344 / 346 / 346 / 346 of 346 |
+| Seller rating (0 reviews = unknown) | 299/346 |
+| Stated material / with percentages | 242/346 (70%) / 173/346 (50%) |
 | Demo props | Carhartt Detroit 68 listings, Nike Dunk Low 33 |
-| Kids' items | 8 of 20 in the unfiltered smoke test; 4 of 200 once `excludeKeywords` was added |
-| Color | 0/206 (Mercari rarely has it) |
+| Kids' items | 8 of 20 in the unfiltered smoke test; 6 of 350 once `excludeKeywords` was added |
+| Color | 0/346 (Mercari rarely has it) |
+| A 150-item run (two results pages) | 150 delivered in 106 s, no warnings; 7 duplicates across queries were collapsed |
 
 Mercari's total price is `price + shipping (only when the buyer pays) + buyer-protection fee`, checked on 25 of 25
 rows. `cost.total_cents` includes the shipping but not the fee.
@@ -420,14 +421,17 @@ characters survived into the text (decision 19).
 
 ## 16. Open items and risks
 
-- Mercari (`automation_craft`) is 11 days old and lightly used. It ran cleanly in all 7 runs (250 listings, none above 80
-  per run); test a 300-item query, the real size, before the full run, and keep `tortuga/mercari-scraper` as the fallback.
+- Mercari (`automation_craft`) is 11 days old and lightly used. It ran cleanly in all 8 runs (400 listings, up to 150 per run =
+  two pages); the plan's 300-item queries span three pages, so watch the first real Mercari runs, and keep `tortuga/mercari-scraper` as the fallback.
 - Grailed costs $0.012 per row and is the biggest line; its quota is where to trim.
 - Depop returned US items 20/20 in the test run; check the country spread on the full run.
 - 50k (~$235) may exceed the ~$200 credits (§6). Decide quotas after the 20k run.
 - `seller.type`: Grailed and Depop have no common scale. Grailed uses the seller's listing count (≤20 / ≤200 / more); eBay uses
   account type and feedback score (business with ≥ 5000 feedback is a large reseller); Depop and Poshmark give none (null). All guesses.
 - Material coverage may fall short of the 25% / 10% targets; the fix is more material-rich queries.
+- Multi-part tags: 53 of 346 Mercari rows (15%, 49 of them coats) are `composition_suspect`, and 47 of those are "shell, then a
+  100% lining". A parser that reads the "Shell:" / "Lining:" labels would recover them. Not built: picking the first group
+  instead would give a wool coat a polyester label whenever the seller lists the lining first.
 - Terms of service (see §5).
 - The two product specs differ (new+used vs secondhand-only; eco score vs eco facts). Decision 1 and 2
   settle this for the pipeline; the team should reconcile `DESCRIPTION.md`.

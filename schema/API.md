@@ -212,7 +212,7 @@ The "cheapest match drops to #N" headline is computed by the client.
 
 ## 4. Enums
 
-- `marketplace`: `depop poshmark grailed mercari ebay` (`mercari` is reserved: the v1 pipeline does not collect it)
+- `marketplace`: `depop poshmark grailed mercari ebay`
 - `category`: `jackets_outerwear hoodies_sweatshirts tshirts sneakers jeans_pants
   sweaters_knitwear shirts dresses_skirts` (the 8 categories in backend/pipeline/SCRAPING.md §2)
 - `condition`: `new_with_tags like_new good fair` (`null` if it can't be mapped)

@@ -33,13 +33,15 @@ description text, all image URLs, and a 768-d image embedding.
 | Depop | `jongoose/depop-scraper` | `query`, `maxItems`, optional `startUrls`; datacenter proxy default | $0.001/result | listed in schema, **absent from the sample record → verify in test run** | `123webdata/depop-scraper` detail mode ($0.00999, has description) |
 | Poshmark | `123webdata/poshmark-scraper` | `categoryUrls` = Poshmark search URLs, `scrapeProductDetails: true` | $0.00199/detail + $0.01 start | yes (detail mode) | `xtracto/poshmark-detail-scraper` ($0.003, has `condition`, which 123webdata lacks) |
 | Grailed | `piotrv1001/grailed-listings-scraper` | `scrapeDetails: true` | $0.01 with details ($0.003–0.005 without) | detail mode only | `lulzasaur/grailed-scraper` ($0.01, 1,000/query cap) |
+| Mercari US | `automation_craft/mercari-us-scraper` | `keywords`, `statuses`, `includeDetails: true`, `maxItems`, `excludeKeywords` | $0.00273/listing (listing + details) + $0.006/run | yes, with `includeDetails` | `tortuga/mercari-scraper` (`market: us`, $0.0048/listing) |
 | eBay | `memo23/ebay-search-scraper-ppe` | search queries, `includeDescription: true`; detail mode for `itemSpecifics` | $0.003 fast / $0.005 detail + $0.02 start | yes | eBay Browse API (free, 5k calls/day; `Material` needs `getItem` per item) |
 
-Do not use `markdolanmoore/depop-scraper` (no description). Mercari US was tried in the Oct 24 test run and dropped:
-`getascraper/mercari-us-scraper` returns no description and one image per listing, and bills $0.04 per search.
+Do not use `markdolanmoore/depop-scraper` (no description). Do not use `getascraper/mercari-us-scraper` either: in the
+Oct 24 test run it returned card data only (no description, one photo) and once returned 0 rows while billing $0.04
+(`SPEC.md` §13a).
 
-Budget at 20k: ≈ $97 for 26,000 raw rows (the 20k target plus ~30% over-scrape for duplicates and dropped
-records): Depop 10.4k $10, Poshmark 7.2k $15, Grailed 4k $48, eBay 4.65k $24. At 50k ≈ $240. Grailed detail mode is
+Budget at 20k: ≈ $94 for 26,200 raw rows (the 20k target plus ~30% over-scrape for duplicates and dropped
+records): Depop 10.4k $10, Poshmark 5.2k $11, Grailed 4k $48, Mercari 3.9k $11, eBay 2.7k $14. At 50k ≈ $235. Grailed detail mode is
 the expensive line. Prices were confirmed against the test-run bills; see `SPEC.md` §6.
 
 ## 2. Query plan
@@ -77,7 +79,7 @@ Normalize every actor record into this shape (Pydantic `Listing` in
 
 | Field | Source | Notes |
 | --- | --- | --- |
-| `marketplace` | constant | `depop` `poshmark` `grailed` `ebay` (`mercari` is in the API enum but is not collected) |
+| `marketplace` | constant | `depop` `poshmark` `grailed` `mercari` `ebay` |
 | `external_id` | actor id field, else last path segment of `url` | unique with `marketplace` |
 | `url` | actor | the link-out |
 | `title` | actor | |
@@ -94,7 +96,7 @@ Normalize every actor record into this shape (Pydantic `Listing` in
 | `price_cents`, `currency` | actor | convert to cents; keep currency, do not convert FX |
 | `original_price_cents` | actor when returned (Depop `originalPrice`, Poshmark markdowns) | null otherwise |
 | `retail_price_cents` | text regex `retail(s)? (for )?\$?(\d+)` or an actor field | null otherwise; the UI shows "vs retail" only when present |
-| `shipping_cents` / `free_shipping` | actor when returned | eBay and Grailed (US rate) expose it; Depop and Poshmark do not |
+| `shipping_cents` / `free_shipping` | actor when returned | eBay, Grailed (US rate) and Mercari expose it; Depop and Poshmark do not |
 | `condition`, `condition_raw` | actor | keep the raw string; map to `new_with_tags` `like_new` `good` `fair` |
 
 ### Fabric and product quality
@@ -123,7 +125,7 @@ Normalize every actor record into this shape (Pydantic `Listing` in
 | `seller_listing_count` | actor seller block when present | used in memory to derive `seller_type`; username discarded |
 | `seller_type` | derived | `individual` (≤ 20 listings) / `small_shop` (≤ 200) / `large_reseller`; thresholds set after the test run |
 | `seller_rating` | actor when present | number, no identity |
-| `seller_region` | Depop `country`, eBay `itemLocation`, Grailed `sellerProfile.country_code`; Poshmark is `US` | coarse only (country); recorded, not a filter |
+| `seller_region` | Depop `country`, eBay `itemLocation`, Grailed `sellerProfile.country_code`; Poshmark and Mercari US are `US` | coarse only (country); recorded, not a filter |
 
 Nothing else about the seller is stored: no username, profile URL, avatar, or
 full location.
@@ -180,7 +182,7 @@ crash halfway loses one batch, not the night.
 For each primary actor, one query, `maxItems: 20`. Pass criteria:
 
 - ≥ 18 of 20 records have `url`, `title`, `price`, `image_urls` non-empty;
-- `description` present and non-trivial (> 40 chars) on ≥ 15 of 20 for Depop (jongoose), Poshmark (detail), Grailed (details), eBay (`includeDescription`);
+- `description` present and non-trivial (> 40 chars) on ≥ 15 of 20 for Depop (jongoose), Poshmark (detail), Grailed (details), Mercari (`includeDetails`), eBay (`includeDescription`);
 - total charge < $1.
 - Also: classify the extra images of those ~100 records as tag / not tag with one Haiku call each (~$0.03) and record the per-marketplace care-tag rate for the pitch.
 
@@ -199,5 +201,5 @@ Poshmark to `xtracto`; if those fail too, raise it to the team (pivot rule).
 
 - Poshmark's terms prohibit automated collection; Depop sits behind Cloudflare. Use the actors above (96%+ success over 30 days), run Friday night only, store no seller identity, link out. Say this in the Trust section.
 - Field names differ per actor (`price.amount` vs `price`, `pictureUrls` vs `images`); write one mapper per marketplace and unit-test it on the 20-item samples.
-- Grailed caps 1,000 results per search; split by brand.
+- Grailed caps 1,000 results per search; split by brand. Mercari US also serves at most 1,000 per search.
 - Venue wifi: run the scrape and the thumbnail download from the venue early, or from a hotspot; both are network-bound.
