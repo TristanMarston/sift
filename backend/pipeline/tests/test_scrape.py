@@ -87,13 +87,27 @@ def test_estimate_simulates_the_quota_stop_and_sums_best_case_cost_and_worst_cas
     ("grailed", {"searchQuery": "carhartt jacket", "maxItems": 50, "scrapeDetails": True}),
     ("poshmark", {"categoryUrls": ["https://poshmark.com/search?query=carhartt+jacket&type=listings&src=dir"],
                   "maxResultsPerScrape": 50, "usePagination": True, "scrapeProductDetails": True}),
+    # Women (1) and Men (2): a live search without them paid for 7 kids' rows out of 20
     ("mercari", {"keywords": ["carhartt jacket"], "statuses": ["on_sale"], "includeDetails": True, "maxItems": 50,
-                 "excludeKeywords": S.KIDS_WORDS}),
-    ("ebay", {"searchQueries": ["carhartt jacket"], "maxItems": 50, "marketplace": "ebay.com", "mode": "active",
-              "condition": "used", "detailedItems": True, "includeDescription": True, "includeSummary": False}),
+                 "excludeKeywords": S.KIDS_WORDS, "usCategoryIds": [1, 2]}),
+    # a used Buy It Now search shipped to a US buyer (_fcid=1, _stpos): see test_ebay_searches_as_a_buyer_in_the_us
+    ("ebay", {"startUrls": [{"url": "https://www.ebay.com/sch/i.html?_nkw=carhartt+jacket&LH_ItemCondition=3000&LH_BIN=1"
+                                    "&_fcid=1&_stpos=10001&_sop=12"}],
+              "maxItems": 50, "marketplace": "ebay.com", "mode": "active", "condition": "used", "detailedItems": True,
+              "includeDescription": True, "includeSummary": False}),
 ])
 def test_run_input_per_actor(mp, expected):
     assert S.ACTORS[mp].build_input("carhartt jacket", 50) == expected
+
+
+def test_ebay_searches_as_a_buyer_in_the_us():
+    """The actor's eBay session is sometimes a buyer abroad (1 of 9 live runs): 16 of 18 results were foreign sellers,
+    and even US items were quoted international shipping ($34.80). Shipping to a US buyer fixed it (20 of 20 US, $0-20
+    shipping), and Buy It Now skips the auctions step 02 drops anyway (4.5% of eBay rows, paid for)."""
+    from urllib.parse import parse_qs, urlparse
+    q = parse_qs(urlparse(S.ACTORS["ebay"].build_input("levi's 501 jeans", 150)["startUrls"][0]["url"]).query)
+    assert q["_nkw"] == ["levi's 501 jeans"] and q["_fcid"] == ["1"] and q["LH_BIN"] == ["1"]
+    assert q["LH_ItemCondition"] == ["3000"]          # used
 
 
 def test_charge_cap_is_the_expected_cost_plus_25_percent_rounded_up_to_the_cent():
@@ -111,6 +125,9 @@ def test_cap_is_a_call_option_never_part_of_run_input(tmp_path):
     assert kw["max_total_charge_usd"] == Decimal("0.13")
     assert kw["run_input"] == {"query": "boxy tee", "maxItems": 100}
     assert "max_total_charge_usd" not in kw["run_input"]
+    # no streaming of the actor's log into ours: it was 98% of a live batch's output and buried the ALERT lines.
+    # The log is still read once per run (health.py) and every alert links to the run on Apify.
+    assert kw["logger"] is None
 
 
 # --- privacy -------------------------------------------------------------------------------
@@ -234,7 +251,8 @@ def test_a_marketplace_stops_at_its_quota_and_others_continue(tmp_path):
     plan = [t("depop", q=f"d{i}") for i in range(5)] + [t("ebay", q=f"e{i}") for i in range(2)]
     client = FakeClient(items=3)
     S.run_plan(client, plan, {"depop": 5, "ebay": 100}, tmp_path)
-    ran = [kw["run_input"].get("query") or kw["run_input"]["searchQueries"][0] for _, kw in client.calls]
+    ran = [kw["run_input"].get("query") or kw["run_input"]["startUrls"][0]["url"].split("_nkw=")[1].split("&")[0]
+           for _, kw in client.calls]
     assert ran == ["d0", "d1", "e0", "e1"]  # 3 + 3 rows >= 5 stops depop
 
 
@@ -309,6 +327,13 @@ def test_queries_cover_exactly_the_api_categories_and_marketplaces(cfg):
     assert set(cfg.quotas) == set(S.ACTORS) <= set(get_args(listing.Marketplace))
     for by_mp in cfg.queries.values():
         assert set(by_mp) == set(S.ACTORS)
+
+
+def test_grailed_runs_no_dress_queries(cfg):
+    """Grailed is menswear: live, "100% cotton dress" returned 1 dress in 20 rows (10 dress shirts, 5 dress pants), at
+    $0.012 a row. Its quota goes to the categories it has; dresses come from the other four marketplaces."""
+    assert cfg.queries["dresses_skirts"]["grailed"] == []
+    assert all(cfg.queries["dresses_skirts"][mp] for mp in ("depop", "poshmark", "mercari", "ebay"))
 
 
 def test_mercari_uses_the_actor_that_returns_listing_details():

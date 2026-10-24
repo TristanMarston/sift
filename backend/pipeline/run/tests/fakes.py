@@ -18,6 +18,8 @@ def query_of(run_input: dict) -> str:
     for key in ("keywords", "searchQueries"):
         if key in run_input:
             return run_input[key][0]
+    if "startUrls" in run_input:                                                 # ebay
+        return parse_qs(urlparse(run_input["startUrls"][0]["url"]).query)["_nkw"][0]
     return parse_qs(urlparse(run_input["categoryUrls"][0]).query)["query"][0]   # poshmark
 
 
@@ -42,7 +44,7 @@ class FakeApify:
         self.lock, self.calls, self.jobs, self.storage, self.named = threading.Lock(), [], {}, {}, {}
 
     def actor(self, actor_id):
-        def call(run_input, max_total_charge_usd, run_timeout):
+        def call(run_input, max_total_charge_usd, run_timeout, logger):
             mp, q = self.MP[actor_id], query_of(run_input)
             items = self.rows(mp, q, items_of(run_input))
             a = S.ACTORS[mp]

@@ -38,6 +38,10 @@ So the judge looks at **what came back first** and uses the log only as supporti
 | Fewer than 10% of the rows are usable because the rest were filtered out (wrong country or currency, for example) | `degraded` | **at once** |
 | Far fewer rows than asked for (under 20%) | `short` | no, but it is counted and flagged in the report |
 
+"Reports giving up" means the actor itself says so. Crawlee also logs `Request failed and reached maximum retries` for
+each single page that fails for good; that is only a note, because one dead page is normal and the request statistics
+("most of its requests failed") already catch a real block.
+
 Rows are judged with the same mapper that step 02 uses, so "unusable" means exactly "step 02 would reject it".
 Kids' items, wrong categories and non-USD prices are *filtered* on purpose and never count as bad. Row-quality checks
 need at least 10 rows, so a narrow query that returns 4 listings is not accused of anything.

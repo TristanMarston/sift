@@ -110,7 +110,11 @@ def test_depop_title_is_the_first_line_of_the_description_because_its_own_title_
            "Carhartt Detroit Jacket in brown"
 
 
-@pytest.mark.parametrize("description", [None, "", "#vintage #y2k #carhartt"])
+def test_depop_title_skips_a_first_line_of_only_emoji():
+    assert mapped("depop", 0, description="✨✨✨\nCarhartt Detroit Jacket #workwear").title == "Carhartt Detroit Jacket"
+
+
+@pytest.mark.parametrize("description", [None, "", "#vintage #y2k #carhartt", "✨ 🔥"])
 def test_depop_title_falls_back_to_the_actors_title(description):
     assert mapped("depop", 0, description=description).title == "The North Face White Fuzzy"
 
@@ -126,6 +130,13 @@ def test_depop_kids_items_have_only_a_broad_category(category):
     Sneakers"). Checked on the listing pages. A kids item whose size is "Other" is caught this way."""
     with pytest.raises(Drop, match="kids"):
         mapped("depop", 0, category=category, sizes=["Other"], size="Other")
+
+
+def test_depop_vests_under_tops_are_tank_tops_not_jackets():
+    """Depop is British: a "vest" under tops is a tank top (its product type is "vests-tanks-camis")."""
+    with pytest.raises(Drop, match="unmapped_category"):
+        mapped("depop", 0, category="Tops", group="tops", productType="vests-tanks-camis")
+    assert mapped("depop", 0, category="Outerwear", group="coats-jackets", productType="vests").category == "jackets_outerwear"
 
 
 def test_depop_sold_and_non_us_seller_with_a_usd_price_is_kept_with_its_region():

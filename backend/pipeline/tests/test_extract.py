@@ -93,6 +93,31 @@ def test_bare_words_and_traps(text, expected):
     assert fibers(text) == expected
 
 
+@pytest.mark.parametrize("text, expected", [
+    # Grailed resellers paste eBay's item specifics into the description (seen on 14% of live Grailed rows)
+    ("Outer Shell Material: Cotton Closure: Zip Lining Material: Nylon Vintage: Yes", [("cotton", None, None, None)]),
+    ("Outer Shell Material: Cotton Insulation Material: Polyester Size Type: Regular", [("cotton", None, None, None)]),
+    ("Shell: 100% wool. Lining: 100% polyester", [("wool", 100, None, None)]),
+    ("Lining: 60% acetate, 40% viscose. Shell: 100% wool", [("wool", 100, None, None)]),
+    ("Made of cotton canvas and lined with polyester", [("cotton", None, None, None)]),
+    ("cotton outer shell material and polyester lining", [("cotton", None, None, None)]),
+    ("Shell 100% nylon, 100% polyester lining", [("nylon", 100, None, None)]),
+    ("Material: 100% Cotton Duck Shell Lining: Acrylic/Polyester Blanket", [("cotton", 100, None, None)]),
+])
+def test_lining_and_insulation_are_not_what_the_garment_is_made_of(text, expected):
+    """eBay's own Lining and Insulation fields are skipped (they add up past 100%); the same words in text too."""
+    assert fibers(text) == expected
+
+
+def test_hashtags_are_not_material_claims():
+    """Reseller tools tag every pasted field, the lining too (18 live Grailed rows, no Depop row needed them)."""
+    assert fibers("Carhartt chore coat in cotton canvas. #men #cotton #polyester #workwear") == [("cotton", None, None, None)]
+
+
+def test_a_ply_count_between_the_percent_and_the_fiber():
+    assert fibers("100% 2-Ply Cashmere Shawl Collar") == [("cashmere", 100, None, None)]
+
+
 def test_percent_wins_over_bare_word_for_the_same_fiber():
     assert fibers("100% cotton, soft cotton feel") == [("cotton", 100, None, None)]
     assert fibers("Brown genuine leather bomber. Shell: 100% Genuine Leather") == [("leather", 100, None, None)]
@@ -233,19 +258,28 @@ def test_product_lines_file_covers_the_demo_props():
 
 
 def test_product_line_matches_on_brand_and_title():
-    hit = X.match_product_line("Carhartt", "Carhartt DETROIT Jacket Brown", X.PRODUCT_LINES)
+    hit = X.match_product_line("Carhartt", "Carhartt DETROIT Jacket Brown", "jackets_outerwear", X.PRODUCT_LINES)
     assert hit.note == "Carhartt Detroit → cotton duck"
-    assert X.match_product_line(None, "Patagonia Better Sweater fleece", X.PRODUCT_LINES)
-    assert X.match_product_line(" PATAGONIA ", "better sweater", X.PRODUCT_LINES)
-    assert X.match_product_line("Carhartt", "Carhartt beanie", X.PRODUCT_LINES) is None
-    assert X.match_product_line("Carhartt WIP", "Carhartt WIP detroit jacket", X.PRODUCT_LINES) is None
-    assert X.match_product_line("Nike", "Nike detroit jacket", X.PRODUCT_LINES) is None
+    assert X.match_product_line(None, "Patagonia Better Sweater fleece", "jackets_outerwear", X.PRODUCT_LINES)
+    assert X.match_product_line(" PATAGONIA ", "better sweater", "jackets_outerwear", X.PRODUCT_LINES)
+    assert X.match_product_line("Carhartt", "Carhartt beanie", "jackets_outerwear", X.PRODUCT_LINES) is None
+    assert X.match_product_line("Carhartt WIP", "Carhartt WIP detroit jacket", "jackets_outerwear", X.PRODUCT_LINES) is None
+    assert X.match_product_line("Nike", "Nike detroit jacket", "jackets_outerwear", X.PRODUCT_LINES) is None
+
+
+def test_a_product_line_only_applies_to_its_own_kind_of_garment():
+    """The North Face also sells Nuptse booties and chukkas: footwear must not inherit the jacket's nylon and down,
+    nor the quality marker's "known durable line"."""
+    boots = X.extract(norm(brand="The North Face", title="The North Face Nuptse Traction Booties", category="sneakers"))
+    assert boots.materials.fibers == [] and not [e for e in boots.evidence if e.source == "product_line"]
+    jacket = X.extract(norm(brand="The North Face", title="The North Face Nuptse Jacket", category="jackets_outerwear"))
+    assert [f.fiber for f in jacket.materials.fibers] == ["nylon", "down"]
 
 
 def test_pendleton_board_shirt_is_a_known_wool_line():
-    hit = X.match_product_line("Pendleton", "Vintage Pendleton Board Shirt plaid M", X.PRODUCT_LINES)
+    hit = X.match_product_line("Pendleton", "Vintage Pendleton Board Shirt plaid M", "shirts", X.PRODUCT_LINES)
     assert hit and [(f.fiber, f.pct) for f in hit.fibers] == [("wool", 100)]
-    assert X.match_product_line("Pendleton", "Pendleton wool blanket", X.PRODUCT_LINES) is None
+    assert X.match_product_line("Pendleton", "Pendleton wool blanket", "shirts", X.PRODUCT_LINES) is None
 
 
 # --- extract() ------------------------------------------------------------------------------
@@ -302,7 +336,7 @@ def test_ebay_outer_shell_material_counts_but_lining_and_insulation_do_not():
 
 
 def test_product_line_can_come_from_the_specifics():
-    out = X.extract(norm(brand="The North Face", title="TNF puffer jacket mens",
+    out = X.extract(norm(brand="The North Face", title="TNF puffer jacket mens", category="jackets_outerwear",
                          specifics={"Product Line": "The North Face Nuptse"}))
     assert [f.fiber for f in out.materials.fibers] == ["nylon", "down"]
     assert (out.evidence[0].status, out.evidence[0].source) == ("inferred", "product_line")

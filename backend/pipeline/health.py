@@ -34,6 +34,9 @@ _HARD_HINT = re.compile(r"\b(403|429)\b|forbidden|captcha|cloudflare|challenge|a
 _BENIGN = re.compile(r"blockedStatusCodes|retryOnBlocked")  # Poshmark prints this config note on every healthy run
 _SOFT_HINT = re.compile(r"No listings extracted|No new items intercepted|Scraped 0 listing|Total listings: 0|Pushed 0 listing", re.I)
 _GAVE_UP = re.compile(r"giving up|gave up|retries exhausted|max(?:imum)? retries|all (?:proxies|addresses) (?:failed|refused)", re.I)
+# Crawlee logs this for every single request that fails for good. One dead page is normal; the final request
+# statistics (below) say whether most of them failed.
+_ONE_REQUEST = re.compile(r"\brequest\b.*\bfailed and reached max(?:imum)? retries", re.I)
 _ROTATION = re.compile(r"refused.*\((\d+) of (\d+)\)")
 _CRAWLER_STATS = re.compile(r'"requestsFinished":(\d+),"requestsFailed":(\d+)')
 _STATUS_COUNTS = re.compile(r"Total (\d+) requests: (\d+) succeeded, (\d+) failed")
@@ -109,8 +112,10 @@ def _log_evidence(log: str, status_message: str | None):
         blocked.append(f"ran out of fresh addresses ({spent[0][0]} of {spent[0][1]}): the site keeps refusing us")
     elif rotations:
         notes.append(f"{len(rotations)} address refusals (HTTP 403)")
-    if any(_GAVE_UP.search(l) for l in warnings):
+    if any(_GAVE_UP.search(l) and not _ONE_REQUEST.search(l) for l in warnings):
         blocked.append("the actor reports giving up")
+    if dead := sum(bool(_ONE_REQUEST.search(l)) for l in warnings):
+        notes.append(f"{dead} request(s) failed after every retry")
     for text in (log, status_message or ""):
         for done, failed in _CRAWLER_STATS.findall(text):
             if int(done) + int(failed) >= MIN_REQUESTS_TO_JUDGE and int(failed) / (int(done) + int(failed)) >= MAX_FAILED_REQUEST_SHARE:

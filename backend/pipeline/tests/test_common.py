@@ -68,6 +68,21 @@ def test_category_from_label(label, expected):
     assert C.category_from_label(label) == expected
 
 
+@pytest.mark.parametrize("label, expected", [
+    ("Women > Pants & Jumpsuits > Jumpsuits & Rompers", None),   # Poshmark: not pants, though the parent says so
+    ("Women > Pants & Jumpsuits > Leggings", "jeans_pants"),
+    ("Women > Pants & Jumpsuits", "jeans_pants"),               # no subcategory: the parent decides
+    ("Women > Tops & blouses > Tank, cami", None),               # Mercari: not a shirt
+    ("Men > Shirts > Tank Tops", None),                         # Poshmark
+    ("Women > Tops & blouses > Crop top", None),
+    ("Women > Tops & blouses > T-shirts", "tshirts"),
+])
+def test_a_part_that_names_another_garment_ends_the_search(label, expected):
+    """A leaf such as "Jumpsuits & Rompers" names a garment outside the 8; climbing to its parent ("Pants &
+    Jumpsuits") would file a romper as pants."""
+    assert C.category_from_label(label) == expected
+
+
 @pytest.mark.parametrize("text, expected", [
     ("US", "US"), ("usa", "US"), ("United States", "US"), ("Located in United States", "US"),
     ("Hattiesburg, United States", "US"), ("Austin, TX, United States", "US"),

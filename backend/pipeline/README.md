@@ -49,7 +49,7 @@ cd backend
 uv sync                                    # install dependencies
 uv run pytest                              # ~600 tests, no network, no money
 
-# put your Apify token in the repo root: /workspace/.env  ->  APIFY_TOKEN=...
+# put your Apify token in .env at the repo root (next to DESCRIPTION.md):  APIFY_TOKEN=...
 uv run python pipeline/01_scrape.py --dry-run      # see the plan and what it would cost. Calls nothing.
 uv run python pipeline/01_scrape.py --test         # go/no-go: 20 items per marketplace, about $0.50
 uv run python pipeline/02_normalize.py --test
@@ -155,8 +155,11 @@ Countries get one name each (`U.S.A.`, `United States`, `America` → `USA`; `Ko
 
 Composition details: synonyms are unified (`poly` → `polyester`, `spandex` → `elastane`, `merino` and `lambswool` → `wool`);
 words between the number and the fiber are allowed (`100% pure new wool`, `100% Italian boiled wool`, `100% baby alpaca`);
-percentages that add up to 90–110 are scaled to 100; any other sum is kept but marked `composition_suspect`
-(multi-part tags like shell + lining land here). `synthetic_share` is the share of polyester, nylon, acrylic and
+lining and insulation are not the garment's material, so text labeled as one is skipped (`Lining: 100% polyester`,
+`Lining Material: Nylon` pasted from eBay, `lined with polyester`, `polyester lining`), as eBay's own Lining and
+Insulation fields are; hashtags are tags, not claims, and are skipped too (resellers tag the lining). Percentages
+that add up to 90–110 are scaled to 100; any other sum is kept but marked `composition_suspect` (body + trim, or a
+shell and lining without labels). `synthetic_share` is the share of polyester, nylon, acrylic and
 elastane (plus modacrylic and polyurethane), and is only computed when every fiber has a percentage and the sum is sound. Fabrics that are not fibers
 (fleece, ripstop, Gore-Tex) are not reported as materials.
 
@@ -187,7 +190,7 @@ embeds the photos with `backend.embed` (Marqo-FashionSigLIP, 768-d unit vectors)
 
 | Input | What it is |
 | --- | --- |
-| `/workspace/.env` | `APIFY_TOKEN=...`. Needed for step 01 only (not for `--dry-run`). Never committed. |
+| `.env` (repo root) | `APIFY_TOKEN=...`. Needed for step 01 and `run/cli.py` (not for `--dry-run`). Never committed. |
 | `queries.yaml` | What to search, and how much. See below. |
 | `product_lines.yaml` | Known product lines → material (`Carhartt Detroit → cotton duck`). Used only when a listing states no material. |
 | `scrape.py` → `ACTORS` | Which Apify actor serves each marketplace, its input format, its price per row (for caps and estimates), and for eBay the list of fields kept. |
@@ -206,8 +209,9 @@ queries:
       - {query: carhartt detroit jacket, max_items: 400}   # or set a cap (keep it ≤ 500)
 ```
 
-**`product_lines.yaml`:** each entry has a `brand`, the words that must all appear in the title (`title_has`), a
-`note` shown as the evidence snippet, and the `fibers`. The title is also matched together with eBay's `Product Line` and `Model`.
+**`product_lines.yaml`:** each entry has a `brand`, the words that must all appear in the title (`title_has`), the
+`categories` it covers (a name can also be on another product: The North Face sells Nuptse *booties*), a `note` shown
+as the evidence snippet, and the `fibers`. The title is also matched together with eBay's `Product Line` and `Model`.
 Add a line only when the maker's own page states the material.
 
 ## Outputs
@@ -352,10 +356,14 @@ that is not mirrored in `listing.py` fails a test.
 
 - `seller.region` mixes formats: `US` for any US place, otherwise whatever the marketplace reports (a code like `CN`
   from Grailed, a name like `China` from eBay).
-- Poshmark gives no condition, so it is null. Depop gives no shipping and no seller details. Mercari gives no color.
-- Sellers sometimes put the wrong category on an item; a mislabeled item passes through. A tank top under a
-  `Shirts` or `Tops & blouses` parent (Poshmark men's, Mercari women's) is filed as a shirt; eBay's and Poshmark
-  women's tank tops and crop tops are dropped.
+- Poshmark's actor gives no condition and no shipping (poshmark.com shows both). Condition comes from the seller's
+  own words when they state one (37% of live rows); shipping is null.
+  Depop gives no shipping and no seller details. Mercari gives no color.
+- Sellers sometimes put the wrong category on an item; a mislabeled item passes through (a tee filed as `Blouses`
+  is a shirt). Tank tops, camis, crop tops, jumpsuits and rompers are dropped on every marketplace, also when their
+  parent is one of ours (`Tops & blouses > Tank, cami`, `Pants & Jumpsuits > Jumpsuits & Rompers`). Depop calls a tank
+  top a `vest`; under its `tops` group that is not a jacket.
+- A Poshmark item with only a generic parent (`Women > Tops`, no subcategory) is dropped as `unmapped_category`.
 - Grailed resellers cross-list one item as several listings (same title and price, different ids). Deduping by id
   cannot catch this; it needs image-based dedupe later.
 - The duplicate counts in `run_report.md` ignore rows from earlier invocations of step 01 (step 02 still dedupes
@@ -365,10 +373,9 @@ that is not mirrored in `listing.py` fails a test.
   so `seller.rating` is null, as it is for a Mercari seller with no reviews.
 - Material coverage depends on the queries. One generic jacket query gave 41% with a stated material and 6% with
   percentages; material-rich queries lifted Mercari to 70% and 50%. Check `REPORT.md` after the run.
-- Tags with several parts (shell, lining) add up past 100%, so they are kept but marked `composition_suspect` and get no
-  `synthetic_share`. This is 15% of the Mercari rows we tested, almost all coats, usually "shell composition, then a 100%
-  polyester lining". Reading the "Shell:" and "Lining:" labels would recover most of them; taking the first group would
-  be wrong whenever a seller lists the lining first, so we do not.
+- Tags with several parts add up past 100%, so they are kept but marked `composition_suspect` and get no
+  `synthetic_share`. A labeled lining is skipped (see 03), so what is left is mostly body + trim or an unlabeled lining:
+  1.1% of the rows in the second review's live sample.
 - The Mercari actor is new; it worked up to 300 items per run (three results pages) in the review scrape.
   `tortuga/mercari-scraper` is the fallback.
 - Not built yet: hosted thumbnails, the Supabase upload, care-tag OCR, the LLM fallback for odd material

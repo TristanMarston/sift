@@ -30,9 +30,12 @@ Fix: every lane sets its own `done` event in a `finally`, the main thread waits 
 lane is recorded before `start()`. The test now sends a real SIGINT and keeps the run "on Apify" until the STOP file
 exists, so it no longer depends on a sleep: 70 of 70 runs pass, and the full suite runs without deselecting it.
 
-## What is still timing-based (could flake on a slow or loaded machine)
+## No test depends on timing any more
 
-- `test_lanes_run_side_by_side_and_every_entry_lands_whole` relies on a 0.05 s sleep so the two lanes overlap.
+- `test_lanes_run_side_by_side_and_every_entry_lands_whole` used a 0.05 s sleep so the two lanes overlap. Now each
+  lane's first run waits at a `threading.Barrier(2)`; lanes that ran one at a time would break it and fail the run.
+- The Ctrl-C test sets Python's normal Ctrl-C handler while it runs: a shell starts `uv run pytest &` with Ctrl-C
+  ignored, and the SIGINT would then do nothing.
 
 ## How to check
 

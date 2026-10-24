@@ -101,6 +101,11 @@ _CATEGORY_RULES = [
 ]
 
 
+# Garments that are none of the 8. A part that names one (and none of ours) ends the search: its parent would file a
+# romper under Poshmark's "Pants & Jumpsuits" as pants, and a tank top under "Tops & blouses" as a shirt.
+_OTHER_GARMENT = re.compile(r"jumpsuit|romper|\btanks?\b|\bcamis?\b|camisole|\bcrop(?:ped)?[\s-]?tops?\b")
+
+
 def category_from_label(label: str | None) -> str | None:
     """A marketplace category label or path ("Men > Coats & Jackets") -> one of the 8 categories, else None.
     The leaf of a path is the most specific part, so it is tried first ("Sweats & hoodies > Track jacket" is a jacket).
@@ -113,6 +118,8 @@ def category_from_label(label: str | None) -> str | None:
         for category, pattern in _CATEGORY_RULES:
             if re.search(pattern, part):
                 return category
+        if _OTHER_GARMENT.search(part):
+            return None
     return None
 
 

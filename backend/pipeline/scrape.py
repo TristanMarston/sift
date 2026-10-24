@@ -47,6 +47,14 @@ EBAY_KEEP = frozenset({
     "sellerAccountType", "sellerFeedbackPercentage", "sellerFeedbackScore", "sellerHasStore", "sellerMemberSince"})
 
 
+def ebay_search(query: str) -> str:
+    """eBay's search for used Buy It Now items, as a buyer in the US sees it. The actor's session is sometimes a buyer
+    abroad: results then skew to foreign sellers and even US items are quoted international shipping. Shipping to the US
+    (`_fcid=1`, a US ZIP) pins it; auctions are dropped in step 02, so they are not paid for either (`LH_BIN=1`)."""
+    return (f"https://www.ebay.com/sch/i.html?_nkw={quote_plus(query)}&LH_ItemCondition=3000&LH_BIN=1"
+            "&_fcid=1&_stpos=10001&_sop=12")
+
+
 ACTORS = {
     # Depop records carry the seller's city (`location`) and a `slug` that starts with their handle.
     "depop": Actor("jongoose/depop-scraper", Decimal("0.001"), Decimal("0"),
@@ -58,13 +66,14 @@ ACTORS = {
                      lambda q, n: {"searchQuery": q, "maxItems": n, "scrapeDetails": True}),
     # Details mode returns description, all photos, size, shipping and seller counts. The first Mercari actor we
     # tried (getascraper) returned card data only. The dataset also holds free search/status/summary rows.
+    # Categories 1 and 2 are Women and Men (3 is Kids): one search each, so kids' items are not paid for.
     "mercari": Actor("automation_craft/mercari-us-scraper", Decimal("0.00273"), Decimal("0.006"),
                      lambda q, n: {"keywords": [q], "statuses": ["on_sale"], "includeDetails": True, "maxItems": n,
-                                   "excludeKeywords": KIDS_WORDS},
+                                   "excludeKeywords": KIDS_WORDS, "usCategoryIds": [1, 2]},
                      is_item=lambda row: row.get("type") == "listing"),
     "ebay": Actor("memo23/ebay-search-scraper-ppe", Decimal("0.005"), Decimal("0.02"),
-                  lambda q, n: {"searchQueries": [q], "maxItems": n, "marketplace": "ebay.com", "mode": "active",
-                                "condition": "used", "detailedItems": True, "includeDescription": True,
+                  lambda q, n: {"startUrls": [{"url": ebay_search(q)}], "maxItems": n, "marketplace": "ebay.com",
+                                "mode": "active", "condition": "used", "detailedItems": True, "includeDescription": True,
                                 "includeSummary": False}, EBAY_KEEP),
 }
 
@@ -192,7 +201,8 @@ def _execute(client, task: Task, cap: Decimal, data_dir: Path, classify, seen: s
     counts, ids = H.RowCounts(), set()
     try:
         run = client.actor(actor.id).call(run_input=actor.build_input(task.query, task.max_items),
-                                          max_total_charge_usd=cap, run_timeout=RUN_TIMEOUT)
+                                          max_total_charge_usd=cap, run_timeout=RUN_TIMEOUT,
+                                          logger=None)   # don't stream the actor's log into ours: _fetch_log reads it
     except Exception as e:
         return Outcome({**entry, "status_message": f"{type(e).__name__}: {e}"}, counts, "", ids)
     if run is None:

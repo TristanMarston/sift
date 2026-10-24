@@ -11,7 +11,7 @@ def _title(raw: dict) -> str | None:
     The seller's real title is the first line of the description without its hashtags (at most 120 characters)."""
     for line in (raw.get("description") or "").split("\n"):
         line = " ".join(re.sub(r"#\S*", " ", line).split())
-        if line:
+        if re.search(r"[^\W_]", line):   # a letter or digit: a line of only emoji ("✨✨✨") is not a title
             return line if len(line) <= 120 else line[:121].rsplit(" ", 1)[0][:120]
     return raw.get("title")
 
@@ -19,6 +19,8 @@ def _title(raw: dict) -> str | None:
 def map_item(raw: dict, category: str, scraped_at) -> Normalized:
     price, original = raw.get("price") or {}, raw.get("originalPrice") or {}
     label = " ".join(str(raw.get(k) or "") for k in ("category", "productType", "group"))
+    if raw.get("group") == "tops":   # Depop is British: a vest under tops is a tank top ("vests-tanks-camis")
+        label = re.sub(r"\bvests?\b", "tank", label)
     sizes = raw.get("sizes") or []
     size = (sizes[0] if sizes else raw.get("size")) or None
     # Depop has no kids label, but its kids department uses only broad categories ("Kids > Shoes", where adults get

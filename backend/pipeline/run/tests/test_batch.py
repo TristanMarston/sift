@@ -103,19 +103,15 @@ def test_one_batch_scrapes_every_lane_checks_it_shares_it_and_rebuilds_the_catal
 
 
 def test_lanes_run_side_by_side_and_every_entry_lands_whole(tmp_path):
-    lock, now, peak = threading.Lock(), [0], [0]
+    both = threading.Barrier(2)
 
-    def slow(mp, q, n):
-        with lock:
-            now[0] += 1
-            peak[0] = max(peak[0], now[0])
-        time.sleep(0.05)
-        with lock:
-            now[0] -= 1
+    def together(mp, q, n):
+        if q in ("t1", "e1"):        # each lane's first run waits until the other lane's is running too
+            both.wait(timeout=5)     # one lane at a time would break the barrier: that run then fails
         return full_rows(mp, q, n)
-    go(FakeApify(rows=slow), tmp_path)
-    assert peak[0] == 2
-    assert len(jsonl.load(tmp_path / "runs.jsonl")) == 3
+    go(FakeApify(rows=together), tmp_path)
+    entries = jsonl.load(tmp_path / "runs.jsonl")
+    assert len(entries) == 3 and all(e["status"] == "SUCCEEDED" for e in entries)
 
 
 def test_batches_all_keeps_going_until_nothing_is_left(tmp_path):
@@ -173,7 +169,11 @@ def test_ctrl_c_lets_the_lanes_finish_their_current_run_then_stops(tmp_path):
             time.sleep(0.01)
         return full_rows(mp, q, n)
     client = FakeApify(rows=interrupt)
-    code, lines = go(client, tmp_path, only={"depop"})
+    old = signal.signal(signal.SIGINT, signal.default_int_handler)   # `pytest &` starts with Ctrl-C ignored
+    try:
+        code, lines = go(client, tmp_path, only={"depop"})
+    finally:
+        signal.signal(signal.SIGINT, old)
     assert code == 130 and len(client.calls) == 1 and not (tmp_path / "STOP").exists()
     assert len(jsonl.load(tmp_path / "runs.jsonl")) == 1 and len(batch_dirs(tmp_path)) == 1
 

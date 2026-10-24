@@ -10,7 +10,7 @@ import yaml
 from pydantic import BaseModel, ValidationError
 
 import jsonl
-from listing import Evidence, Fiber, Listing, Materials, Normalized
+from listing import Category, Evidence, Fiber, Listing, Materials, Normalized
 from normalize.common import slug
 
 _LAMBSWOOL = "lamb(?:['’]?s|s['’])?\\s?wool"   # lambswool, lambs wool, lamb's wool
@@ -26,7 +26,13 @@ _CANON = {"poly": "polyester", "polyamide": "nylon", "spandex": "elastane", "lyc
           "suede": "leather"}
 # Words sellers put between the percentage and the fiber: "100% pure new wool", "100% Italian boiled wool".
 _ADJ = r"(?:(?:pure|virgin|new|fine|extra[\s-]?fine|super[\s-]?fine|italian|scottish|worsted|boiled|premium|genuine|" \
-       r"shetland|baby)[\s/]+)*"
+       r"shetland|baby|\d[\s-]?ply)[\s/]+)*"
+# Lining and insulation are not what the garment is made of (MATERIAL_KEYS skips eBay's fields for them for the same
+# reason). Resellers paste those fields into descriptions ("Lining Material: Nylon"), and tags say "Lining: 100% poly".
+_PCTS = r"\d{1,3}(?:\.\d+)?\s*%\s*[a-z]+(?:\s*[,/&]?\s*(?:and\s+)?\d{1,3}(?:\.\d+)?\s*%\s*[a-z]+)*"
+_WORDS = r"[a-z]+(?:\s*/\s*[a-z]+)*"   # "Acrylic/Polyester"
+_INNER = re.compile(rf"\b(?:lining|insulation)(?:\s+material)?\s*[:\-]\s*(?:{_PCTS}|{_WORDS})|\blined\s+with\s+(?:{_PCTS}|{_WORDS})"
+                    rf"|(?:\d{{1,3}}(?:\.\d+)?\s*%\s*)?\b[a-z]+\s+lining\b(?!\s*(?:material|[:\-]))", re.I)
 _PCT = re.compile(rf"(?<![\d.])(\d{{1,3}}(?:\.\d+)?)\s*%\s*{_ADJ}(organic\s+|recycled\s+)?({_FIBER})\b", re.I)
 _BARE_RE = re.compile(rf"\b(organic\s+|recycled\s+)?({_BARE})\b", re.I)
 # A dedicated material field is unambiguous, so there "leather", "down" and "poly" are fibers too, and suede is leather.
@@ -81,6 +87,7 @@ _MADE_IN = re.compile(r"\bmade\s+in\s*:?\s*(?:the\s+)?("
 class ProductLine(BaseModel):
     brand: str
     title_has: list[str]
+    categories: list[Category]   # the garments the line covers: a name can also be a shoe ("Nuptse Traction Booties")
     note: str
     fibers: list[Fiber]
     durable: bool = False  # True: a known long-lived line (quality +2); False: the line only tells us its fabric
@@ -103,6 +110,7 @@ def parse_fibers(text: str, field: bool = False) -> tuple[list[Fiber], str]:
             out.append(fiber)
             snips.append(snippet)
 
+    text = _INNER.sub(" ", re.sub(r"#\w+", " ", text))   # hashtags are tags, not claims: resellers tag the lining too
     for m in _FAUX_LEATHER.finditer(text):
         add("synthetic_leather", None, "", m[0])
     text = _FAUX_LEATHER.sub(" ", text)
@@ -131,10 +139,10 @@ def to_materials(fibers: list[Fiber], certifications: list[str]) -> Materials:
     return Materials(fibers=fibers, synthetic_share=share, certifications=certifications, composition_suspect=suspect)
 
 
-def match_product_line(brand: str | None, title: str, lines: list[ProductLine]) -> ProductLine | None:
+def match_product_line(brand: str | None, title: str, category: str, lines: list[ProductLine]) -> ProductLine | None:
     for p in lines:
         brand_ok = slug(p.brand) == slug(brand) if brand else slug(p.brand) in slug(title)
-        if brand_ok and all(re.search(rf"\b{re.escape(w)}\b", title, re.I) for w in p.title_has):
+        if brand_ok and category in p.categories and all(re.search(rf"\b{re.escape(w)}\b", title, re.I) for w in p.title_has):
             return p
 
 
@@ -158,7 +166,7 @@ def extract(n: Normalized, lines: list[ProductLine] = PRODUCT_LINES) -> Listing:
     if not fibers or (all(f.pct is None for f in fibers) and any(f.pct is not None for f in in_text)
                       and {f.fiber for f in fibers} <= {f.fiber for f in in_text}):
         fibers, snippet, source = in_text, text_snippet, "listing_text"
-    line = match_product_line(n.brand, f"{n.title} {spec.get('product line', '')} {spec.get('model', '')}", lines)
+    line = match_product_line(n.brand, f"{n.title} {spec.get('product line', '')} {spec.get('model', '')}", n.category, lines)
     if fibers:
         note("materials.fibers", "claimed", source, snippet)
     elif line:
