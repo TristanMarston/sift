@@ -209,7 +209,8 @@ Any non-2xx response has the body `{"error": {"code": "...", "message": "..."}}`
   costs more than the typical match**, so the UI shows "Break-even: wear this N+ times to win" exactly when it is set.
 - `wear.facts` are the assumptions behind `expected_wears` (the category baseline and the condition factor).
   Show them under "Expected wears" so the number is never a black box.
-- `match.band`: `exact` when `similarity ≥ 0.9`, otherwise `similar`.
+- `match.band`: `exact` when `similarity ≥ 0.9`, `close` from 0.8 (the same garment in another colour or cut),
+  otherwise `similar` (the kind of thing).
 - `thumb_url` is a small (~320 px) variant of the first photo, fast on a phone. Use `image_urls` for the full gallery.
 - `quality.level == "unknown"` and `facts == []` → show **"Not enough evidence yet."**
   `score` is then `null`, and the item sorts last on that marker but stays in the list.

@@ -35,7 +35,7 @@ export type Result = {
     thumb_url: string | null;
     image_urls: string[];
     flags: { is_vintage: boolean; is_deadstock: boolean; is_upcycled: boolean };
-    match: { similarity: number; band: 'exact' | 'similar' };
+    match: { similarity: number; band: 'exact' | 'close' | 'similar' };
     cost: {
         price_cents: number;
         currency: 'USD';
