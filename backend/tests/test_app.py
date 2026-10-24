@@ -116,6 +116,32 @@ def test_bad_params_are_invalid_params(client, params):
     assert error_code(search(client, params), 400) == "invalid_params"
 
 
+def heic(size=(64, 48)):
+    """An iPhone photo as the browser hands it over (Pillow needs pillow-heif to read it)."""
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+    return jpeg(size, "HEIF")
+
+
+def test_heic_photos_are_accepted_like_jpeg(client):
+    """iPhones shoot HEIC. The file is decoded at the door; everything after (upright, embed, detect) sees a PIL
+    image as before, so the embedding pipeline is unchanged."""
+    body = valid("SearchResponse", search(client, image=heic()).json())
+    assert [r["id"] for r in body["results"]] == [r["id"] for r in search(client).json()["results"]]
+    d = client.post("/detect", files={"image": ("p.heic", heic(), "image/heic")})
+    assert d.status_code == 200 and d.json()["image"] == {"width": 64, "height": 48}
+
+
+def test_jpeg_converts_a_photo_the_browser_cannot_decode(client):
+    """Chrome cannot draw a HEIC file, so the web app asks for a JPEG (upright, long edge at most 1024 px) and carries on
+    with its usual crop-and-search."""
+    r = client.post("/jpeg", files={"image": ("p.heic", heic((2048, 1024)), "image/heic")})
+    assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg"
+    im = Image.open(io.BytesIO(r.content))
+    assert (im.format, im.size) == ("JPEG", (1024, 512))
+    assert error_code(client.post("/jpeg", files={"image": ("p.txt", b"hello", "text/plain")}), 400) == "invalid_image"
+
+
 def test_a_file_that_is_not_a_photo_is_invalid_image(client):
     assert error_code(search(client, image=b"%PDF-1.4 not a photo"), 400) == "invalid_image"
     assert error_code(client.post("/search", data={"params": "{}"}), 400) == "invalid_image"  # no file at all
