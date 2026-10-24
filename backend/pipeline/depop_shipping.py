@@ -4,7 +4,9 @@ the catalog had "shipping unknown". parsebird/depop-scraper in URL mode returns 
 is dropped). Answers are cached in depop_shipping.jsonl, so reruns after a rebuild re-apply them for free; listings
 the actor no longer finds (sold or removed) are remembered as unknown; failed chunks are retried next run."""
 import os
+import threading
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from pathlib import Path
 
@@ -48,7 +50,8 @@ def apply(row: dict, rec: dict) -> dict:
     return {**row, "cost": cost}
 
 
-def ship_file(path, cache_path, fetch=fetch_apify, chunk: int = CHUNK, limit: int | None = None) -> Counter:
+def ship_file(path, cache_path, fetch=fetch_apify, chunk: int = CHUNK, limit: int | None = None,
+              workers: int = 1) -> Counter:
     path, cache_path = Path(path), Path(cache_path)
     answered = {d["id"]: d for d in (jsonl.load(cache_path) if cache_path.exists() else [])}
     rows, stats, today = jsonl.load(path), Counter(), date.today().isoformat()
@@ -60,20 +63,26 @@ def ship_file(path, cache_path, fetch=fetch_apify, chunk: int = CHUNK, limit: in
             stats["cached"] += 1
         elif limit is None or len(todo) < limit:
             todo.append(r)
-    for i in range(0, len(todo), chunk):
-        part = todo[i:i + chunk]
+    lock = threading.Lock()
+
+    def one(part):
         try:
             items = {str(it["id"]): it for it in fetch([r["url"] for r in part])}
         except Exception:  # noqa: BLE001  the whole chunk is retried next run
-            stats["error"] += len(part)
-            continue
+            with lock:
+                stats["error"] += len(part)
+            return
         for r in part:
             it = items.get(r["external_id"])
             rec = _record(it, today) if it else {"id": r["external_id"], "as_of": today, "shipping_cents": None,
                                                   "free_shipping": None}
-            stats["fetched" if it else "not_found"] += 1
-            answered[rec["id"]] = rec
+            with lock:
+                stats["fetched" if it else "not_found"] += 1
+                answered[rec["id"]] = rec
             jsonl.append(cache_path, rec)
+
+    with ThreadPoolExecutor(workers) as pool:   # the Apify account runs 5 actors at once: keep one slot free
+        list(pool.map(one, [todo[i:i + chunk] for i in range(0, len(todo), chunk)]))
     out = [apply(r, answered[r["external_id"]]) if r["marketplace"] == "depop" and r["external_id"] in answered else r
            for r in rows]
     path.with_suffix(".tmp").write_text("".join(jsonl.dumps(r) + "\n" for r in out), encoding="utf-8", newline="\n")

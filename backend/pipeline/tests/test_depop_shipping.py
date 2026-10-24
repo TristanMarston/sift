@@ -71,3 +71,21 @@ def test_a_failed_chunk_is_retried_next_run(tmp_path):
     assert stats["error"] == 1 and out[0]["cost"]["shipping_cents"] is None
     stats, out = run(tmp_path, [depop(1)], lambda urls: [answer(1)])
     assert stats["fetched"] == 1
+
+
+def test_chunks_can_run_side_by_side(tmp_path):
+    import threading
+    import time
+    live, peak, lock = [0], [0], threading.Lock()
+
+    def fetch(urls):
+        with lock:
+            live[0] += 1
+            peak[0] = max(peak[0], live[0])
+        time.sleep(0.05)
+        with lock:
+            live[0] -= 1
+        return [answer(u.rstrip("/").split("-")[-1]) for u in urls]
+    stats, out = run(tmp_path, [depop(i) for i in range(8)], fetch, chunk=2, workers=4)
+    assert stats["fetched"] == 8 and peak[0] > 1 and all(r["cost"]["shipping_cents"] == 199 for r in out)
+    assert len(jsonl.load(tmp_path / "depop_shipping.jsonl")) == 8

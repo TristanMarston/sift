@@ -34,7 +34,7 @@ def main():
     load_dotenv(HERE.parents[1] / ".env")
     if not os.environ.get("APIFY_TOKEN"):
         raise SystemExit("APIFY_TOKEN is not set (repo root .env)")
-    print(dict(D.ship_file(data / "listings.jsonl", cache, limit=args.limit)))
+    print(dict(D.ship_file(data / "listings.jsonl", cache, limit=args.limit, workers=4)))
 
 
 if __name__ == "__main__":
