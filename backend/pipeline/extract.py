@@ -9,6 +9,7 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, ValidationError
 
+import jsonl
 from listing import Evidence, Fiber, Listing, Materials, Normalized
 from normalize.common import slug
 
@@ -177,9 +178,9 @@ def extract(n: Normalized, lines: list[ProductLine] = PRODUCT_LINES) -> Listing:
 def extract_file(src, dst) -> Counter:
     """Step 03 driver: normalized.jsonl -> listings.jsonl. Lines that do not validate are counted and skipped."""
     stats, out = Counter(), []
-    for line in Path(src).read_text().splitlines():
+    for line in jsonl.read(src):
         try:
-            out.append(extract(Normalized.model_validate_json(line)).model_dump_json() + "\n")
+            out.append(jsonl.dumps(extract(Normalized.model_validate_json(line)).model_dump(mode="json")) + "\n")
         except ValidationError:
             stats["invalid"] += 1
     Path(dst).with_suffix(".tmp").write_text("".join(out))

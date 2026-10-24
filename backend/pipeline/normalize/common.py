@@ -12,6 +12,19 @@ def slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]", "", text.lower())
 
 
+_INVISIBLE = re.compile("[\u200b\u200c\u200d\u2060\ufeff\u00ad]")  # zero-width characters, word joiner, BOM, soft hyphen
+
+
+def clean_text(text: str | None, one_line: bool = False) -> str | None:
+    """Drop invisible characters (a zero-width space inside "100%cotton" defeats the composition regex), turn
+    non-breaking spaces into plain ones and trim. A one-line field also collapses runs of whitespace. None if empty."""
+    if text is None:
+        return None
+    text = _INVISIBLE.sub("", text).translate({0xA0: " ", 0x2007: " ", 0x202F: " "})
+    text = re.sub(r"\s+", " ", text) if one_line else re.sub(r"[ \t]{2,}", " ", text)
+    return "\n".join(line.strip(" \t") for line in text.split("\n")).strip() or None
+
+
 def to_cents(value) -> int | None:
     """48, "48.00", "$1,200.50" -> cents. None for anything that is not a non-negative amount."""
     if value is None or isinstance(value, bool):

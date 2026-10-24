@@ -81,7 +81,8 @@ def test_estimate_simulates_the_quota_stop_and_sums_best_case_cost_and_worst_cas
     ("grailed", {"searchQuery": "carhartt jacket", "maxItems": 50, "scrapeDetails": True}),
     ("poshmark", {"categoryUrls": ["https://poshmark.com/search?query=carhartt+jacket&type=listings&src=dir"],
                   "maxResultsPerScrape": 50, "usePagination": True, "scrapeProductDetails": True}),
-    ("mercari", {"keywords": ["carhartt jacket"], "statuses": ["on_sale"], "includeDetails": True, "maxItems": 50}),
+    ("mercari", {"keywords": ["carhartt jacket"], "statuses": ["on_sale"], "includeDetails": True, "maxItems": 50,
+                 "excludeKeywords": S.KIDS_WORDS}),
     ("ebay", {"searchQueries": ["carhartt jacket"], "maxItems": 50, "marketplace": "ebay.com", "mode": "active",
               "condition": "used", "detailedItems": True, "includeDescription": True, "includeSummary": False}),
 ])
@@ -251,6 +252,21 @@ def test_mercari_uses_the_actor_that_returns_listing_details():
     """getascraper/mercari-us-scraper returned card data only (no description, one photo) and was dropped."""
     assert S.ACTORS["mercari"].id == "automation_craft/mercari-us-scraper"
     assert S.charge_cap("mercari", 100) == Decimal("0.35")      # (100 * 0.00273 + 0.006) * 1.25, rounded up
+
+
+def test_kids_filter_words_never_exclude_adult_terms():
+    """The actor matches word prefixes, so 'boy' would drop 'boyfriend jeans' and 'baby' would drop 'baby alpaca'."""
+    adult_titles = ["boyfriend jeans", "baby alpaca sweater", "babydoll dress", "girlfriend tee", "kid mohair cardigan",
+                    "infinity scarf"]
+    for title in adult_titles:
+        assert not any(w in title.split() or any(part.startswith(w) for part in title.split()) for w in S.KIDS_WORDS), title
+
+
+def test_raw_files_are_ascii_so_unicode_line_separators_cannot_split_a_record(tmp_path):
+    S.run_plan(FakeClient(rows=[{"id": 1, "description": "a\u2028b caf\u00e9"}, {"id": 2}]), [t()], None, tmp_path)
+    (path,) = (tmp_path / "raw" / "depop").glob("*.jsonl")
+    text = path.read_text()
+    assert text.isascii() and len(text.splitlines()) == 2
 
 
 def test_free_summary_rows_are_neither_written_nor_counted(tmp_path):

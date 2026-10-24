@@ -173,3 +173,14 @@ def test_require_returns_the_value_or_drops():
     for empty in (None, "", [], 0):
         with pytest.raises(C.Drop, match="no_title"):
             C.require(empty, "no_title")
+
+
+@pytest.mark.parametrize("text, one_line, expected", [
+    ("\u200bWoolrich  Womens\u00a0XL", True, "Woolrich Womens XL"),
+    ("100%\u200bcotton\u2060 tee", True, "100%cotton tee"),
+    ("soft\u00adware", True, "software"),
+    ("line one\n\nline  two\u00a0here  ", False, "line one\n\nline two here"),
+    ("  \u200b ", True, None), ("", False, None), (None, False, None),
+])
+def test_clean_text_removes_invisible_characters_and_odd_spaces(text, one_line, expected):
+    assert C.clean_text(text, one_line=one_line) == expected

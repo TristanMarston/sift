@@ -6,6 +6,7 @@ import argparse
 from datetime import date
 from pathlib import Path
 
+import jsonl
 import report
 from listing import Listing
 
@@ -18,7 +19,7 @@ def main():
     ap.add_argument("--min-rows", type=int, default=20_000, help="active rows needed to pass (default 20000)")
     args = ap.parse_args()
     data = HERE / "data" / ("test" if args.test else "")
-    listings = [Listing.model_validate_json(line) for line in (data / "listings.jsonl").read_text().splitlines()]
+    listings = [Listing.model_validate_json(line) for line in jsonl.read(data / "listings.jsonl")]
     s = report.stats(listings)
     md = report.render(s, report.acceptance(s, listings, args.min_rows), date.today().isoformat())
     (data / "REPORT.md" if args.test else HERE / "REPORT.md").write_text(md)

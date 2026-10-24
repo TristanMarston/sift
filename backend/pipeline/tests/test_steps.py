@@ -64,6 +64,16 @@ def test_duplicates_keep_the_newest_scrape(tmp_path):
     assert only["cost"]["price_cents"] == 150 and stats["duplicates"] == 1 and stats["kept"] == 1
 
 
+def test_titles_and_descriptions_are_cleaned_of_invisible_characters(tmp_path):
+    def noisy(raw, category, scraped_at):
+        n = mapper(raw, category, scraped_at)
+        return n.model_copy(update={"title": "\u200bWoolrich  vest", "description": "100%\u200bwool\u00a0blend"})
+    write_run(tmp_path, "r1", [{"id": "a", "price": 100}])
+    N.normalize_all(tmp_path, {"depop": noisy})
+    (only,) = [json.loads(line) for line in (tmp_path / "normalized.jsonl").read_text().splitlines()]
+    assert (only["title"], only["description"]) == ("Woolrich vest", "100%wool blend")
+
+
 def test_failed_runs_and_missing_files_are_skipped(tmp_path):
     write_run(tmp_path, "bad", [{"id": "x", "price": 1}], status="FAILED")
     write_run(tmp_path, "gone", [{"id": "y", "price": 1}], file=False)

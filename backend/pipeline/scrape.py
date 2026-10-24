@@ -1,7 +1,6 @@
 """Run the Apify actors listed in queries.yaml.
 Every call carries max_total_charge_usd as a call option (never inside run_input). Seller identity is scrubbed
 before anything is written. Reruns resume: finished queries are skipped and quotas count earlier rows."""
-import json
 from collections import Counter
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
@@ -12,8 +11,13 @@ from urllib.parse import quote_plus
 
 import yaml
 
+import jsonl
+
 OK = "SUCCEEDED"
 MAX_FAILS_IN_A_ROW = 3
+# Title words that mean children's clothing. The Mercari actor matches word *prefixes*, so these are whole words:
+# "boy" would also drop "boyfriend jeans" and "baby" would drop "baby alpaca". normalize/mercari.py drops what slips through.
+KIDS_WORDS = ["kids", "kid's", "boys", "boy's", "girls", "girl's", "toddler", "toddlers", "infant", "youth"]
 CAP_MARGIN, CAP_FLOOR = Decimal("1.25"), Decimal("0.05")
 RUN_TIMEOUT = timedelta(minutes=30)  # Apify ends a hung run as TIMED-OUT
 
@@ -50,7 +54,8 @@ ACTORS = {
     # Details mode returns description, all photos, size, shipping and seller counts. The first Mercari actor we
     # tried (getascraper) returned card data only. The dataset also holds free search/status/summary rows.
     "mercari": Actor("automation_craft/mercari-us-scraper", Decimal("0.00273"), Decimal("0.006"),
-                     lambda q, n: {"keywords": [q], "statuses": ["on_sale"], "includeDetails": True, "maxItems": n},
+                     lambda q, n: {"keywords": [q], "statuses": ["on_sale"], "includeDetails": True, "maxItems": n,
+                                   "excludeKeywords": KIDS_WORDS},
                      is_item=lambda row: row.get("type") == "listing"),
     "ebay": Actor("memo23/ebay-search-scraper-ppe", Decimal("0.005"), Decimal("0.02"),
                   lambda q, n: {"searchQueries": [q], "maxItems": n, "marketplace": "ebay.com", "mode": "active",
@@ -172,7 +177,7 @@ def _execute(client, task: Task, cap: Decimal, data_dir: Path) -> dict:
         with path.with_suffix(".tmp").open("w") as f:
             for item in client.dataset(run.default_dataset_id).iterate_items():
                 if actor.is_item is None or actor.is_item(item):
-                    f.write(json.dumps(scrub(item, keep=actor.keep), ensure_ascii=False) + "\n")
+                    f.write(jsonl.dumps(scrub(item, keep=actor.keep)) + "\n")
                     n += 1
         path.with_suffix(".tmp").replace(path)
     except Exception as e:
@@ -188,7 +193,7 @@ def say(message: str) -> None:
 def run_plan(client, plan, quotas, data_dir, max_spend: Decimal | None = None, log=say) -> dict:
     data_dir = Path(data_dir)
     runs_path = data_dir / "runs.jsonl"
-    past = [json.loads(line) for line in runs_path.read_text().splitlines()] if runs_path.exists() else []
+    past = jsonl.load(runs_path)
     done = {(r["marketplace"], r["category"], r["query"]) for r in past if r["status"] == OK}
     rows = Counter()
     spent = sum((Decimal(str(r["est_charge_usd"])) for r in past), Decimal(0))
@@ -209,7 +214,7 @@ def run_plan(client, plan, quotas, data_dir, max_spend: Decimal | None = None, l
         entry = _execute(client, task, cap, data_dir)
         runs_path.parent.mkdir(parents=True, exist_ok=True)
         with runs_path.open("a") as f:
-            f.write(json.dumps(entry) + "\n")
+            f.write(jsonl.dumps(entry) + "\n")
         spent += Decimal(str(entry["est_charge_usd"]))
         ok = entry["status"] == OK
         rows[mp] += entry["items"]
