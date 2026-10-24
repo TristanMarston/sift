@@ -121,3 +121,10 @@ def test_care_tag_answers_travel_with_a_snapshot_so_nobody_pays_for_them_twice(t
     assert L.import_snapshot(dst, tmp_path / "snap.zip")["tags"] == 1
     assert [t["id"] for t in jsonl.load(dst / "tags.jsonl")] == ["depop:1"]
     assert "tags" not in L.import_snapshot(dst, tmp_path / "snap.zip")   # importing twice changes nothing
+
+
+def test_depop_shipping_answers_travel_with_a_snapshot_too(tmp_path):
+    src, dst = snapshot_dir(tmp_path), tmp_path / "dst"
+    jsonl.append(src / "depop_shipping.jsonl", {"id": "1", "as_of": "2026-10-24", "shipping_cents": 199, "free_shipping": False})
+    L.export(src, tmp_path / "snap.zip")
+    assert L.import_snapshot(dst, tmp_path / "snap.zip")["shipping"] == 1
