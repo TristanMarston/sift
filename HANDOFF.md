@@ -6,7 +6,7 @@ the contract; `CLAUDE.md` rules still apply (branch per feature, PR, TDD for dat
 ## TL;DR
 
 - The backend is **built, merged and live**: <https://lu-anthony-73--sift-api.us-east.modal.run> serves
-  `GET /health`, `POST /detect`, `POST /search` over **51,131 real listings** (5 marketplaces), with Claude Haiku in
+  `GET /health`, `POST /detect`, `POST /search` over **51,101 real listings** (5 marketplaces), with Claude Haiku in
   `/detect`. PRs #4–#39 are merged; 885 backend tests pass; backend CI runs on every PR touching `backend/` or `schema/`.
 - **The overnight jobs finished** (Oct 24): 51,131 listings, shipping known for 100%, index rebuilt and redeployed.
   Scraping and deploying are open again; tell the team before you run either.
@@ -19,6 +19,9 @@ Depop shipping for all Depop listings (21,213 fetched) → 6 scrape batches (all
 new listings (3,578 got verified fabric) → snapshot `sift-data-2026-10-24.zip` in the Modal volume `/snapshots/` →
 index rebuilt (51,131) → API redeployed. Live test: 21 photos, no schema errors, 50 results each.
 
+Rebuilt again at 11:00 PT with the extraction fixes from #43 (free: no new scraping): 30 tank tops/rompers dropped,
+649 listings no longer read a lining as the fabric. Live: **51,101** listings, same live test passes.
+
 Before you scrape again, check that no one else is running a batch: the batch runner needs all 5 Apify run slots
 (`pipeline/run/README.md`). After any redeploy, stop the old warm container (`modal container stop -y <id>`), or it
 keeps serving the old index.
@@ -29,7 +32,7 @@ Base URL: `https://lu-anthony-73--sift-api.us-east.modal.run` · Contract: `sche
 
 | Endpoint | Behaviour worth knowing |
 | --- | --- |
-| `GET /health` | `{"status":"ok","index_size":51131}` |
+| `GET /health` | `{"status":"ok","index_size":51101}` |
 | `POST /detect` | multipart `image`. SegFormer boxes + Claude Haiku labels ("black leather jacket", "white ribbed crop top"), one garment per tab (overlaps merged, shoe pairs = 1). Product shots → one whole-photo garment with a category. `category` may be **null**. **~3 s warm, ~10 s cold** — the web app gives up at 8 s and searches the whole photo. |
 | `POST /search` | multipart `image` + `params` JSON (`SearchParams`). Top 50, cross-posted duplicates collapsed to the **cheapest copy**. **No category → read from the photo**; `query.category` in the response says which was used. ~0.5 s. |
 | Errors | always `{"error": {"code", "message"}}`: 400 `invalid_image` / `invalid_params`, 413 `image_too_large`, 500 `internal`. |
@@ -44,7 +47,7 @@ null → "Shipping unknown" (already handled). Break-even beyond the item's life
 
 | Feature | Status | Where | Notes |
 | --- | --- | --- | --- |
-| Scrape pipeline (5 marketplaces, batches, checks, privacy) | ✅ | `backend/pipeline/`, `pipeline/run/` (Andy) | Ctrl-C bug fixed (#19); 51,131 listings, all checks passed |
+| Scrape pipeline (5 marketplaces, batches, checks, privacy) | ✅ | `backend/pipeline/`, `pipeline/run/` (Andy) | Ctrl-C bug fixed (#19); 51,101 listings, all checks passed |
 | Search index (FashionSigLIP, ONNX) | ✅ | `src/backend/embed.py`, `index.py` | median top match 0.89; product shots 0.89–0.99 |
 | Garment detection | ✅ | `src/backend/detect.py` | SegFormer + Haiku + FashionSigLIP naming; YOLOS swap via `backend="yolos"` |
 | HTTP API + hosting | ✅ | `src/backend/app.py`, `backend/modal_app.py` | deploy: `SIFT_HAIKU=1 SIFT_INDEX_NAME=full uv run modal deploy modal_app.py` |
@@ -78,6 +81,17 @@ cd web && npm ci && npm test && npm run lint            # web (npm test needs No
 ```
 
 Get the data on your machine: `backend/DATA.md` (snapshot zip from the Modal volume, then `cli.py import`).
+
+## Open questions (Oct 24, 11:00 PT)
+
+- **Apify budget: $19.73 left** of the $205 monthly limit. No more scraping this month without raising the limit;
+  ~$20 buys ~6k more Depop shipping lookups or ~1 small batch.
+- **Haram — `REPORT.md` says 69,027 listings.** The team ledger (`cli.py sync`: "already up to date") and the live
+  index have 51,101. Where are the other ~18k? If they're on your Mac, `cli.py export` them and share the zip (they'd
+  need tags + Depop shipping before indexing).
+- **#42 is superseded:** its 4 commits are already on `main` through #43. Close it.
+- From Haram's review, for the API/ranker: buyer fees are not in `total_cents` (Depop marketplace fee, Mercari
+  ~3.5%), and sizes are raw strings while the size filter is exact.
 
 ## What you (or your agent) can do now
 
