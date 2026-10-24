@@ -89,6 +89,10 @@ def run_lanes(make_client, lanes: dict[str, Lane], data_dir, classify, log=S.say
     spent = sum((Decimal(str(e["est_charge_usd"])) for e in past), Decimal(0))
     results, crashed = {}, {}
 
+    # Each lane says when it is done. Thread.is_alive() can't be trusted here: on Python 3.12 a Ctrl-C that lands
+    # inside Thread.join() can make a running thread look finished, and the runner would leave paid runs behind.
+    done = {mp: threading.Event() for mp in lanes}
+
     def lane(l: Lane):
         try:
             results[l.marketplace] = S.run_plan(make_client(), l.tasks, {l.marketplace: l.quota}, data_dir,
@@ -96,16 +100,20 @@ def run_lanes(make_client, lanes: dict[str, Lane], data_dir, classify, log=S.say
                                                 write_report=False, past=past)
         except Exception as e:
             crashed[l.marketplace] = f"lane crashed: {type(e).__name__}: {e}"
+        finally:
+            done[l.marketplace].set()
 
-    threads = [threading.Thread(target=lane, args=(l,), daemon=True) for l in lanes.values()]
-    pending, interrupted, made_stop, stop = list(threads), False, False, data_dir / "STOP"
+    pending = [(mp, threading.Thread(target=lane, args=(l,), daemon=True)) for mp, l in lanes.items()]
+    started, interrupted, made_stop, stop = [], False, False, data_dir / "STOP"
     while True:
         try:
             while pending:
-                pending.pop(0).start()
-            for t in threads:
-                while t.is_alive():
-                    t.join(0.2)
+                started.append(pending.pop(0))        # before start(): a Ctrl-C can land while start() waits
+                started[-1][1].start()
+            for mp, t in started:
+                # is_alive() is reliable again (no join()); it only rules out a thread whose start() never launched it
+                while not done[mp].wait(0.2) and (t.is_alive() or t.ident is not None):
+                    pass
             break
         except KeyboardInterrupt:
             if interrupted:
