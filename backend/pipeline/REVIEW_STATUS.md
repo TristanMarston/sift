@@ -1,9 +1,11 @@
 # Pipeline review: status
 
-Review of `backend/pipeline/`, started 2026-10-24. Work is on branch `pipeline-review` (made from `pipeline-scraping`).
-Open the PR against `pipeline-scraping`. `gh` isn't installed, so open it in the GitHub web UI. Delete this file before merging.
+Review of `backend/pipeline/`, 2026-10-24. Work is on branch `pipeline-review` (made from `pipeline-scraping`).
+Open the PR against `pipeline-scraping`. Delete this file before merging.
 
 ## Done (committed, tests first)
+
+### First session
 
 | Area | Problem | Fix |
 | --- | --- | --- |
@@ -17,60 +19,46 @@ Open the PR against `pipeline-scraping`. `gh` isn't installed, so open it in the
 | Grailed | Brand "The North Face × Vintage" | Brand from designer list; "Vintage" becomes a flag |
 | Depop raw files | Two fields not allowed by SPEC §8 were kept | `Actor.drop` removes them |
 | Budget | Failed runs booked at start fee only | Booked at their charge cap |
-| Cleanup | Duplicate bad-verdict set; unused `build_plan(only=)` | Removed |
-| Docs | README/SPEC out of date | Updated |
 
-Effect on the old test data: rows with % composition went from 41.8% to 50.4%; vintage flags from 90 to 104; about 20 countries corrected.
+### Second session
 
-## User decisions
+| Area | Problem | Fix |
+| --- | --- | --- |
+| Windows | Files used the platform encoding (cp1252): product-line notes became mojibake, `run_report.md` crashed at the end of a run, 45 tests failed | Every read and write is UTF-8; the CLIs print UTF-8 |
+| Depop title | The actor's title is five words of the description cut mid-phrase | First line of the description without hashtags, ≤ 120 chars (user decision) |
+| Poshmark | `regular_price` was stored as a markdown | It is `retail_price_cents` (0 = none), with a `claimed`/`specifics` evidence record (user decision) |
+| eBay category | `Women's Clothing > Tops` maps to nothing: a whole tee query was dropped and eBay stopped | The `Type` specific is the leaf of the path (user decision). The tee query now gives 20/20 good rows |
+| Category | `Jeans > Boot cut` (Mercari, Poshmark) became sneakers; `Hooded jacket` became a hoodie | Fixed in the rules |
+| Grailed category | `short_sleeve_shirts`/`long_sleeve_shirts` are Grailed's T-shirt categories (checked on grailed.com), so every Grailed tee was a "shirt" | They map to tshirts |
+| Depop kids | Kids items with size "Other" or "One size" got through | Depop's kids department has only the broad categories `Clothing` and `Shoes` (checked on the listing pages); both are dropped |
+| eBay auctions | An auction's price is the current bid (3.5% of eBay rows) | Dropped as `auction`, an expected filter |
+| eBay size | Every eBay sneaker had no size (the key is `US Shoe Size`) | Read it |
+| Brands | Poshmark sellers type `Nike Dunk Low`, `Levi's 501` as the brand; Grailed lists tags like `Flannel`, `Designer`, `Band Tees` as designers | A known brand followed by a model is that brand; the tags are not brands |
+| Materials | eBay sneakers' `Upper Material` was ignored; a bare `Material: Wool` beat a text saying `100% merino wool` | Read `Upper Material` (suede = leather); take the text when it names the same fibers with percentages |
+| Privacy | The seller-block allowlist only applied one level deep | Applies at every depth |
+| CLI | Steps 02–04 had no `--data-dir` | Added |
 
-1. Depop title = first line of the description (hashtags removed, at most 120 chars, cut at a word). Fall back to the actor's title.
-2. Poshmark `regular_price` goes to `cost.retail_price_cents` (not `original_price_cents`). A zero or missing value means null.
+## Live check (second session: $5.41 estimated, of a fresh $10)
 
-## In progress
+The first session's data was on another machine, so the check was redone: the first query of each of the 8 categories on
+all 5 marketplaces at 20 items, plus full-size runs (Depop 200, Poshmark 200, eBay 150) and one `01_scrape.py --test`.
+Data: `pipeline/data/review/all/` (steps 02–04 run on it; `REPORT.md` there). All 44 runs were judged `ok`.
 
-There are 4 failing tests for the two decisions above (committed in the commit "bugs, changes to make", in `test_mappers.py` and `test_extract.py`). Still to do:
-- `normalize/depop.py`: build the title from the description.
-- `normalize/poshmark.py`: pass `retail=` to `make_cost`, not `original=`.
-- `extract.py`: when the mapper already set the retail price, add the evidence record `("cost.retail_price_cents", "claimed",
-  "specifics", "$X.XX")`.
-- Then update the README (Poshmark markdown column, retail-price row, Depop title) and SPEC §9, run `uv run pytest`, and commit.
+| | Depop | Poshmark | Grailed | Mercari | eBay | All |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Rows kept | 348 | 334 | 160 | 133 | 282 | 1257 |
+| Stated material % | 21 | 42 | 68 | 47 | 70 | 46 |
+| Percentages % | 16 | 32 | 42 | 37 | 23 | 27 |
 
-## Live check (about $5.07 of the $10 budget spent)
+Effect of the fixes on this data: Grailed tees 0 → 27 rows in tshirts; sneakers with a material 2 → 70 of 217; eBay
+sneakers with a size 0 → 146 of 146; eBay stated material 46% → 70%.
 
-34 runs in `pipeline/data/review/` (report: `run_report.md`): one query per category per marketplace, plus Mercari at 300 items
-and Grailed at 100. 33 runs were ok. Mercari's 3-page run and Grailed's 100-item run both worked.
+## Still open (documented in README "Known limits")
 
-## Open findings, not fixed yet
-
-1. **Most urgent: eBay "Women's Clothing > Tops" is unmapped.** All 20 rows of `100% cotton tee` were filtered, the run was judged
-   `degraded`, and eBay was stopped. In the real run eBay would most likely stop here too: this is its first t-shirt query,
-   early in the order. Possible fixes: use the eBay specific `Type`/`Style` (e.g. "T-Shirt") when the leaf is generic, or treat
-   a generic "Tops" as no label (fall back to the query's category). Ask the user. Also check whether Poshmark's 7 filtered
-   rows are the same "Tops" issue.
-2. Depop kids item with size "Other" got through. Both Depop kids items seen so far have `category: "Clothing"`, where adult
-   items have "Outerwear". Check this across `data/review/raw/depop` before relying on it. Title words are risky
-   ("Kids See Ghosts", "Beastie Boys").
-3. Grailed resellers cross-list the same item under different listings (same title and price). This needs image-based
-   dedupe later. Note it as a known limit.
-4. Steps 02–04 have no `--data-dir` (step 01 does).
-5. The seller-block allowlist in `scrub()` only filters one level deep. Low risk with the current actors.
-6. Duplicate counts in the run report ignore rows from earlier invocations (report only; step 02 still dedupes).
-7. Every Grailed run logs "site layout may have changed (fell back to cached settings)". Healthy so far, but watch it.
-
-## Checked and fine
-
-- `run.status` is a plain string.
-- Depop descriptions are long enough for the health check (18–20 of 20 are over 40 characters).
-- `--dry-run` matches SPEC §6 ($93.85 best case, $117.96 at the caps).
-- Every estimated cost matched the plan.
-
-## To finish the review
-
-1. Make the 4 red tests pass and commit.
-2. Fix the eBay "Tops" problem (finding 1) with a test, after asking the user which approach they want.
-3. Decide on finding 2.
-4. Rerun steps 02–03 on `data/review` and `data/test` (copy them first) and spot-check categories, materials and flags
-   for the new categories.
-5. Optionally re-run the eBay queries that never ran (budget left: about $4.90).
-6. Push, open the PR, and give the user a short summary.
+1. Grailed resellers cross-list one item under several ids. Needs image-based dedupe later.
+2. `run_report.md` duplicate counts ignore earlier invocations (step 02 still dedupes).
+3. Every Grailed run logs "site layout may have changed (fell back to cached settings)". Healthy so far.
+4. Poshmark has no condition (null on 26% of rows). Only 7% of its titles say NWT/NWOT, so it is not inferred.
+5. Tank tops under a `Shirts` / `Tops & blouses` parent are filed as shirts (rare).
+6. Poshmark and eBay repeat ~10% of rows inside one full-size run; the 30% over-scrape covers it.
+7. No product line for the Nike Dunk Low demo prop (the evidence owner's call: the table needs the maker's own page).
