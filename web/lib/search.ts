@@ -46,7 +46,7 @@ export type Result = {
         retail_price_cents: number | null; // new retail: show "vs retail" only when known
     };
     materials: {
-        fibers: { fiber: string; pct: number | null; organic: boolean; recycled: boolean }[];
+        fibers: { fiber: string; pct: number | null; organic: boolean | null; recycled: boolean | null }[];
         synthetic_share: number | null;
         certifications: string[];
         composition_suspect: boolean;
@@ -65,7 +65,7 @@ export type Result = {
 };
 
 export type SearchResponse = {
-    query: { category?: string; filters: Record<string, unknown> };
+    query: { category?: string | null; filters?: Record<string, unknown> };
     typical: { price_cents: number; expected_wears_mid: number; cpw_cents: number } | null;
     results: Result[];
     orders: Record<Sort, string[]>;

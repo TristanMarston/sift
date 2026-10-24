@@ -4,7 +4,7 @@ import type { Garment } from './types';
 export type Box = { x: number; y: number; w: number; h: number }; // fractions of the photo, top-left origin
 export type DetectResponse = {
     image: { width: number; height: number };
-    garments: { id: string; category: string; label: string; box: Box; confidence: number }[];
+    garments: { id: string; category: string | null; label: string; box: Box; confidence: number }[]; // null: none of the 8
 };
 
 /** API.md: with no garments found, the whole photo is searched as one. Inset a little so its trace reads as a frame. */
@@ -23,5 +23,5 @@ export function toGarments(res: DetectResponse | null): Garment[] {
     if (!res?.garments.length) return [WHOLE_PHOTO];
     return [...res.garments]
         .sort((a, b) => b.confidence - a.confidence)
-        .map((g) => ({ id: g.id, category: g.category, label: g.label.charAt(0).toUpperCase() + g.label.slice(1), attributes: {}, bbox: clampBox(g.box) }));
+        .map((g) => ({ id: g.id, category: g.category ?? '', label: g.label.charAt(0).toUpperCase() + g.label.slice(1), attributes: {}, bbox: clampBox(g.box) }));
 }
