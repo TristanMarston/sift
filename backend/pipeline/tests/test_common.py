@@ -212,9 +212,20 @@ def cost(**kw):
 
 def test_make_cost_basic_and_with_shipping_and_markdown():
     assert cost(price=48) == dict(price_cents=4800, currency="USD", shipping_cents=None, free_shipping=None,
-                                  total_cents=4800, original_price_cents=None, retail_price_cents=None)
+                                  fee_cents=0, total_cents=4800, original_price_cents=None, retail_price_cents=None)
     c = cost(price="48.00", shipping="5.99", original=60)
     assert (c["total_cents"], c["shipping_cents"], c["free_shipping"], c["original_price_cents"]) == (5399, 599, False, 6000)
+
+
+def test_make_cost_adds_a_buyer_fee_to_the_total():
+    c = cost(price=48, shipping="5.99", fee_cents=340)
+    assert (c["fee_cents"], c["total_cents"]) == (340, 5739)
+    assert cost(price=48)["fee_cents"] == 0
+
+
+@pytest.mark.parametrize("price_cents, fee", [(4500, 325), (1900, 195), (1, 101), (None, None)])
+def test_depop_fee_is_the_stated_maximum_5_percent_plus_a_dollar(price_cents, fee):
+    assert C.depop_fee(price_cents) == fee
 
 
 @pytest.mark.parametrize("kw, free", [

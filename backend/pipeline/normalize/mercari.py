@@ -1,9 +1,12 @@
 """Mercari US (automation_craft/mercari-us-scraper, details on) record -> Normalized.
-Buyer total = price + shipping (only when the buyer pays) + Mercari's buyer-protection fee; the fee is not part of
-`cost` (it is a marketplace fee, and no other marketplace's fees are modelled). Mercari US sellers ship from US states."""
+Buyer total = price + shipping (only when the buyer pays) + Mercari's Buyer Protection fee, which the actor returns as
+Mercari's own checkout figure (`buyerProtectionFee`). Mercari help centre, "Fees on Mercari"
+(https://www.mercari.com/us/help_center/article/169/, updated 10/23/2026, read 2026-10-24): "A Buyer Protection fee
+of 3.6% of the combined amount of item price and buyer-paid shipping will be charged to the buyer" (listings created or
+updated since January 6 2025; older ones carry 10%). Mercari US sellers ship from US states."""
 from listing import Normalized
 from normalize.common import (Drop, clean_images, is_kids, make_cost, map_condition, normalize_brand, require,
-                              resolve_category, seller_type)
+                              resolve_category, seller_type, to_cents)
 
 
 def map_item(raw: dict, category: str, scraped_at) -> Normalized:
@@ -26,7 +29,8 @@ def map_item(raw: dict, category: str, scraped_at) -> Normalized:
         subcategory=raw.get("category"), size=raw.get("size") or None, color=raw.get("color") or None,
         condition=map_condition(raw.get("condition")), condition_raw=raw.get("condition"),
         image_urls=require(clean_images(raw.get("photoUrls") or [raw.get("imageUrl")]), "no_image"),
-        cost=make_cost(raw.get("price"), raw.get("currency"), shipping=shipping, original=raw.get("originalPrice")),
+        cost=make_cost(raw.get("price"), raw.get("currency"), shipping=shipping, original=raw.get("originalPrice"),
+                       fee_cents=to_cents(raw.get("buyerProtectionFee"))),
         # a rating of 0 from 0 reviews means "no rating yet", not a bad one
         seller=dict(type=seller_type(count), rating=raw.get("sellerRating") if raw.get("sellerRatingCount") else None,
                     region="US", listing_count=count))

@@ -30,6 +30,12 @@ def test_shipping_is_added_and_the_total_follows(tmp_path):
     Listing.model_validate(out[0])
 
 
+def test_the_buyer_fee_stays_in_the_total_when_shipping_arrives(tmp_path):
+    _, out = run(tmp_path, [depop(1, cost=dict(price_cents=2000, fee_cents=200, total_cents=2200))],
+                 lambda urls: [answer(1, 1.99)])
+    assert (out[0]["cost"]["fee_cents"], out[0]["cost"]["total_cents"]) == (200, 2399)
+
+
 def test_the_us_national_rate_is_used_when_it_differs(tmp_path):
     _, out = run(tmp_path, [depop(1)], lambda urls: [answer(1, ship=12.5, national=4.0)])
     assert out[0]["cost"]["shipping_cents"] == 400

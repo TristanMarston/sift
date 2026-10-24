@@ -2,8 +2,8 @@
 import re
 
 from listing import Normalized
-from normalize.common import (Drop, clean_images, make_cost, map_condition, normalize_brand, normalize_region, require,
-                              resolve_category)
+from normalize.common import (Drop, clean_images, depop_fee, make_cost, map_condition, normalize_brand,
+                              normalize_region, require, resolve_category, to_cents)
 
 
 def _title(raw: dict) -> str | None:
@@ -37,5 +37,6 @@ def map_item(raw: dict, category: str, scraped_at) -> Normalized:
         color=", ".join(raw.get("colours") or []) or None,
         condition=map_condition(raw.get("condition")), condition_raw=raw.get("condition"),
         image_urls=require(clean_images(raw.get("pictureUrls")), "no_image"),
-        cost=make_cost(price.get("amount"), price.get("currency"), original=original.get("amount")),
+        cost=make_cost(price.get("amount"), price.get("currency"), original=original.get("amount"),
+                       fee_cents=depop_fee(to_cents(price.get("amount")))),
         seller=dict(region=normalize_region(raw.get("country"))))

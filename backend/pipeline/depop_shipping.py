@@ -47,7 +47,7 @@ def apply(row: dict, rec: dict) -> dict:
         return row
     price = row["cost"]["price_cents"]
     cost = {**row["cost"], "shipping_cents": rec["shipping_cents"], "free_shipping": rec["free_shipping"],
-            "total_cents": price + rec["shipping_cents"]}
+            "total_cents": price + rec["shipping_cents"] + row["cost"].get("fee_cents", 0)}
     return {**row, "cost": cost}
 
 

@@ -35,14 +35,15 @@ class Cost(_Strict):
     currency: Literal["USD"] = "USD"
     shipping_cents: Cents | None = None
     free_shipping: bool | None = None
+    fee_cents: Cents = 0   # what the marketplace charges the buyer on top (Depop, Mercari); 0 elsewhere
     total_cents: Cents
     original_price_cents: Cents | None = None
     retail_price_cents: Cents | None = None
 
     @model_validator(mode="after")
-    def _total_is_price_plus_known_shipping(self):
-        if self.total_cents != self.price_cents + (self.shipping_cents or 0):
-            raise ValueError("total_cents must equal price_cents + shipping_cents (when known)")
+    def _total_is_price_plus_known_shipping_plus_fee(self):
+        if self.total_cents != self.price_cents + (self.shipping_cents or 0) + self.fee_cents:
+            raise ValueError("total_cents must equal price_cents + shipping_cents (when known) + fee_cents")
         return self
 
 
