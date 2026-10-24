@@ -172,7 +172,12 @@ def _execute(client, task: Task, cap: Decimal, data_dir: Path) -> dict:
     return {**entry, "items": n, "est_charge_usd": float(n * actor.item_usd + actor.start_usd)}
 
 
-def run_plan(client, plan, quotas, data_dir, max_spend: Decimal | None = None, log=print) -> dict:
+def say(message: str) -> None:
+    """Progress line. Flushed, so a log file fills as the run goes (stdout is buffered when redirected)."""
+    print(message, flush=True)
+
+
+def run_plan(client, plan, quotas, data_dir, max_spend: Decimal | None = None, log=say) -> dict:
     data_dir = Path(data_dir)
     runs_path = data_dir / "runs.jsonl"
     past = [json.loads(line) for line in runs_path.read_text().splitlines()] if runs_path.exists() else []
