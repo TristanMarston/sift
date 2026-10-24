@@ -3,6 +3,7 @@ queries nobody has run yet (breadth first, as scrape.build_plan orders them). It
 once, then checks what came back (checks.py) before the next batch starts."""
 import json
 import threading
+import time
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -87,7 +88,7 @@ def run_lanes(make_client, lanes: dict[str, Lane], data_dir, classify, log=S.say
     data_dir = Path(data_dir)
     past = jsonl.load(data_dir / "runs.jsonl")
     spent = sum((Decimal(str(e["est_charge_usd"])) for e in past), Decimal(0))
-    results, crashed = {}, {}
+    results, crashed, finished = {}, {}, set()
 
     def lane(l: Lane):
         try:
@@ -96,16 +97,19 @@ def run_lanes(make_client, lanes: dict[str, Lane], data_dir, classify, log=S.say
                                                 write_report=False, past=past)
         except Exception as e:
             crashed[l.marketplace] = f"lane crashed: {type(e).__name__}: {e}"
+        finally:
+            finished.add(l.marketplace)
 
-    threads = [threading.Thread(target=lane, args=(l,), daemon=True) for l in lanes.values()]
+    threads = [threading.Thread(target=lane, args=(l,), name=l.marketplace, daemon=True) for l in lanes.values()]
     pending, interrupted, made_stop, stop = list(threads), False, False, data_dir / "STOP"
     while True:
         try:
             while pending:
                 pending.pop(0).start()
-            for t in threads:
-                while t.is_alive():
-                    t.join(0.2)
+            # Not Thread.join() or is_alive(): on Python 3.12 a Ctrl-C that lands inside them can mark a running lane
+            # as finished, and the batch would end without its current run (FLAKY_TESTS.md).
+            while any(t.ident is not None and t.name not in finished for t in threads):
+                time.sleep(0.2)
             break
         except KeyboardInterrupt:
             if interrupted:
