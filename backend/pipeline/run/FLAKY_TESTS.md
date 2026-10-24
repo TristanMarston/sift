@@ -19,13 +19,20 @@ planned. In a real run, the effect would have been a smaller batch, not lost mon
 `tests/test_scrape.py` covers it (`test_lanes_can_share_one_snapshot_of_past_runs_instead_of_reading_the_file`).
 After the fix, 60 of 60 and then 150 of 150 repeated runs passed.
 
+## The Ctrl-C test was a real bug (fixed)
+
+`test_ctrl_c_lets_the_lanes_finish_their_current_run_then_stops` failed about 1 run in 4 on macOS and every run on
+Linux. Not the test's fault: on Python 3.12 a Ctrl-C that lands inside `Thread.join()` can make a running thread report
+`is_alive() == False`, so `run_lanes` returned while a lane's Apify run was still going (billed, its rows never saved).
+A Ctrl-C landing inside `Thread.start()` dropped the lane the same way.
+
+Fix: every lane sets its own `done` event in a `finally`, the main thread waits on those events (no `join()`), and a
+lane is recorded before `start()`. The test now sends a real SIGINT and keeps the run "on Apify" until the STOP file
+exists, so it no longer depends on a sleep: 70 of 70 runs pass, and the full suite runs without deselecting it.
+
 ## What is still timing-based (could flake on a slow or loaded machine)
 
-- `test_ctrl_c_lets_the_lanes_finish_their_current_run_then_stops` sends a fake Ctrl-C with
-  `_thread.interrupt_main()` and relies on a 0.3 s sleep inside the fake run, so the main thread handles it first.
 - `test_lanes_run_side_by_side_and_every_entry_lands_whole` relies on a 0.05 s sleep so the two lanes overlap.
-
-If either one flakes, make it wait on a `threading.Event` instead of sleeping.
 
 ## How to check
 

@@ -64,7 +64,8 @@ def test_fit_shrinks_the_batch_until_its_worst_case_fits_the_money():
 
 # --- the loop ------------------------------------------------------------------------------------
 
-import _thread
+import os
+import signal
 import json
 import threading
 import time
@@ -166,8 +167,10 @@ def test_a_stop_file_halts_before_the_next_batch(tmp_path):
 
 def test_ctrl_c_lets_the_lanes_finish_their_current_run_then_stops(tmp_path):
     def interrupt(mp, q, n):
-        _thread.interrupt_main()
-        time.sleep(0.3)                                  # the main thread handles Ctrl-C while this run is "on Apify"
+        os.kill(os.getpid(), signal.SIGINT)              # a real Ctrl-C, delivered to the main thread
+        deadline = time.monotonic() + 10                 # this run stays "on Apify" until the main thread has handled it
+        while not (tmp_path / "STOP").exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
         return full_rows(mp, q, n)
     client = FakeApify(rows=interrupt)
     code, lines = go(client, tmp_path, only={"depop"})
