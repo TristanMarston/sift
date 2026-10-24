@@ -324,16 +324,13 @@ def test_the_brand_rides_through_relabel_and_the_response(monkeypatch):
     assert [x["brand"] for x in resp["garments"]] == ["GAP", None]
 
 
-def test_describe_asks_haiku_at_temperature_zero_so_the_same_photo_gets_the_same_answer(monkeypatch):
-    sent = {}
+def test_the_haiku_call_only_uses_arguments_the_installed_sdk_accepts():
+    """A rejected argument (temperature, on Oct 24) made every Haiku call raise; the fallback then shipped SegFormer's
+    labels and categories to the live site (a tee became a dress). Check the call against the real SDK signature."""
+    import inspect
 
-    class Messages:
-        def create(self, **kw):
-            sent.update(kw)
-            text = json.dumps({"garments": []})
-            return type("Msg", (), {"stop_reason": "end_turn", "content": [type("B", (), {"type": "text", "text": text})]})
-
-    monkeypatch.setattr(D, "_client", lambda: type("C", (), {"messages": Messages()})())
-    D.describe(b"jpeg", "top")
-    assert sent["temperature"] == 0
+    import anthropic
+    params = inspect.signature(anthropic.resources.messages.Messages.create).parameters
+    assert all(p.kind is not p.VAR_KEYWORD for p in params.values()), "a **kwargs signature would hide a rejected argument"
+    assert set(D.request(b"jpeg", "top")) <= set(params)
     assert "brand" in D.SCHEMA["properties"]["garments"]["items"]["properties"]
