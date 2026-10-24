@@ -8,7 +8,7 @@ only inside the app (some marketplaces forbid automated collection in their term
 | --- | --- | --- |
 | The runner's laptop, `backend/pipeline/data/` | raw runs, `listings.jsonl`, batch checks | until deleted |
 | Apify, dataset `sift-runs` (team log) | every run, so teammates can `sync` | **7 days** (Apify keeps run data a week) |
-| Modal volume `sift-index`, `/snapshots/` | dated `sift-data-YYYY-MM-DD.zip` exports: the long-term backup | until deleted |
+| Modal volume `sift-index`, `/snapshots/` | dated `sift-data-YYYY-MM-DD.zip` exports (runs, raw rows, batch reports, care-tag answers): the long-term backup | until deleted |
 | Modal volume `sift-index`, `/full/` | the search index the API serves (`embeddings.npy`, `rows.jsonl`, `manifest.json`) | until rebuilt |
 
 ## After each scrape (run from `backend/`)

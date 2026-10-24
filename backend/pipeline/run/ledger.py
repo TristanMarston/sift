@@ -13,7 +13,8 @@ import scrape as S
 from health import BAD
 
 LEDGER = "sift-runs"                                        # the named dataset on the Apify account
-SNAPSHOT = ("runs.jsonl", "alerts.jsonl", "raw", "batches")  # everything else in data/ is rebuilt from these
+SNAPSHOT = ("runs.jsonl", "alerts.jsonl", "raw", "batches",   # everything else in data/ is rebuilt from these,
+            "tags.jsonl")                                     # except care-tag answers, which cost money to redo
 
 
 def key(entry: dict):
@@ -116,4 +117,10 @@ def import_snapshot(data_dir, src) -> Counter:
                 n["files"] += 1
     n["runs"] += _union(data_dir, src, "runs.jsonl", key)
     n["alerts"] += _union(data_dir, src, "alerts.jsonl", _alert_key)
+    answered = {e["id"] for e in jsonl.load(data_dir / "tags.jsonl") if not e.get("error")}
+    for e in jsonl.load(src / "tags.jsonl"):   # answers only: a failed call is retried by whoever runs step 03b next
+        if not e.get("error") and e["id"] not in answered:
+            jsonl.append(data_dir / "tags.jsonl", e)
+            answered.add(e["id"])
+            n["tags"] += 1
     return +n
