@@ -329,6 +329,13 @@ def test_queries_cover_exactly_the_api_categories_and_marketplaces(cfg):
         assert set(by_mp) == set(S.ACTORS)
 
 
+def test_grailed_runs_no_dress_queries(cfg):
+    """Grailed is menswear: live, "100% cotton dress" returned 1 dress in 20 rows (10 dress shirts, 5 dress pants), at
+    $0.012 a row. Its quota goes to the categories it has; dresses come from the other four marketplaces."""
+    assert cfg.queries["dresses_skirts"]["grailed"] == []
+    assert all(cfg.queries["dresses_skirts"][mp] for mp in ("depop", "poshmark", "mercari", "ebay"))
+
+
 def test_mercari_uses_the_actor_that_returns_listing_details():
     """getascraper/mercari-us-scraper returned card data only (no description, one photo) and was dropped."""
     assert S.ACTORS["mercari"].id == "automation_craft/mercari-us-scraper"

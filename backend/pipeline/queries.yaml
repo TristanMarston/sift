@@ -338,7 +338,7 @@ queries:
       - shirt dress
       - mini skirt
     poshmark: *dresses
-    grailed: *dresses
+    grailed: []      # menswear: "100% cotton dress" returned 1 dress in 20 rows (dress shirts, dress pants), at $0.012 a row
     ebay: *dresses
     mercari:
       - cotton dress
