@@ -18,10 +18,13 @@ only inside the app (some marketplaces forbid automated collection in their term
 uv run python pipeline/run/cli.py export sift-data-$(date +%F).zip
 uv run modal volume put sift-index sift-data-$(date +%F).zip /snapshots/
 
-# 2. rebuild the search index on Modal (photos download at datacenter speed; the index stays on the volume)
+# 2. read care tags for listings that state no fabric (cached: only new listings are paid for, ~$0.0005 each)
+uv run python pipeline/03b_tags.py --dry-run && uv run python pipeline/03b_tags.py
+
+# 3. rebuild the search index on Modal (photos download at datacenter speed; the index stays on the volume)
 uv run modal run modal_app.py::embed --listings pipeline/data/listings.jsonl --name full
 
-# 3. check it
+# 4. check it
 uv run modal run modal_app.py::query --photo some_jacket.jpg --name full
 ```
 
