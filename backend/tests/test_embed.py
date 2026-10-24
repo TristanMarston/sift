@@ -3,9 +3,9 @@ import pytest
 from huggingface_hub import try_to_load_from_cache
 from PIL import Image, ImageDraw
 
-from backend.embed import DIM, embed_image, embed_images
+from backend.embed import DIM, FILE, REPO, embed_image, embed_images
 
-if not isinstance(try_to_load_from_cache("Marqo/marqo-fashionSigLIP", "open_clip_model.safetensors"), str):
+if not isinstance(try_to_load_from_cache(REPO, FILE), str):
     pytest.skip("FashionSigLIP weights not downloaded yet", allow_module_level=True)
 
 
@@ -54,6 +54,13 @@ def test_similar_images_are_closer():
     far = noise()
     v, n, f = embed_images([orig, near, far])
     assert v @ n > v @ f
+
+
+def test_tall_crops_are_padded_not_squashed():
+    tall = shirt(size=600).resize((200, 600))
+    padded = Image.new("RGB", (600, 600), "white")
+    padded.paste(tall, (200, 0))
+    assert embed_image(tall) @ embed_image(padded) > 0.999
 
 
 def test_empty():
