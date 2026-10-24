@@ -6,6 +6,7 @@ after the batch runner rebuilds listings.jsonl, never pays twice. Failed calls a
 import base64
 import io
 import json
+import re
 import threading
 import urllib.request
 from collections import Counter
@@ -21,8 +22,9 @@ from extract import parse_fibers, to_materials
 
 HAIKU = "claude-haiku-5-5"
 SIDE = 768        # long edge sent to the model: a care tag stays legible
-MAX_PHOTOS = 6
-USD_PER_LISTING = 0.0005  # ~6 photos x ~790 image tokens + prompt at Haiku input prices, rounded up
+MAX_PHOTOS = 8   # the last ones: sellers put the tag photo near the end (42% of listings have more than 6 photos)
+USD_PER_LISTING = 0.0007  # ~8 photos x ~790 image tokens + prompt at Haiku input prices, rounded up
+_LINING = re.compile(r"\b(?:body\s+)?lining\b|\bfill(?:ing)?\b|\binsulation\b|\bpocket(?:ing)?\b|\btrim\b", re.I)
 UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/130 Safari/537.36"}
 PROMPT = """These are the photos of one secondhand clothing listing. If any photo shows the garment's care or content \
 label, transcribe exactly the fiber composition printed on it (for example "80% wool, 20% nylon"; keep shell and lining \
@@ -38,8 +40,14 @@ def needs_tag(row: dict) -> bool:
     return not row["materials"]["fibers"] or (ev is not None and ev["status"] in {"inferred", "unknown"})
 
 
+def pick(urls: list[str]) -> list[str]:
+    return urls[-MAX_PHOTOS:]
+
+
 def apply_tag(row: dict, text: str, as_of: str) -> dict:
-    fibers, _ = parse_fibers(text, field=True)
+    """A tag listing a shell then a lining is read for the shell: that is what wears."""
+    shell = _LINING.split(text)[0] if re.search(r"\bshell\b", text, re.I) else text
+    fibers, _ = parse_fibers(shell, field=True)
     if not fibers:
         return row
     materials = to_materials(fibers, row["materials"]["certifications"]).model_dump(mode="json")
@@ -67,18 +75,21 @@ def fetch(url: str) -> Image.Image:
 @cache
 def _client():
     import anthropic
-    return anthropic.Anthropic(timeout=60, max_retries=2)
+    return anthropic.Anthropic(timeout=90, max_retries=2)
 
 
 def ask_haiku(images: list[bytes]) -> dict:
     content = [{"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
                                            "data": base64.standard_b64encode(b).decode()}} for b in images]
     msg = _client().messages.create(
-        model=HAIKU, max_tokens=512, output_config={"effort": "low", "format": {"type": "json_schema", "schema": SCHEMA}},
+        model=HAIKU, max_tokens=4096, output_config={"effort": "low", "format": {"type": "json_schema", "schema": SCHEMA}},
         messages=[{"role": "user", "content": [*content, {"type": "text", "text": PROMPT}]}])
     if msg.stop_reason == "refusal":
         return {"tag_found": False, "composition": None}
-    return json.loads(next(b.text for b in msg.content if b.type == "text"))
+    text = next((b.text for b in msg.content if b.type == "text"), None)
+    if text is None:  # e.g. the budget went on thinking: retried next run
+        raise RuntimeError(f"no answer (stop_reason {msg.stop_reason})")
+    return json.loads(text)
 
 
 def tag_file(path, cache_path, ask=ask_haiku, fetch=fetch, limit: int | None = None, workers: int = 8) -> Counter:
@@ -101,7 +112,7 @@ def tag_file(path, cache_path, ask=ask_haiku, fetch=fetch, limit: int | None = N
     def read(r):
         rec = {"id": r["id"], "as_of": date.today().isoformat(), "tag_found": False, "composition": None}
         try:
-            rec.update(ask(prepare([fetch(u) for u in r["image_urls"][:MAX_PHOTOS]])))
+            rec.update(ask(prepare([fetch(u) for u in pick(r["image_urls"])])))
             with lock:
                 stats["read" if rec["composition"] else "no_tag"] += 1
                 answered[r["id"]] = rec

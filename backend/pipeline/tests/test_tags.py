@@ -76,7 +76,7 @@ def test_the_step_reads_tags_and_caches_every_answer(tmp_path):
                                   evidence=[dict(field="materials.fibers", status="claimed", source="listing_text",
                                                  as_of="2026-10-24")])]
     stats, out = run(tmp_path, rows, ask)
-    assert stats["read"] == 1 and stats["skipped:stated"] == 1 and calls == [3]
+    assert stats["read"] == 1 and stats["skipped:stated"] == 1 and calls == [3]   # all 3 photos (fewer than MAX)
     assert out[0]["materials"]["fibers"][0]["fiber"] == "cotton" and out[1] == rows[1]
     stats, out = run(tmp_path, [listing("1")], ask)                # a rerun: answered from the cache, not paid again
     assert calls == [3] and stats["cached"] == 1 and out[0]["materials"]["fibers"][0]["fiber"] == "cotton"
@@ -100,7 +100,7 @@ def test_limit_caps_how_many_listings_are_paid_for(tmp_path):
 def test_photos_are_sent_at_a_readable_size_and_at_most_six():
     big = Image.new("RGB", (3000, 2000), "white")
     images = T.prepare([big] * 9)
-    assert len(images) == 6 and all(max(Image.open(io.BytesIO(b)).size) == T.SIDE for b in images)
+    assert len(images) == T.MAX_PHOTOS and all(max(Image.open(io.BytesIO(b)).size) == T.SIDE for b in images)
 
 
 def test_ask_haiku_sends_the_photos_and_reads_the_structured_answer(monkeypatch):
@@ -117,3 +117,26 @@ def test_ask_haiku_sends_the_photos_and_reads_the_structured_answer(monkeypatch)
     assert sent["model"] == "claude-haiku-5-5" and sent["output_config"]["format"]["type"] == "json_schema"
     content = sent["messages"][0]["content"]
     assert [c["type"] for c in content] == ["image", "image", "text"]
+
+
+def test_the_last_photos_are_sent_because_sellers_put_the_tag_last():
+    urls = [f"u{i}" for i in range(12)]
+    assert T.pick(urls) == urls[-T.MAX_PHOTOS:] and T.pick(urls[:3]) == urls[:3]
+
+
+def test_a_jacket_tag_is_read_for_its_shell_not_its_lining():
+    out = T.apply_tag(listing(), "Shell: 100% Cotton; Body Lining: 100% Nylon", "2026-10-25")
+    assert [(f["fiber"], f["pct"]) for f in out["materials"]["fibers"]] == [("cotton", 100)]
+    assert out["evidence"][-1]["snippet"] == "Shell: 100% Cotton; Body Lining: 100% Nylon"   # the receipt quotes it all
+
+
+def test_an_answer_with_no_text_is_an_error_to_retry(monkeypatch):
+    class Messages:
+        def create(self, **kw):
+            return type("Msg", (), {"stop_reason": "max_tokens", "content": []})
+    monkeypatch.setattr(T, "_client", lambda: type("C", (), {"messages": Messages()})())
+    try:
+        T.ask_haiku([b"\xff\xd8a"])
+        raise AssertionError("expected an error")
+    except RuntimeError as e:
+        assert "max_tokens" in str(e)
