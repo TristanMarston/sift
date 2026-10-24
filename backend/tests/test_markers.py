@@ -177,3 +177,13 @@ def test_a_certification_the_listing_and_the_brand_both_state_counts_once(row):
     e = M.eco(r, BRANDS)
     assert [f["value"] for f in e["facts"] if f["kind"] == "certification"] == ["Fair Trade"]
     assert e["score"] == M.eco(row(brand="Patagonia", materials=fibers(("cotton", 100))), BRANDS)["score"]
+
+
+def test_a_nylon_shell_counts_for_outerwear_only(row):
+    shell = dict(materials=fibers(("nylon", 100), synthetic_share=100), evidence=[ev("materials.fibers", "tag_image", "verified")])
+    assert M.quality(row(category="jackets_outerwear", **shell), {})[0]["level"] == "medium"
+    assert M.quality(row(category="tshirts", **shell), {})[0]["level"] == "unknown"          # not a durability signal there
+    blend = dict(materials=fibers(("nylon", 60), ("polyester", 40), synthetic_share=100), evidence=[ev("materials.fibers")])
+    assert M.quality(row(category="jackets_outerwear", **blend), {})[0]["level"] == "unknown"  # below the 80% bar
+    poly = dict(materials=fibers(("polyester", 100), synthetic_share=100), evidence=[ev("materials.fibers")])
+    assert M.quality(row(category="jackets_outerwear", **poly), {})[0]["level"] == "unknown"   # pills and abrades sooner
