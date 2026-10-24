@@ -18,7 +18,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const COUNTER_AT_LEAST = 1600; // the count rolls up and the market names light before results take over
 const RESULTS = '/results';
 const SCAN = '/scan';
-const FRESH: View = { selected: '', sort: 'cpw', mix: 0, openId: null };
+const FRESH: View = { selected: '', sort: 'cpw', mix: 10, openId: null }; // a new scan opens on closest match; drag left for value
 
 type Props = {
     onClose: () => void;
