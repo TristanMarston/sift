@@ -33,14 +33,16 @@ def band(sim: float) -> str:
 
 def _result(row: dict, sim: float, cfg: Config) -> dict:
     q, scored = markers.quality(row, cfg.brands)
-    wears = W.expected_wears(cfg.baselines["categories"][row["category"]], q["level"], row["condition"])
+    baseline = cfg.baselines["categories"][row["category"]]
+    wears = W.expected_wears(baseline, q["level"], row["condition"])
+    typical = W._round(baseline.get("mid", (baseline["low"] + baseline["high"]) / 2))
     sim = round(min(1.0, max(0.0, sim)), 4)
     return {
         **{k: row[k] for k in PASS_THROUGH},
         "thumb_url": small_url(row["image_urls"][0]),
         "match": {"similarity": sim, "band": band(sim)},
         "quality": q,
-        "eco": markers.eco(row, cfg.brands),
+        "eco": markers.eco(row, cfg.brands, wears=wears["mid"], typical=typical),
         "wear": {
             "expected_wears": wears,
             "basis": "category_baseline" if q["level"] == "unknown" else "evidence_adjusted",
@@ -69,8 +71,11 @@ def rank(hits: list[tuple[dict, float]], query: dict, cfg: Config) -> dict:
     results = [_result(row, sim, cfg) for row, sim in hits]
     given = {r["id"]: i for i, r in enumerate(results)}
     typ = W.typical([r["cost"]["total_cents"] for r in results], [r["wear"]["expected_wears"]["mid"] for r in results])
+    scores = [r["eco"]["score"] for r in results]
     for r in results:
         r["wear"]["break_even_wears"] = W.break_even(r["cost"]["total_cents"], typ)
+        lower = sum(s < r["eco"]["score"] for s in scores)   # "greener than N% of these matches"
+        r["eco"]["percentile"] = round(100 * lower / (len(scores) - 1)) if len(scores) > 1 else 100
     orders = {
         "cpw": _order(results, lambda r: r["wear"]["cpw_cents"]["at_mid"]),
         "price": _order(results, lambda r: r["cost"]["total_cents"]),

@@ -161,7 +161,7 @@ Any non-2xx response has the body `{"error": {"code": "...", "message": "..."}}`
   },
 
   "eco": {
-    "level": "medium", "score": 0.6,
+    "level": "medium", "score": 0.6, "percentile": 72,
     "facts": [
       {"kind": "secondhand", "label": "Secondhand", "value": "Already in use (vintage)",
        "status": "verified", "source": "listing_text", "source_url": null,
@@ -214,9 +214,15 @@ Any non-2xx response has the body `{"error": {"code": "...", "message": "..."}}`
 - `thumb_url` is a small (~320 px) variant of the first photo, fast on a phone. Use `image_urls` for the full gallery.
 - `quality.level == "unknown"` and `facts == []` → show **"Not enough evidence yet."**
   `score` is then `null`, and the item sorts last on that marker but stays in the list.
-- `eco.level` is never `unknown`: secondhand itself is the eco win (no new garment is made), so an item with
-  nothing else known is `medium` (score 0.5); evidence moves it to `high` (natural fibers, recycled, organic,
-  vintage, certified) or `low` (mostly synthetic). The facts say which.
+- `eco.score` (0–1) is continuous, so the eco sort always separates a result list. Every item is secondhand (the
+  new-garment impact is avoided for all of them); what separates them: **natural-fiber share** 35% (stated, or a
+  fabric named in the title; 50% neutral when unstated), **durability** 30% (expected wears vs the category's typical:
+  a garment that lasts replaces more new clothing), **shipping** 15% (US 1.0, abroad 0.4, unknown 0.6), **circularity**
+  20% (vintage/deadstock/upcycled, recycled, organic, certifications, capped). Weights are a team judgement.
+  `level`: `high` ≥ 0.70 (cotton + vintage, or cotton + built to last), `low` < 0.40 (synthetic, or long-haul with
+  nothing else), else `medium`; never `unknown`. `eco.percentile` = share of the other results with a lower score:
+  show "Greener than 72% of these matches". The facts say which signals applied (`fabric_unknown`, `durability`,
+  `shipping` are new kinds).
 - `confidence` is the overall amount of evidence behind `wear`. `unknown` is allowed.
 - `fact.status`: `verified | claimed | inferred | unknown`. Suggested UI: verified = solid,
   claimed = "as declared", inferred = "likely", unknown = grey "unknown".

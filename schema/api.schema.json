@@ -150,6 +150,18 @@
       }
     },
 
+    "EcoMarker": {
+      "type": "object",
+      "required": ["level", "score", "facts", "percentile"],
+      "additionalProperties": false,
+      "properties": {
+        "level": {"$ref": "#/$defs/Level"},
+        "score": {"$ref": "#/$defs/Unit"},
+        "facts": {"type": "array", "items": {"$ref": "#/$defs/Fact"}},
+        "percentile": {"description": "Share of the other results with a lower eco score (0-100): \"greener than N% of these matches\".", "type": "integer", "minimum": 0, "maximum": 100}
+      }
+    },
+
     "Marker": {
       "type": "object",
       "required": ["level", "score", "facts"],
@@ -245,7 +257,7 @@
           }
         },
         "quality": {"$ref": "#/$defs/Marker"},
-        "eco": {"$ref": "#/$defs/Marker"},
+        "eco": {"$ref": "#/$defs/EcoMarker"},
         "wear": {
           "type": "object",
           "required": ["expected_wears", "basis", "cpw_cents", "break_even_wears", "facts"],
