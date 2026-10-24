@@ -61,7 +61,7 @@ null → "Shipping unknown" (already handled). Break-even beyond the item's life
 | HTTP API + hosting | ✅ | `src/backend/app.py`, `backend/modal_app.py` | deploy: `SIFT_HAIKU=1 SIFT_INDEX_NAME=full uv run modal deploy modal_app.py` |
 | Ranker: cost per wear, break-even, sorts, slider | ✅ | `src/backend/ranker.py`, `wear.py` | wear figures cited from EU PEFCR (mid = published default) |
 | Quality marker | ✅ | `src/backend/markers.py` | brand promises that reach secondhand buyers, durable product lines, fabric fit, construction words, vintage-that-lasted; **unknown 40%** at 51k (32% at 20k: the new batches have more sneakers and dresses) |
-| Eco marker | ✅ | `markers.py` | **every item has a level** (#59): secondhand alone is medium (no new garment is made); natural fibers (incl. a fabric named in the title), recycled, organic, vintage, certifications lift it; mostly synthetic lowers it. At 76k: high 20%, medium 79%, low 1%; 67% carry a fact beyond secondhand |
+| Eco marker | ✅ | `markers.py` | **every item has a level** (#60): secondhand alone is medium (no new garment is made); natural fibers (incl. a fabric named in the title), recycled, organic, vintage, certifications lift it; mostly synthetic lowers it. At 76k: high 20%, medium 79%, low 1%; 67% carry a fact beyond secondhand |
 | Evidence: brand facts | ✅ | `backend/ml/evidence/brands.yaml` | 12 brands incl. Carhartt repairs, Patagonia B Corp. Rule at top of file |
 | Evidence: product lines | ✅ | `pipeline/product_lines.yaml` | `durable: true` lines earn +2; material-only lines (Samba OG) just supply fabric |
 | Evidence: care tags (Haiku) | ✅ | `pipeline/tags.py`, `03b_tags.py` | 1,979 listings got verified fabric; cached |
