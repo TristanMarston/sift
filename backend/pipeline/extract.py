@@ -1,0 +1,173 @@
+"""Normalized row -> Listing: materials, certifications, flags, retail price, origin, plus evidence.
+Order for materials (SCRAPING.md §4): structured specifics > listing text > product line.
+Never invent: no evidence means null and an 'unknown' evidence record."""
+import re
+from collections import Counter
+from decimal import Decimal
+from pathlib import Path
+
+import yaml
+from pydantic import BaseModel, ValidationError
+
+from listing import Evidence, Fiber, Listing, Materials, Normalized
+from normalize.common import slug
+
+_FIBER = ("cotton|polyester|poly|nylon|polyamide|wool|merino|linen|hemp|silk|viscose|rayon|modal|lyocell|"
+          "tencel|acrylic|elastane|spandex|lycra|cashmere|alpaca|mohair|leather|down")
+# Bare words skip "down" (button-down), "leather" (leather patch), "poly" (poly mailer) and the traps below.
+_BARE = ("cotton(?!\\s+on\\b)|polyester|nylon|wool|merino|linen|hemp|silk(?!\\s*-?\\s*screen)|viscose|rayon|"
+         "modal|lyocell|tencel|acrylic|elastane|spandex|lycra|cashmere|alpaca|mohair")
+_CANON = {"poly": "polyester", "polyamide": "nylon", "spandex": "elastane", "lycra": "elastane",
+          "rayon": "viscose", "tencel": "lyocell", "merino": "wool"}
+_PCT = re.compile(rf"(?<![\d.])(\d{{1,3}}(?:\.\d+)?)\s*%\s*(organic\s+|recycled\s+)?({_FIBER})\b", re.I)
+_BARE_RE = re.compile(rf"\b(organic\s+|recycled\s+)?({_BARE})\b", re.I)
+# A dedicated material field is unambiguous, so there "leather", "down" and "poly" are fibers too.
+_BARE_FIELD_RE = re.compile(rf"\b(organic\s+|recycled\s+)?({_BARE}|leather|down|poly)\b", re.I)
+_FAUX_LEATHER = re.compile(r"\b(?:vegan|faux|synthetic)\s+leather\b", re.I)
+_REAL_LEATHER = re.compile(r"\b(?:genuine|real|full[- ]grain|top[- ]grain)\s+leather\b", re.I)
+_SYNTHETIC = {"polyester", "nylon", "acrylic", "elastane"}
+MATERIAL_KEYS = ("material", "fabric type", "fabric", "composition")  # structured specifics we trust
+
+_CERTS = {
+    "gots": r"\bgots\b|global organic textile standard",
+    "oeko_tex": r"oeko[\s_-]?tex",
+    "bluesign": r"\bbluesign",
+    "fair_trade": r"fair[\s-]?trade",
+    "rws": r"\brws\b|responsible wool standard",
+    "rds": r"\brds\b|responsible down standard",
+    "b_corp": r"\bb[\s-]?corp(?:oration)?\b",
+}
+_FLAGS = {
+    "is_vintage": r"\bvintage\b(?![\s-]*(?:wash|style|inspired|fit|look|fade|effect))",
+    "is_deadstock": r"\bdead[\s-]?stock\b|\bnew old stock\b",
+    "is_upcycled": r"\bup[\s-]?cycl(?:ed|e)\b",
+}
+_RETAIL = re.compile(r"\b(?:retail(?:s|ed)?(?:\s+(?:price|value))?(?:\s+(?:for|at))?|msrp)\s*[:\-]?\s*"
+                     r"\$\s*(\d[\d,]*(?:\.\d{1,2})?)", re.I)
+_MADE_IN = re.compile(r"\bmade in (?:the )?([a-z]+)", re.I)
+
+
+class ProductLine(BaseModel):
+    brand: str
+    title_has: list[str]
+    note: str
+    fibers: list[Fiber]
+
+
+PRODUCT_LINES = [ProductLine(**p) for p in yaml.safe_load(Path(__file__).with_name("product_lines.yaml").read_text())]
+
+
+def parse_fibers(text: str, field: bool = False) -> tuple[list[Fiber], str]:
+    """Fibers named in `text` and the matched snippets. Percent matches first, then bare words.
+    `field=True` when `text` comes from a structured material field rather than free text."""
+    out, snips = [], []
+
+    def add(name, pct, modifier, snippet):
+        name, modifier = name.lower(), modifier.strip().lower()
+        fiber = Fiber(fiber=_CANON.get(name, name), pct=pct, organic=True if modifier == "organic" else None,
+                      recycled=True if modifier == "recycled" else None)
+        if fiber not in out:
+            out.append(fiber)
+            snips.append(snippet)
+
+    for m in _FAUX_LEATHER.finditer(text):
+        add("synthetic_leather", None, "", m[0])
+    text = _FAUX_LEATHER.sub(" ", text)
+    for m in _PCT.finditer(text):
+        if float(m[1]) <= 100:
+            add(m[3], float(m[1]), m[2] or "", m[0])
+    text = _PCT.sub(" ", text)
+    for m in _REAL_LEATHER.finditer(text):
+        add("leather", None, "", m[0])
+    for m in (_BARE_FIELD_RE if field else _BARE_RE).finditer(text):
+        if _CANON.get(m[2].lower(), m[2].lower()) not in {f.fiber for f in out}:
+            add(m[2], None, m[1] or "", m[0])
+    return out, "; ".join(snips)
+
+
+def to_materials(fibers: list[Fiber], certifications: list[str]) -> Materials:
+    """Percentages summing to 90-110 are scaled to 100; otherwise kept and flagged suspect."""
+    pcts = [f.pct for f in fibers if f.pct is not None]
+    total = sum(pcts)
+    suspect = bool(pcts) and not 90 <= total <= 110
+    scale = 100 / total if pcts and not suspect else 1
+    fibers = [f.model_copy(update={"pct": None if f.pct is None else round(f.pct * scale, 1)}) for f in fibers]
+    complete = bool(fibers) and not suspect and len(pcts) == len(fibers)
+    share = round(sum(f.pct for f in fibers if f.fiber in _SYNTHETIC), 1) if complete else None
+    return Materials(fibers=fibers, synthetic_share=share, certifications=certifications, composition_suspect=suspect)
+
+
+def match_product_line(brand: str | None, title: str, lines: list[ProductLine]) -> ProductLine | None:
+    for p in lines:
+        brand_ok = slug(p.brand) == slug(brand) if brand else slug(p.brand) in slug(title)
+        if brand_ok and all(re.search(rf"\b{re.escape(w)}\b", title, re.I) for w in p.title_has):
+            return p
+
+
+def _hits(patterns: dict[str, str], text: str) -> dict[str, str]:
+    return {k: m[0] for k, p in patterns.items() if (m := re.search(p, text, re.I))}
+
+
+def extract(n: Normalized, lines: list[ProductLine] = PRODUCT_LINES) -> Listing:
+    day = n.scraped_at.date()
+    text = f"{n.title}. {n.description or ''}"
+    spec = {k.strip().lower(): v.strip() for k, v in n.specifics.items() if v and v.strip()}
+    evidence = list(n.evidence)
+
+    def note(field, status, source, snippet=None):
+        evidence.append(Evidence(field=field, status=status, source=source, snippet=snippet, as_of=day))
+
+    fibers, snippet = parse_fibers(" ".join(spec.get(k, "") for k in MATERIAL_KEYS), field=True)
+    source = "specifics"
+    if not fibers:
+        fibers, snippet = parse_fibers(text)
+        source = "listing_text"
+    if fibers:
+        note("materials.fibers", "claimed", source, snippet)
+    elif line := match_product_line(n.brand, n.title, lines):
+        fibers = line.fibers
+        note("materials.fibers", "inferred", "product_line", line.note)
+    else:
+        note("materials.fibers", "unknown", "listing_text")
+
+    certs = {}
+    for source, where in (("specifics", " ".join(spec.values())), ("listing_text", text)):
+        for cert, snippet in _hits(_CERTS, where).items():
+            if cert not in certs:
+                certs[cert] = snippet
+                note("materials.certifications", "claimed", source, snippet)
+
+    flags = _hits(_FLAGS, text)
+    for flag, snippet in flags.items():
+        note(f"flags.{flag}", "claimed", "listing_text", snippet)
+
+    cost = n.cost.model_dump()
+    if cost["retail_price_cents"] is None and (m := _RETAIL.search(text)):
+        cost["retail_price_cents"] = int(Decimal(m[1].replace(",", "")) * 100)
+        note("cost.retail_price_cents", "claimed", "listing_text", m[0])
+
+    country = next((v for k, v in spec.items() if k.startswith("country") and ("manufactur" in k or "origin" in k)), None)
+    if country:
+        note("country_of_manufacture", "claimed", "specifics", country)
+    elif m := _MADE_IN.search(text):
+        country = m[1].upper() if len(m[1]) <= 3 else m[1].title()
+        note("country_of_manufacture", "claimed", "listing_text", m[0])
+
+    data = n.model_dump(exclude={"specifics"})
+    data.update(cost=cost, materials=to_materials(fibers, list(certs)), country_of_manufacture=country,
+                flags=n.flags.model_copy(update={k: True for k in flags}), evidence=evidence)
+    return Listing(**data)
+
+
+def extract_file(src, dst) -> Counter:
+    """Step 03 driver: normalized.jsonl -> listings.jsonl. Lines that do not validate are counted and skipped."""
+    stats, out = Counter(), []
+    for line in Path(src).read_text().splitlines():
+        try:
+            out.append(extract(Normalized.model_validate_json(line)).model_dump_json() + "\n")
+        except ValidationError:
+            stats["invalid"] += 1
+    Path(dst).with_suffix(".tmp").write_text("".join(out))
+    Path(dst).with_suffix(".tmp").replace(dst)
+    stats["kept"] = len(out)
+    return stats

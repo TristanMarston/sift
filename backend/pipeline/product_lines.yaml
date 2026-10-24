@@ -1,0 +1,27 @@
+# Known product lines -> material. Used only when a listing states no material; recorded as "inferred".
+# Hand-curated: add a line only when the maker's own page states the material.
+# `title_has`: words that must all appear in the title. `fibers` carry no percentages on purpose.
+- brand: Carhartt
+  title_has: [detroit]
+  note: Carhartt Detroit → cotton duck
+  fibers: [{fiber: cotton}]
+- brand: Carhartt
+  title_has: [chore, coat]
+  note: Carhartt Chore Coat → cotton duck
+  fibers: [{fiber: cotton}]
+- brand: Patagonia
+  title_has: [better, sweater]
+  note: Patagonia Better Sweater → recycled polyester
+  fibers: [{fiber: polyester, recycled: true}]
+- brand: Patagonia
+  title_has: [nano, puff]
+  note: Patagonia Nano Puff → recycled polyester
+  fibers: [{fiber: polyester, recycled: true}]
+- brand: Patagonia
+  title_has: [synchilla]
+  note: Patagonia Synchilla → polyester fleece
+  fibers: [{fiber: polyester}]
+- brand: The North Face
+  title_has: [nuptse]
+  note: The North Face Nuptse → nylon shell, down fill
+  fibers: [{fiber: nylon}, {fiber: down}]
