@@ -25,7 +25,7 @@ def main():
     listings = [Listing.model_validate_json(line) for line in jsonl.read(data / "listings.jsonl")]
     s = report.stats(listings)
     md = report.render(s, report.acceptance(s, listings, args.min_rows), date.today().isoformat())
-    (data / "REPORT.md" if args.test or args.data_dir else HERE / "REPORT.md").write_text(md, encoding="utf-8")
+    (data / "REPORT.md" if args.test or args.data_dir else HERE / "REPORT.md").write_text(md, encoding="utf-8", newline="\n")
     print(md)
 
 

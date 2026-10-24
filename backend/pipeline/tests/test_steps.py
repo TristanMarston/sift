@@ -29,7 +29,7 @@ def write_run(d, run_id, items, category="tshirts", status="SUCCEEDED", at="2026
     (d / "raw" / "depop").mkdir(parents=True, exist_ok=True)
     if file:
         (d / "raw" / "depop" / f"{run_id}.jsonl").write_text("".join(json.dumps(i) + "\n" for i in items), encoding="utf-8")
-    with (d / "runs.jsonl").open("a", encoding="utf-8") as f:
+    with (d / "runs.jsonl").open("a", encoding="utf-8", newline="\n") as f:
         f.write(json.dumps(dict(marketplace="depop", category=category, query="q", run_id=run_id, status=status,
                                 items=len(items), at=at, **({"verdict": verdict} if verdict else {}))) + "\n")
 
@@ -155,3 +155,18 @@ def test_render_has_a_table_row_per_marketplace_and_the_checklist():
     rows = [L(1), L(2, "ebay")]
     md = R.render(R.stats(rows), R.acceptance(R.stats(rows), rows), "2026-10-24")
     assert "| depop | 1 |" in md and "| ebay | 1 |" in md and "- [ ] active rows" in md
+
+
+# --- every OS writes the same bytes ---------------------------------------------------------
+
+def test_every_file_the_pipeline_writes_has_plain_newlines(tmp_path):
+    """Text mode on Windows writes "\r\n". The data files must be byte-identical on Windows, macOS and Linux."""
+    import scrape as S
+    from test_scrape import FakeClient, t
+    S.run_plan(FakeClient(items=2, statuses={1: "FAILED"}), [t(q="one"), t(q="two")], None, tmp_path)
+    write_run(tmp_path, "r1", [{"id": "a", "price": 100}])
+    N.normalize_all(tmp_path, {"depop": mapper})
+    X.extract_file(tmp_path / "normalized.jsonl", tmp_path / "listings.jsonl")
+    written = [*(tmp_path / "raw" / "depop").glob("run*.jsonl"), *(tmp_path / n for n in (
+        "runs.jsonl", "alerts.jsonl", "run_report.md", "run_report.json", "normalized.jsonl", "listings.jsonl"))]
+    assert len(written) == 7 and not [p.name for p in written if b"\r" in p.read_bytes()]

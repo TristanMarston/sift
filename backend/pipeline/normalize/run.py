@@ -43,7 +43,7 @@ def normalize_all(data_dir, mappers) -> Counter:
                 if n.id not in best or n.scraped_at >= best[n.id].scraped_at:
                     best[n.id] = n
     out = data_dir / "normalized.jsonl"
-    out.with_suffix(".tmp").write_text("".join(jsonl.dumps(best[i].model_dump(mode="json")) + "\n" for i in sorted(best)), encoding="utf-8")
+    out.with_suffix(".tmp").write_text("".join(jsonl.dumps(best[i].model_dump(mode="json")) + "\n" for i in sorted(best)), encoding="utf-8", newline="\n")
     out.with_suffix(".tmp").replace(out)
     stats["kept"] = len(best)
     return stats
