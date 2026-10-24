@@ -54,9 +54,9 @@ def plan_batch(cfg: S.Config, past: list[dict], rows: int, only=None, categories
     every run known (runs.jsonl): its finished queries are skipped. `only` / `categories` choose what to scrape, `skip`
     leaves marketplaces out."""
     done, have = S.finished_queries(past), S.quota_rows(past)
-    tasks = {mp: [t for t in S.build_plan(cfg.queries) if t.marketplace == mp and (mp, t.category, t.query) not in done
-                  and (categories is None or t.category in categories)]
-             for mp in cfg.quotas if cfg.quotas[mp] > 0 and (only is None or mp in only) and mp not in skip}
+    tasks = {mp: [t for t in S.build_plan(cfg.queries) if t.marketplace == mp and mp not in skip
+                  and (mp, t.category, t.query) not in done and (categories is None or t.category in categories)]
+             for mp in cfg.quotas if cfg.quotas[mp] > 0 and (only is None or mp in only)}   # skipped: a lane that ran out
     targets = split_rows({mp: cfg.quotas[mp] for mp in tasks}, {mp for mp, ts in tasks.items() if ts}, rows)
     lanes = {}
     for mp, target in targets.items():
