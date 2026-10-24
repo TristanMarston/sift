@@ -91,6 +91,19 @@ def test_ebay_root_category_does_not_make_everything_footwear(label, expected):
 
 
 @pytest.mark.parametrize("label, expected", [
+    ("Men > Suits", "jackets_outerwear"),                       # Mercari files blazers and sport coats here
+    ("Men > Suits > Four button", "jackets_outerwear"),
+    ("Men > Suits > Pants", "jeans_pants"),                     # the leaf still wins
+    ("Women > Swimwear > One-piece swimsuit", None),
+    ("Women > Jumpsuits & rompers", None),
+    ("Vintage & collectibles > Supplies > Yarn", None),
+    ("Pet Supplies > Dog Supplies > Other Dog Supplies", None),
+])
+def test_suits_are_jackets_but_swimsuits_and_pet_supplies_are_not(label, expected):
+    assert C.category_from_label(label) == expected
+
+
+@pytest.mark.parametrize("label, expected", [
     ("Men > Sweats & hoodies > Track jacket", "jackets_outerwear"),     # Mercari files track jackets under hoodies
     ("Women > Sweats & hoodies > Hoodie", "hoodies_sweatshirts"),
     ("Men > Sweats & hoodies > Other", "hoodies_sweatshirts"),          # unmapped leaf: the parent decides

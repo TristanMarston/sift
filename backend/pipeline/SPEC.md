@@ -12,8 +12,8 @@ Sources read: `DESCRIPTION.md`, `backend/pipeline/SCRAPING.md`, `schema/API.md`,
 
 ## 1. Goal
 
-Produce **large JSONL files of clean secondhand clothing listings** from four marketplaces
-(Depop, Poshmark, Grailed, eBay). Any listing priced in USD counts, wherever it ships from. Each row carries what the ranker and the frontend later need
+Produce **large JSONL files of clean secondhand clothing listings** from five marketplaces
+(Depop, Poshmark, Grailed, Mercari, eBay). Any listing priced in USD counts, wherever it ships from. Each row carries what the ranker and the frontend later need
 for three markers (cost, quality, eco): price, full description, all images, condition, brand, size,
 materials, certifications, flags, and a coarse seller profile.
 
@@ -55,11 +55,13 @@ Targets:
 | 10 | Pipeline steps renumbered 01–04 | Steps for thumbs, embed, and upsert are dropped |
 | 11 | Time estimates are ignored; build in the order in §14 | User instruction |
 | 12 | **USD only.** Any listing priced in USD counts, wherever the seller is. There is no location filter; the seller's country is stored in `seller.region` | `api.schema.json` requires USD, not US. In the test run only 4 of 20 Grailed items were US-located, so a location filter would waste ~80% of that spend. A US-only view is a one-line filter on `seller.region` later. DESCRIPTION.md, SCRAPING.md and API.md were updated to say USD only |
-| 13 | **Mercari is dropped.** It failed the go/no-go (§13a) and has no mapper; its quota went to Poshmark and eBay | No description, one image per listing, no size/location/shipping, and $0.04 per search. `mercari` stays in the API enum, which belongs to the schema |
+| 13 | **Mercari uses `automation_craft/mercari-us-scraper` with details on.** The first Mercari actor we tried (`getascraper/mercari-us-scraper`) failed the go/no-go and was dropped; this one passed (§13b) | `getascraper` only reads the card data embedded in Mercari's search page: no description, one photo, no size or shipping, and it can return 0 rows while billing $0.04. `automation_craft` returns all of them at $0.00273 per listing + $0.006 per run. `tortuga/mercari-scraper` is the fallback |
 | 14 | Seller blocks are scrubbed by **allowlist** (rating/count/location only); eBay records keep a top-level key whitelist | The test run showed Grailed `sellerProfile` (account id, PayPal id) and eBay page modules (seller handle, buyer feedback) slipping past a denylist |
 | 15 | Category: the marketplace label wins; a present label that maps to none of the 8 drops the record instead of using the query's category; eBay's root "Clothing, **Shoes** & Accessories" is ignored; kids' labels are dropped | A hat must not inherit "jackets"; the root made every eBay item "sneakers"; children's clothes are outgrown, not worn out |
 | 16 | `is_vintage` / `is_deadstock` / `is_upcycled` come from the **title** and structured style fields, never the description | Shop-wide boilerplate ("especially for pre-owned or vintage goods") made most Grailed items look vintage |
 | 17 | eBay is scraped with `condition: used`; its material is `Outer Shell Material` (lining and insulation are excluded); `Product Line`/`Model` feed product-line matching | eBay has no `Material` specific; without `condition` the actor returns new items |
+| 18 | JSON Lines are read on `\n` only and written ASCII-escaped (`jsonl.py`) | Real Mercari descriptions contain U+2028, which `str.splitlines()` treats as a line break: records were cut in half and ~5% of Mercari rows would have been dropped silently |
+| 19 | Titles and descriptions lose zero-width characters and non-breaking spaces at the normalize step; the Mercari actor excludes kids' titles at the source (whole words only) | A zero-width space inside `100%cotton` defeats the composition regex. Kids' listings were 40% of a broad Mercari query and are now ~2% |
 
 ## 4. Repo state and layout
 
@@ -70,12 +72,14 @@ and `contract/` paths do not exist.
 Files, all under `backend/pipeline/` (see `README.md` there for how to use them):
 
 ```
+jsonl.py                read JSON Lines on newline only, write them ASCII-escaped
 listing.py              Pydantic Listing, Normalized (Listing + specifics), Evidence; enums mirror schema/api.schema.json
 scrape.py               actors, charge caps, scrubbing, plan, run loop, cost estimate (01_scrape.py is the CLI)
 normalize/common.py     price -> cents, condition map, category rules, brand names, region, cost block, Drop
 normalize/depop.py      one mapper per marketplace: raw dict -> Normalized, or raises Drop(reason)
 normalize/poshmark.py
 normalize/grailed.py
+normalize/mercari.py
 normalize/ebay.py
 normalize/run.py        applies the mappers to the raw files, counts drop reasons, dedupes
 extract.py              composition, certifications, flags, retail price, origin, product lines, evidence
@@ -103,10 +107,11 @@ SCRAPING.md.
 | Depop | `jongoose/depop-scraper` | `query`, `maxItems`, `startUrls`, `proxyConfiguration` | $0.001/result | In the full field list but **absent from the sample record** | `123webdata/depop-scraper` (detail mode) |
 | Poshmark | `123webdata/poshmark-scraper` | `categoryUrls`, `maxResultsPerScrape`, `usePagination`, `scrapeProductDetails: true` | $0.00199/detail, **$0.02 per run start** | Yes, in detail mode only | `xtracto/poshmark-detail-scraper` (has `condition`) |
 | Grailed | `piotrv1001/grailed-listings-scraper` | `searchQuery`, `department`, `minPrice`, `maxPrice`, `scrapeDetails: true`, `maxItems` (default 50) | $0.003 standard, **$0.012 with details**, $0.00005 start | Detail mode only | `lulzasaur/grailed-scraper` |
+| Mercari US | `automation_craft/mercari-us-scraper` | `keywords`, `statuses`, `includeDetails: true`, `maxItems`, `excludeKeywords` | **$0.00133 per listing + $0.0014 for details (= $0.00273), $0.006 per run** | Yes, with `includeDetails` | `tortuga/mercari-scraper` (`market: us`, $0.0048/listing) |
 | eBay | `memo23/ebay-search-scraper-ppe` | `searchQueries` (≤500), `marketplace`, `mode`, `detailedItems`, `includeDescription`, `maxItems` (per search, default 1000) | **$5 per 1,000 detailed items** | Only with `includeDescription: true` (one extra request per item) | eBay Browse API |
 
-Do not use `markdolanmoore/depop-scraper` (no description). Mercari US (`getascraper/mercari-us-scraper`) was
-evaluated in the test run and dropped (decision 13).
+Do not use `markdolanmoore/depop-scraper` (no description) or `getascraper/mercari-us-scraper` (§13a: card data
+only, and flaky).
 
 Known risks per actor:
 - **Depop**: the input schema defaults to a *residential* proxy while SCRAPING.md says *datacenter*. Only
@@ -119,27 +124,32 @@ Known risks per actor:
 - **eBay**: the connection country follows `marketplace`. Near-match rows are returned and billed. If
   `max_total_charge_usd` is hit, some rows may not be delivered. `Material` comes from
   `itemSpecifics` in detail mode.
+- **Mercari** (`automation_craft`): created Oct 13 and used by only a few accounts, so reliability beyond the ~220 listings we tested
+  (§13b) is unproven. Mercari serves at most 1,000 results per search, so use several queries. `color` is never
+  filled. The dataset also holds free `search`/`status`/`summary` rows, which the runner drops (`type != listing`).
+  The buyer's total includes a buyer-protection fee (~3.5%) that `cost` does not model.
 - **Terms of service**: Poshmark's terms prohibit automated collection; Depop sits behind
   Cloudflare. We use public listing data only, store no seller identity, link out, and state this in the
   Trust section.
 
 ## 6. Cost model
 
-Per-record prices, confirmed against the test-run bills (§13a): Depop $0.001; Poshmark $0.00199 (+ $0.02 per run);
-Grailed $0.012 with details; eBay $0.005 detail rows (+ $0.02 per run). Quotas count **raw rows**, 30% above the
-20k target to cover duplicates and dropped records.
+Per-record prices, confirmed against the test-run bills (§13a, §13b): Depop $0.001; Poshmark $0.00199 (+ $0.02 per run);
+Grailed $0.012 with details; Mercari $0.00273 (+ $0.006 per run); eBay $0.005 detail rows (+ $0.02 per run). Quotas
+count **raw rows**, 30% above the 20k target to cover duplicates and dropped records.
 
 | Marketplace | Raw rows (quota) | Runs | Best-case cost |
 | --- | --- | --- | --- |
 | Depop | 10,400 | 52 | ~$10 |
-| Poshmark | 7,200 | 36 | ~$15 |
+| Poshmark | 5,200 | 26 | ~$11 |
 | Grailed | 4,000 | 20 | ~$48 |
-| eBay | 4,650 | 31 | ~$24 |
-| **Total** | 26,000 | 139 | **~$97** (~$122 if every run hit its charge cap) |
+| Mercari | 3,900 | 13 | ~$11 |
+| eBay | 2,700 | 18 | ~$14 |
+| **Total** | 26,200 | 129 | **~$94** (~$118 if every run hit its charge cap) |
 
 `01_scrape.py --dry-run` prints this table from the live config. At 50k (about 2.5× the rows) the estimate is
-~$240, which can exceed the ~$200 credit budget. The main cost lever is Grailed detail mode. Options if needed:
-fewer Grailed rows, or shift volume to Depop and Poshmark. The quotas in `queries.yaml` are where this is tuned.
+~$235, which can exceed the ~$200 credit budget. The main cost lever is Grailed detail mode. Options if needed:
+fewer Grailed rows, or shift volume to Depop, Poshmark and Mercari. The quotas in `queries.yaml` are where this is tuned.
 
 Cost controls (Apify's guidance):
 - Every `.call()` passes `max_total_charge_usd` **as a call option, never inside `run_input`**.
@@ -233,22 +243,22 @@ items, charge, timestamp.
 
 ## 9. Field mapping (real field names, from the test run; the code is `normalize/<marketplace>.py`)
 
-| Listing field | Depop | Poshmark | Grailed | eBay |
-| --- | --- | --- | --- | --- |
-| external id | `id` | `product_id` | `id` | `itemId` (url rebuilt as `ebay.com/itm/<id>`) |
-| price | `price.amount`, `.currency` | `price`, `currency` | `price` (USD) | `priceValue`, `currency` |
-| original price | `originalPrice.amount`, if above the price | `regular_price` | highest earlier price in `priceDrops` | none |
-| shipping | none | none | seller's US rate `shipping.us`, if enabled | `shippingCost` (`shippingType: free` = free) |
-| description | `description` | `description` | `description` | `description` (HTML entities decoded) |
-| images | `pictureUrls` | `images` | `photos`, else `coverPhoto` | `images` |
-| brand | `brand` | `brand` | `designer` | `brand`, else specifics `Brand` |
-| size / color | `sizes[0]`, `colours` | `size`, `color` | `size`, `color` | specifics `Size`, `Color` |
-| condition | `condition` | none | `condition` | specifics `Condition`, the label before the seller's prose |
-| category label | `category` `productType` `group` | breadcrumbs + `category` | `category` `categoryPath` | `categoryPath` (root ignored) |
-| status | `isSold` | `listing_status`, `in_stock` | `sold` | `listingStatus` |
-| seller type / rating | none | none | listing count (`sellerProfile.listings_for_sale_count`), `seller.ratingAverage` | account type + feedback score; `sellerFeedbackPercentage` ÷ 20 |
-| region | `country` | `US` | `sellerProfile.country_code`, else `location` | `itemLocation` |
-| specifics (for 03) | none | none | `styles` | every `itemSpecifics` entry |
+| Listing field | Depop | Poshmark | Grailed | Mercari | eBay |
+| --- | --- | --- | --- | --- | --- |
+| external id | `id` | `product_id` | `id` | `listingId` | `itemId` (url rebuilt as `ebay.com/itm/<id>`) |
+| price | `price.amount`, `.currency` | `price`, `currency` | `price` (USD) | `price`, `currency` | `priceValue`, `currency` |
+| original price | `originalPrice.amount`, if above the price | `regular_price` | highest earlier price in `priceDrops` | `originalPrice`, if above the price | none |
+| shipping | none | none | seller's US rate `shipping.us`, if enabled | `shippingFee` only when `shippingPayer` is `buyer` (seller pays = free) | `shippingCost` (`shippingType: free` = free) |
+| description | `description` | `description` | `description` | `description` | `description` (HTML entities decoded) |
+| images | `pictureUrls` | `images` | `photos`, else `coverPhoto` | `photoUrls`, else `imageUrl` | `images` |
+| brand | `brand` | `brand` | `designer` | `brand` | `brand`, else specifics `Brand` |
+| size / color | `sizes[0]`, `colours` | `size`, `color` | `size`, `color` | `size`, `color` (never filled) | specifics `Size`, `Color` |
+| condition | `condition` | none | `condition` | `condition` | specifics `Condition`, the label before the seller's prose |
+| category label | `category` `productType` `group` | breadcrumbs + `category` | `category` `categoryPath` | `categoryPath` (a string with `>`) + `category` | `categoryPath` (root ignored) |
+| status | `isSold` | `listing_status`, `in_stock` | `sold` | `status`, `sold` | `listingStatus` |
+| seller type / rating | none | none | listing count (`sellerProfile.listings_for_sale_count`), `seller.ratingAverage` | `sellerListingCount`; `sellerRating` when `sellerRatingCount` > 0 | account type + feedback score; `sellerFeedbackPercentage` ÷ 20 |
+| region | `country` | `US` | `sellerProfile.country_code`, else `location` | `US` | `itemLocation` |
+| specifics (for 03) | none | none | `styles` | none | every `itemSpecifics` entry |
 
 Normalization rules (`02_normalize.py`):
 - Drop records missing `url`, `title`, `price`, or at least one image.
@@ -333,7 +343,7 @@ If Depop and Poshmark both fail, switch to `123webdata/depop-scraper` (detail mo
 | Poshmark | 20/20 | 15/20 (at the threshold) | 6.8 | none (recorded as US) | $0.060 | pass |
 | Grailed | 20/20 | 20/20 | 8.2 | listing location US 4/20, seller country US 6/20 | $0.240 | pass |
 | eBay | 20/20 | 20/20 | 7.3 | US 20/20 | $0.120 | pass |
-| Mercari | 20/20 | **0/20** | **1.0** | none | $0.095 | **fail** |
+| Mercari (`getascraper`) | 20/20 | **0/20** | **1.0** | none | $0.095 | **fail** |
 
 - The price table in §6 was right for every actor except Mercari, which also bills **$0.04 per search request**
   (SCRAPING.md had this; §5 did not). eBay's `includeDescription` costs nothing extra. A run's
@@ -347,6 +357,43 @@ If Depop and Poshmark both fail, switch to `123webdata/depop-scraper` (detail mo
   description text, which is kept.
 - Coverage on this single generic query (north face jackets): stated material 41%, percentages 6%. Material-rich
   queries should lift both; check after the 20k run.
+
+## 13b. Mercari, second attempt
+
+**Why `getascraper/mercari-us-scraper` failed** (run log, three probes, two research passes):
+- It never opens a listing. Its log reads `Fallback: Extracting first-page hydrated listings from Next.js payload`, and its
+  search-API path produced nothing in any run. That payload holds only card data. The zero-valued fields (`id`,
+  `likes_count`, `sales_count`, `seller_review_count`) are placeholders (its dataset schema says so), and the README
+  sample is synthetic (fake listing id, timestamp before the actor existed).
+- Listing URLs do not help: given two item URLs it returned the same card fields, plus an unrelated listing.
+- It is flaky: the same query returned 20 listings once and 0 the next time, billing $0.04 for nothing. Its public
+  "221/222 runs succeeded" counts a run that returns 0 rows as a success.
+- Mercari's own prices were suspected and cleared: both actors report the same discounted prices (e.g. 23.94, was 27.94).
+
+**Alternatives probed (3 items each):** `automation_craft/mercari-us-scraper` and `tortuga/mercari-scraper` returned
+identical descriptions, photo counts and shipping fees for the same three listings. `parsebird/mercari-us-scraper`
+was not probed: its public stats show only 155 of 221 runs succeeding.
+
+**`automation_craft` through the real pipeline (20-item smoke test + 200 items over three queries: `carhartt detroit
+jacket`, `100% wool sweater`, `nike dunk low`; billed $0.625, equal to our estimate):**
+
+| Measure | Result |
+| --- | --- |
+| Core fields (url, title, price, photo) | 206/206 |
+| Description > 40 chars | 190/206 (92%) |
+| Photos | 7.7 on average, none with a single photo |
+| Size / condition / shipping known / seller type | 205 / 206 / 206 / 206 of 206 |
+| Seller rating (0 reviews = unknown) | 185/206 |
+| Stated material / with percentages | 103/206 (50%) / 64/206 (31%) |
+| Demo props | Carhartt Detroit 68 listings, Nike Dunk Low 33 |
+| Kids' items | 8 of 20 in the unfiltered smoke test; 4 of 200 once `excludeKeywords` was added |
+| Color | 0/206 (Mercari rarely has it) |
+
+Mercari's total price is `price + shipping (only when the buyer pays) + buyer-protection fee`, checked on 25 of 25
+rows. `cost.total_cents` includes the shipping but not the fee.
+
+The real run also exposed two pipeline bugs, fixed here: JSON Lines were mis-split on U+2028 (decision 18) and invisible
+characters survived into the text (decision 19).
 
 ## 14. Order of work
 
@@ -373,11 +420,11 @@ If Depop and Poshmark both fail, switch to `123webdata/depop-scraper` (detail mo
 
 ## 16. Open items and risks
 
-- Mercari was dropped (decision 13). A second attempt would need a different actor, or a way to fetch item pages at a
-  sane price (each listing URL probably bills as a $0.04 search request).
+- Mercari (`automation_craft`) is 11 days old and lightly used. It ran cleanly in all 7 runs (250 listings, none above 80
+  per run); test a 300-item query, the real size, before the full run, and keep `tortuga/mercari-scraper` as the fallback.
 - Grailed costs $0.012 per row and is the biggest line; its quota is where to trim.
 - Depop returned US items 20/20 in the test run; check the country spread on the full run.
-- 50k (~$240) may exceed the ~$200 credits (§6). Decide quotas after the 20k run.
+- 50k (~$235) may exceed the ~$200 credits (§6). Decide quotas after the 20k run.
 - `seller.type`: Grailed and Depop have no common scale. Grailed uses the seller's listing count (≤20 / ≤200 / more); eBay uses
   account type and feedback score (business with ≥ 5000 feedback is a large reseller); Depop and Poshmark give none (null). All guesses.
 - Material coverage may fall short of the 25% / 10% targets; the fix is more material-rich queries.
