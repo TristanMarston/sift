@@ -225,3 +225,11 @@ def test_a_product_shot_with_nothing_sure_becomes_one_whole_photo_garment(monkey
     assert resp["garments"] == [{"id": "g0", "label": "sneakers", "category": "sneakers",
                                  "box": {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0}, "confidence": 0.9}]
     assert D.detect(IMG, llm=lambda c, h: [])["garments"][0]["category"] == "sneakers"  # Haiku found nothing
+
+
+def test_a_crop_split_into_many_garments_never_gets_a_negative_confidence():
+    many = lambda crop, hint: [{"label": f"item {i}", "category": "tshirts",  # noqa: E731
+                                "box": {"x": 0.0, "y": 0.0, "w": 0.5, "h": 0.5}} for i in range(12)]
+    out = D.relabel(IMG, [TOP], many, pad=0)
+    assert len(out) == 12 and all(0 < g["confidence"] <= 1 for g in out)
+    validate(D.response(IMG, out))

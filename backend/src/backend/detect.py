@@ -229,8 +229,9 @@ def _haiku(im: Image.Image, region: dict, llm, pad: float) -> list[dict]:
         return [region]
     if len(found) <= 1:
         return [{**region, "label": g["label"], "category": g["category"] or region["category"]} for g in found] or [region]
+    # later (inner, smaller) layers rank lower, but never below 0.1x, so confidence stays in 0-1
     return [_region(g["label"], g["category"], (cx + g["box"]["x"] * cw, cy + g["box"]["y"] * ch, g["box"]["w"] * cw,
-                                                g["box"]["h"] * ch), region["confidence"] * (1 - 0.1 * i))
+                                                g["box"]["h"] * ch), region["confidence"] * max(0.1, 1 - 0.1 * i))
             for i, g in enumerate(found)]
 
 

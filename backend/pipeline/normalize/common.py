@@ -45,11 +45,40 @@ _CONDITION_RULES = [
 ]
 
 
+# Sellers' own words, for marketplaces that send no condition (Poshmark). Stricter than _CONDITION_RULES: free text
+# says "good" and "new" about many things. "Signs of wear" is left out: it is as often "minimal signs of wear".
+_TEXT_CONDITION_RULES = [
+    ("new_with_tags", r"\bnwt\b|\bnew with tags?\b|\bbrand new\b(?! without)|\bnew in box\b|\bnib\b"),
+    ("like_new", r"\bnwot\b|\bnew without tags?\b|\blike[- ]new\b|\beuc\b|\bexcellent (?:used |pre-?owned )?condition\b|"
+                 r"\bmint condition\b|\bnever worn\b"),
+    ("good", r"\bguc\b|\b(?:very )?good (?:used |pre-?owned )?condition\b|\bgently (?:used|worn)\b"),
+    ("fair", r"\bfair condition\b|\bwell[- ]worn\b"),
+]
+_NEGATED = re.compile(r"\b(?:no|not|without|never|zero)\b[\w\s,/&-]{0,15}$", re.I)  # "no stains or flaws", "not new"
+
+
+def _first(rules, text: str) -> tuple[str | None, str | None]:
+    """(bucket, matched words) of the first rule with a match that is not negated."""
+    for cond, pattern in rules:
+        for m in re.finditer(pattern, text, re.I):
+            if not _NEGATED.search(text[max(0, m.start() - 20):m.start()]):
+                return cond, m[0]
+    return None, None
+
+
 def map_condition(raw: str | None) -> str | None:
     """Marketplace condition text -> new_with_tags / like_new / good / fair; None when it cannot be mapped.
     Ordinal: the lowest label on a marketplace (poor, very worn) maps to the lowest bucket."""
-    text = (raw or "").lower()
-    return next((cond for cond, pattern in _CONDITION_RULES if re.search(pattern, text)), None)
+    return _first(_CONDITION_RULES, raw or "")[0]
+
+
+def condition_from_text(title: str | None, description: str | None) -> tuple[str | None, str | None]:
+    """(bucket, the seller's words) from the title, else the description; (None, None) when neither says."""
+    for text in (title or "", description or ""):
+        cond, words = _first(_TEXT_CONDITION_RULES, text)
+        if cond:
+            return cond, words
+    return None, None
 
 
 def seller_type(listing_count: int | None) -> str | None:

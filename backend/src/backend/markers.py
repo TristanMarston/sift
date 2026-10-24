@@ -2,12 +2,19 @@
 Every point comes from a fact on the receipt; no fact, no point.
 
 Quality points: brand repair program or guarantee +2, known durable product line +2, fiber that suits the
-category +1 (+0.5 when from structured data or a tag), pilling-prone knit -1.
+category +1 (+0.5 when from structured data or a tag), a durable construction named in the listing +1, vintage and
+still in good condition +1 (it has already lasted), pilling-prone knit -1, stretch jeans -1, faux or PU leather -1.
 Eco points: vintage/deadstock/upcycled +1 each, recycled +1, organic +1, certifications +1 each (max 2),
 synthetic share over 50% -1. "Secondhand" and animal materials are shown but score nothing."""
 import re
 
 SYNTHETIC_LIMIT = 50
+STRETCH_LIMIT = 2  # % elastane above which jeans bag out and wear faster
+WEAK = {"synthetic_leather", "polyurethane"}  # peel and crack
+CONSTRUCTION = re.compile(
+    r"\b(selvedge|selvage|raw denim|duck canvas|cotton duck|double[- ]knee|triple[- ]stitch(?:ed)?|bar[- ]tack(?:ed)?|"
+    r"chain[- ]?stitch(?:ed)?|full[- ]grain(?: leather)?|goodyear[- ]welt(?:ed)?|gore-?tex|ripstop|"
+    r"waxed (?:cotton|canvas)|boiled wool|heavyweight)\b", re.I)
 ANIMAL = {"wool", "cashmere", "alpaca", "mohair", "silk", "leather", "down"}
 CERT_LABEL = {"gots": "GOTS", "oeko_tex": "OEKO-TEX", "bluesign": "bluesign", "fair_trade": "Fair Trade",
               "rws": "Responsible Wool Standard", "rds": "Responsible Down Standard", "b_corp": "B Corp"}
@@ -85,12 +92,32 @@ def quality(row: dict, brands: dict) -> tuple[dict, list[dict]]:
         known = [x for x in fibers if x["pct"] is not None]
         share = sum(x["pct"] for x in known if x["fiber"] in good) if known else (100 if all(x["fiber"] in good for x in fibers) else 0)
         acrylic = sum(x["pct"] or 0 for x in fibers if x["fiber"] == "acrylic")
-        if share >= need and share > 0:
+        stretch = sum(x["pct"] or 0 for x in fibers if x["fiber"] == "elastane")
+        main = max(fibers, key=lambda x: x["pct"] or 0)["fiber"]
+        if (row["category"] == "jeans_pants" and stretch >= STRETCH_LIMIT) or main in WEAK:
+            points -= 1
+            scored.append(f)
+        elif share >= need and share > 0:
             points += 1.5 if f["source"] in {"specifics", "tag_image"} else 1
             scored.append(f)
         elif row["category"] == "sweaters_knitwear" and (acrylic >= 50 or (row["materials"]["synthetic_share"] or 0) > SYNTHETIC_LIMIT):
             points -= 1
             scored.append(f)
+    as_of = row["scraped_at"][:10]
+    found = list(dict.fromkeys(m[0] for m in CONSTRUCTION.finditer(f"{row['title']}. {row.get('description') or ''}")))
+    if found:
+        f = _fact("construction", "Construction", ", ".join(dict.fromkeys(x.lower() for x in found)), as_of=as_of,
+                  snippet=", ".join(found))
+        facts.append(f)
+        scored.append(f)
+        points += 1
+    if row["flags"]["is_vintage"] and row.get("condition") in {"good", "like_new"}:
+        e = _evidence(row, "flags.is_vintage") or {}
+        f = _fact("survival", "Already lasted", f"Vintage and still in {row['condition'].replace('_', ' ')} condition",
+                  as_of=e.get("as_of", as_of), snippet=e.get("snippet"))
+        facts.append(f)
+        scored.append(f)
+        points += 1
     level = _level(points, [(3, "high"), (1, "medium"), (float("-inf"), "low")])
     score = None if level == "unknown" else min(1.0, max(0.0, (points + 1) / 6))
     return {"level": level, "score": score, "facts": facts}, scored
@@ -112,8 +139,9 @@ def eco(row: dict, brands: dict) -> dict:
             facts.append(_fact(attr, label, f"{label} {', '.join(hit)}", as_of=as_of))
             points += 1
     b = brands.get(brand_key(row.get("brand"))) or {}
-    certs = [(c, None, as_of) for c in m["certifications"]] + \
-            [(c["name"], c["url"], b.get("as_of", "")) for c in b.get("certifications", [])]
+    certs = [(c, None, as_of) for c in m["certifications"]]
+    certs += [(c["name"], c["url"], b.get("as_of", "")) for c in b.get("certifications", [])
+              if c["name"] not in m["certifications"]]  # stated by both: one fact, the listing's
     for c, url, when in certs:
         facts.append(_fact("certification", "Certification", CERT_LABEL.get(c, c),
                            source="brand_table" if url else "listing_text", source_url=url, as_of=when))

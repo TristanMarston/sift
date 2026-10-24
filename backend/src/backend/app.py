@@ -3,7 +3,7 @@
   uv run uvicorn backend.app:app --port 8000
 
 SIFT_INDEX: the step-05 index folder (default pipeline/data/index). SIFT_CORS_ORIGINS: comma-separated web origins
-(default http://localhost:3000). Models and the index load on first use, so the server starts at once."""
+(default http://localhost:3000); SIFT_CORS_ORIGIN_REGEX: a pattern for more (e.g. Vercel preview URLs). Models and the index load on first use, so the server starts at once."""
 import io
 import json
 import os
@@ -22,6 +22,7 @@ from backend import ranker
 MAX_BYTES = 10 * 1024 * 1024
 FORMATS = {"JPEG", "PNG", "WEBP"}
 K = 50
+DUPLICATE = 0.97  # photo similarity at which two listings are one item; checked by eye on the first real batch
 MIN_SIM = 0.3  # cosine below this looks nothing alike: dropped, so a search may come back empty (API.md: Result set)
 INDEX = Path(os.getenv("SIFT_INDEX", Path(__file__).resolve().parents[2] / "pipeline" / "data" / "index"))
 
@@ -78,7 +79,8 @@ def _params(raw: str | None) -> SearchParams:
         raise ApiError(400, "invalid_params", f"`params` must be JSON matching SearchParams: {e}") from None
 
 
-def create_app(index=None, cfg=None, embed=None, detect=None, categorize=None, origins=None) -> FastAPI:
+def create_app(index=None, cfg=None, embed=None, detect=None, categorize=None, origins=None,
+               origin_regex=None) -> FastAPI:
     """Pass the index, ranking config and models to test; otherwise each loads on first use."""
     @cache
     def deps():
@@ -107,7 +109,8 @@ def create_app(index=None, cfg=None, embed=None, detect=None, categorize=None, o
 
     app = FastAPI(title="Sift API")
     app.add_middleware(CORSMiddleware, allow_methods=["GET", "POST"], allow_headers=["*"],
-                       allow_origins=origins or os.getenv("SIFT_CORS_ORIGINS", "http://localhost:3000").split(","))
+                       allow_origins=origins or os.getenv("SIFT_CORS_ORIGINS", "http://localhost:3000").split(","),
+                       allow_origin_regex=origin_regex or os.getenv("SIFT_CORS_ORIGIN_REGEX"))
 
     @app.exception_handler(ApiError)
     def api_error(request: Request, e: ApiError):
@@ -133,7 +136,7 @@ def create_app(index=None, cfg=None, embed=None, detect=None, categorize=None, o
         category = q.category or category_of(vec)
         f = q.filters or Filters()
         hits = idx.search(vec, k=K, min_sim=MIN_SIM, category=category, max_price_cents=f.max_price_cents,
-                          marketplaces=f.marketplaces, sizes=f.sizes, conditions=f.conditions)
+                          marketplaces=f.marketplaces, sizes=f.sizes, conditions=f.conditions, dedupe=DUPLICATE)
         return ranker.rank(hits, {**q.model_dump(exclude_unset=True), "category": category}, conf)
 
     return app

@@ -155,3 +155,22 @@ def test_the_web_app_origin_may_call_the_api(client):
     resp = client.get("/health", headers={"Origin": "https://sift.example"})
     assert resp.headers["access-control-allow-origin"] == "https://sift.example"
     assert "access-control-allow-origin" not in client.get("/health", headers={"Origin": "https://evil.example"}).headers
+
+
+def test_search_shows_a_cross_posted_item_once_at_its_lowest_price():
+    same = [1.0, 0.0, 0.0]
+    rows = [(make_row("a", marketplace="mercari", url="https://www.mercari.com/us/item/a", **price(5400)), same),
+            (make_row("b", marketplace="poshmark", url="https://poshmark.com/listing/b", **price(4500)), same)]
+    index = Index(np.array([v for _, v in rows], np.float32), [r for r, _ in rows])
+    c = TestClient(A.create_app(index=index, cfg=CFG, embed=lambda im: np.array(same, np.float32),
+                                categorize=lambda v: "jackets_outerwear"))
+    body = valid("SearchResponse", search(c, {"category": "jackets_outerwear"}).json())
+    assert [r["id"] for r in body["results"]] == ["poshmark:b"]
+
+
+def test_vercel_preview_urls_can_be_allowed_by_pattern():
+    index = Index(np.zeros((0, 3), np.float32), [])
+    c = TestClient(A.create_app(index=index, cfg=CFG, origin_regex=r"https://sift(-[a-z0-9-]+)?\.vercel\.app"))
+    ok = c.get("/health", headers={"Origin": "https://sift-git-main-tristan.vercel.app"})
+    assert ok.headers["access-control-allow-origin"] == "https://sift-git-main-tristan.vercel.app"
+    assert "access-control-allow-origin" not in c.get("/health", headers={"Origin": "https://evil.vercel.app"}).headers

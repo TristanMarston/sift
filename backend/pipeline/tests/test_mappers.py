@@ -154,6 +154,13 @@ def test_poshmark_fields():
     assert n.title == fx("poshmark")[0]["name"] and len(n.image_urls) == 3
 
 
+def test_poshmark_condition_comes_from_the_sellers_words_when_stated():
+    n = mapped("poshmark", 0, description="Excellent used condition, no flaws. Measurements in photos")
+    assert (n.condition, n.condition_raw) == ("like_new", "Excellent used condition")
+    assert mapped("poshmark", 0, name="NWT The North Face jacket").condition == "new_with_tags"
+    assert mapped("poshmark", 0, description="Not brand new, worn twice").condition is None
+
+
 def test_poshmark_original_price_is_the_retail_price_not_a_markdown():
     """Poshmark's "Original Price" is what the item cost new (API.md: retail_price_cents), not an earlier listing price."""
     n = mapped("poshmark", 0)

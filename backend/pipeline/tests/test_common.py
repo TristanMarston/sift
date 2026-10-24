@@ -19,9 +19,26 @@ def test_to_cents(raw, cents):
     ("Good", "good"), ("Used - Good", "good"), ("Used", "good"), ("Pre-owned", "good"),
     ("Used - Fair", "fair"), ("Fair", "fair"), ("Poor", "fair"), ("Very Worn", "fair"),
     ("Refurbished", None), ("For parts or not working", None), ("", None), (None, None),
+    # a negated word must not decide the bucket
+    ("Good - no flaws", "good"), ("Very good, no stains or flaws", "good"), ("Not new", None),
 ])
 def test_map_condition(raw, expected):
     assert C.map_condition(raw) == expected
+
+
+@pytest.mark.parametrize("title, description, expected", [
+    ("Patagonia fleece NWT", "", ("new_with_tags", "NWT")),
+    ("Levi's 501", "Excellent used condition, no flaws", ("like_new", "Excellent used condition")),
+    ("Levi's 501", "EUC! smoke free home", ("like_new", "EUC")),
+    ("Carhartt jacket", "Good used condition. Measurements in photos", ("good", "Good used condition")),
+    ("Wool coat", "Fair condition, small stain on cuff", ("fair", "Fair condition")),
+    ("Dunks", "Not brand new, worn twice", (None, None)),
+    ("Dunks", "minimal signs of wear", (None, None)),          # too ambiguous to call: left unknown
+    ("Plain tee", "Size M, cotton", (None, None)),
+    ("NWT sweater", "Good condition", ("new_with_tags", "NWT")),  # the title wins over the description
+])
+def test_condition_from_text_when_the_marketplace_gives_none(title, description, expected):
+    assert C.condition_from_text(title, description) == expected
 
 
 @pytest.mark.parametrize("count, kind", [
