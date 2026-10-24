@@ -1,0 +1,358 @@
+# Query plan (SPEC.md §7). Used by 01_scrape.py.
+#
+# ORDER MATTERS. The runner goes breadth first: query 1 of every category and marketplace, then query 2, ...
+# and stops a marketplace when it reaches its quota. A 20k run therefore only uses the first few queries
+# of each list; the rest is the pool for the 50k stage. Put the most valuable queries first:
+# a broad brand query (also the go/no-go test query), the demo props, material-rich phrases, other brands.
+#
+# A query is a string (uses the marketplace default in `max_items`) or {query: ..., max_items: ...}.
+# Caps stay <= 500 so one long tail cannot eat the budget.
+
+quotas:        # raw rows per marketplace at this stage: 20k target x ~1.3 over-scrape. Raise for the 50k stage.
+  depop: 10400
+  poshmark: 5200
+  grailed: 3900
+  mercari: 3900
+  ebay: 2600
+
+max_items:     # default cap per query
+  depop: 200
+  poshmark: 200
+  grailed: 200   # $0.012 per row with details: the expensive line
+  mercari: 300   # fewer, broader queries
+  ebay: 150
+
+queries:
+  jackets_outerwear:
+    depop: &jackets
+      - the north face jacket
+      - carhartt detroit jacket          # demo prop
+      - patagonia better sweater         # demo prop
+      - 100% wool coat
+      - carhartt chore coat
+      - patagonia nano puff
+      - recycled polyester jacket
+      - arc'teryx jacket
+      - columbia jacket
+      - levi's trucker jacket
+      - nike windbreaker jacket
+      - adidas track jacket
+      - champion coach jacket
+      - uniqlo down jacket
+      - patagonia synchilla fleece
+      - north face nuptse puffer
+      - cropped jacket
+      - oversized puffer jacket
+      - vintage wool coat
+      - deadstock jacket
+      - 100% cotton canvas jacket
+      - organic cotton jacket
+      - cashmere coat
+      - linen jacket
+      - bomber jacket
+      - barn jacket
+    poshmark: *jackets
+    grailed: *jackets
+    ebay: *jackets
+    mercari:
+      - the north face jacket
+      - carhartt detroit jacket
+      - patagonia better sweater
+      - patagonia nano puff
+      - 100% wool coat
+      - carhartt chore coat
+      - columbia jacket
+      - levi's trucker jacket
+      - arc'teryx jacket
+      - vintage jacket
+
+  hoodies_sweatshirts:
+    depop: &hoodies
+      - champion reverse weave hoodie
+      - 100% cotton hoodie
+      - carhartt hoodie
+      - nike hoodie
+      - patagonia sweatshirt
+      - the north face hoodie
+      - organic cotton sweatshirt
+      - adidas hoodie
+      - oversized hoodie
+      - new balance sweatshirt
+      - uniqlo sweatshirt
+      - columbia hoodie
+      - vintage crewneck sweatshirt
+      - recycled polyester pullover
+      - heavyweight zip up hoodie
+      - deadstock sweatshirt
+      - cropped hoodie
+      - 100% cotton crewneck sweatshirt
+      - champion hoodie
+      - arc'teryx hoodie
+      - levi's hoodie
+      - fleece lined hoodie
+      - vintage college sweatshirt
+      - graphic hoodie
+    poshmark: *hoodies
+    grailed: *hoodies
+    ebay: *hoodies
+    mercari:
+      - champion reverse weave hoodie
+      - carhartt hoodie
+      - nike hoodie
+      - patagonia sweatshirt
+      - the north face hoodie
+      - 100% cotton hoodie
+      - adidas hoodie
+      - vintage sweatshirt
+      - new balance hoodie
+      - columbia hoodie
+
+  tshirts:
+    depop: &tees
+      - 100% cotton tee
+      - nike tee
+      - carhartt pocket tee
+      - patagonia tee
+      - conference tee
+      - hackathon shirt
+      - boxy tee
+      - champion tee
+      - the north face tee
+      - adidas tee
+      - uniqlo tee
+      - organic cotton tee
+      - vintage graphic tee
+      - levi's tee
+      - new balance tee
+      - recycled polyester tee
+      - deadstock tee
+      - heavyweight cotton tee
+      - merino wool tee
+      - linen tee
+      - columbia tee
+      - arc'teryx tee
+      - vintage band tee
+      - tech conference t-shirt
+    poshmark: *tees
+    grailed: *tees
+    ebay: *tees
+    mercari:
+      - 100% cotton t-shirt
+      - nike t-shirt
+      - carhartt t-shirt
+      - patagonia t-shirt
+      - conference tee
+      - hackathon shirt
+      - champion t-shirt
+      - vintage graphic t-shirt
+      - the north face t-shirt
+      - adidas t-shirt
+
+  sneakers:
+    depop: &sneakers
+      - nike dunk low                    # demo prop
+      - new balance 990
+      - nike air force 1
+      - adidas samba
+      - converse chuck taylor all star
+      - new balance 550
+      - adidas superstar
+      - vans old skool
+      - nike air max 90
+      - dr martens 1460
+      - new balance 574
+      - air jordan 1
+      - asics gel kayano
+      - allbirds wool runner
+      - veja sneakers
+      - leather sneakers
+      - suede sneakers
+      - canvas sneakers
+      - deadstock sneakers
+      - vintage sneakers
+      - adidas gazelle
+      - nike cortez
+      - reebok club c
+      - dr martens 1461
+      - hoka clifton
+      - salomon xt-6
+    poshmark: *sneakers
+    grailed: *sneakers
+    ebay: *sneakers
+    mercari:
+      - nike dunk low
+      - new balance 990
+      - nike air force 1
+      - adidas samba
+      - converse chuck taylor
+      - vans old skool
+      - nike air max
+      - new balance 550
+      - adidas superstar
+      - dr martens boots
+
+  jeans_pants:
+    depop: &pants
+      - levi's 501 jeans
+      - 100% cotton jeans
+      - carhartt double knee pants
+      - dickies 874 work pants
+      - levi's 505 jeans
+      - wide leg pants
+      - patagonia pants
+      - the north face pants
+      - uniqlo chino pants
+      - nike track pants
+      - adidas track pants
+      - columbia hiking pants
+      - arc'teryx pants
+      - wrangler jeans
+      - levi's 511 jeans
+      - vintage levi's jeans
+      - organic cotton pants
+      - 100% linen pants
+      - 100% wool trousers
+      - selvedge denim jeans
+      - deadstock pants
+      - carhartt carpenter pants
+      - cargo pants
+      - champion sweatpants
+      - recycled polyester pants
+    poshmark: *pants
+    grailed: *pants
+    ebay: *pants
+    mercari:
+      - levi's 501
+      - 100% cotton jeans
+      - carhartt double knee pants
+      - dickies work pants
+      - wide leg pants
+      - the north face pants
+      - nike track pants
+      - wrangler jeans
+      - uniqlo pants
+      - adidas track pants
+
+  sweaters_knitwear:
+    depop: &sweaters
+      - 100% wool sweater
+      - merino wool sweater
+      - cashmere sweater
+      - uniqlo merino sweater
+      - patagonia sweater
+      - fisherman sweater
+      - cardigan 100% cotton
+      - lambswool sweater
+      - alpaca sweater
+      - mohair sweater
+      - organic cotton sweater
+      - vintage wool sweater
+      - cable knit sweater
+      - 100% linen sweater
+      - the north face sweater
+      - carhartt knit sweater
+      - recycled wool sweater
+      - deadstock sweater
+      - shetland wool sweater
+      - oversized knit sweater
+      - wool blend cardigan
+      - turtleneck sweater
+      - knit vest
+      - mock neck sweater
+    poshmark: *sweaters
+    grailed: *sweaters
+    ebay: *sweaters
+    mercari:
+      - 100% wool sweater
+      - merino sweater
+      - cashmere sweater
+      - uniqlo sweater
+      - patagonia pullover sweater
+      - cardigan
+      - fisherman sweater
+      - alpaca sweater
+      - vintage wool knit
+      - lambswool sweater
+
+  shirts:
+    depop: &shirts
+      - carhartt flannel shirt
+      - patagonia flannel shirt
+      - 100% cotton flannel shirt
+      - levi's western shirt
+      - uniqlo oxford shirt
+      - 100% linen shirt
+      - overshirt
+      - the north face button up shirt
+      - columbia fishing shirt
+      - chambray shirt
+      - vintage hawaiian shirt
+      - organic cotton shirt
+      - oxford button down shirt
+      - 100% silk shirt
+      - recycled polyester shirt
+      - nike button up shirt
+      - arc'teryx shirt
+      - work shirt
+      - deadstock shirt
+      - corduroy shirt
+      - denim shirt
+      - camp collar shirt
+      - vintage flannel shirt
+      - merino wool shirt
+    poshmark: *shirts
+    grailed: *shirts
+    ebay: *shirts
+    mercari:
+      - carhartt flannel
+      - patagonia shirt
+      - 100% cotton flannel
+      - levi's western shirt
+      - uniqlo oxford
+      - linen shirt
+      - overshirt
+      - columbia fishing shirt
+      - chambray shirt
+      - vintage hawaiian shirt
+
+  dresses_skirts:
+    depop: &dresses
+      - 100% cotton dress
+      - linen dress
+      - 100% silk dress
+      - denim skirt
+      - midi skirt
+      - wool skirt
+      - uniqlo dress
+      - patagonia dress
+      - levi's skirt
+      - organic cotton dress
+      - vintage dress
+      - floral maxi dress
+      - satin slip dress
+      - pleated skirt
+      - cotton sundress
+      - wrap dress
+      - recycled polyester dress
+      - deadstock dress
+      - 100% wool dress
+      - tennis skirt
+      - nike dress
+      - adidas skirt
+      - knit dress
+      - shirt dress
+      - mini skirt
+    poshmark: *dresses
+    grailed: *dresses
+    ebay: *dresses
+    mercari:
+      - cotton dress
+      - linen dress
+      - silk dress
+      - denim skirt
+      - midi skirt
+      - wool skirt
+      - uniqlo dress
+      - vintage dress
+      - maxi dress
+      - pleated skirt
