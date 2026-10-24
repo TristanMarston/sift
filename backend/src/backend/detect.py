@@ -197,11 +197,12 @@ def _client():
     return anthropic.Anthropic(timeout=20, max_retries=1)
 
 
-def describe(jpeg: bytes, hint: str | None) -> list[dict]:
-    """Ask Haiku what garments are in one crop (hint: the segmentation label) or the whole photo (hint None).
-    Raises on API errors; the caller falls back."""
-    msg = _client().messages.create(
-        model=HAIKU, max_tokens=1024, temperature=0,   # the same photo gets the same garments twice
+def request(jpeg: bytes, hint: str | None) -> dict:
+    """The messages.create call for one crop (hint: the segmentation label) or the whole photo (hint None). Only
+    arguments the installed SDK accepts: a rejected one (temperature, once) fails every call, and the fallback then
+    ships SegFormer's labels and categories without anyone noticing."""
+    return dict(
+        model=HAIKU, max_tokens=1024,
         output_config={"effort": "low", "format": {"type": "json_schema", "schema": SCHEMA}},
         messages=[{"role": "user", "content": [
             {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
@@ -209,6 +210,11 @@ def describe(jpeg: bytes, hint: str | None) -> list[dict]:
             {"type": "text", "text": PROMPT.format(hint=hint) if hint else PHOTO_PROMPT},
         ]}],
     )
+
+
+def describe(jpeg: bytes, hint: str | None) -> list[dict]:
+    """Ask Haiku what garments are in one crop or the whole photo. Raises on API errors; the caller falls back."""
+    msg = _client().messages.create(**request(jpeg, hint))
     if msg.stop_reason == "refusal":
         return []
     return json.loads(next(b.text for b in msg.content if b.type == "text"))["garments"]
