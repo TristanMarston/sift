@@ -51,7 +51,7 @@ def test_empty_search_is_valid_and_has_no_typical():
     resp = R.rank([], QUERY, CFG)
     validate(resp)
     assert resp["results"] == [] and resp["typical"] is None
-    assert resp["headline"] == {"cheapest_id": None, "cheapest_rank_by_cpw": None}
+    assert resp["headline"] == {"cheapest_id": None, "cheapest_rank_by_cpw": None, "match": None}
     assert resp["slider"] == [[]] * 11
 
 
