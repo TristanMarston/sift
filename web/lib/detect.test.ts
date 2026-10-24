@@ -28,3 +28,8 @@ test('boxes that spill past the photo are clamped to its edges', () => {
     const res = { image: { width: 768, height: 1024 }, garments: [{ id: 'g0', category: 'tshirts', label: 'tee', box: { x: -0.1, y: 0.9, w: 0.5, h: 0.3 }, confidence: 0.8 }] };
     assert.deepEqual(toGarments(res)[0].bbox, { x: 0, y: 0.9, w: 0.4, h: 0.1 });
 });
+
+test('a garment the backend could not categorize (null) searches with no category, like the whole photo', () => {
+    const res = { image: { width: 768, height: 1024 }, garments: [{ id: 'g0', category: null, label: 'jumpsuit', box: { x: 0.1, y: 0.1, w: 0.5, h: 0.8 }, confidence: 0.9 }] };
+    assert.equal(toGarments(res)[0].category, '');
+});

@@ -138,9 +138,16 @@ def test_depop_sold_and_non_us_seller_with_a_usd_price_is_kept_with_its_region()
 def test_poshmark_fields():
     n = mapped("poshmark", 0)
     assert (n.id, n.brand, n.size, n.color, n.subcategory) == ("poshmark:6acbf84b28951ffc17205cc0", "The North Face", "M", "Blue", "Jackets & Coats")
-    assert (n.cost.price_cents, n.cost.total_cents) == (9000, 9000)
+    assert (n.cost.price_cents, n.cost.shipping_cents, n.cost.total_cents) == (9000, 649, 9649)   # Posh Post flat rate
     assert (n.condition, n.condition_raw, n.seller.region) == (None, None, "US")
     assert n.title == fx("poshmark")[0]["name"] and len(n.image_urls) == 3
+
+
+def test_poshmark_condition_comes_from_the_sellers_words_when_stated():
+    n = mapped("poshmark", 0, description="Excellent used condition, no flaws. Measurements in photos")
+    assert (n.condition, n.condition_raw) == ("like_new", "Excellent used condition")
+    assert mapped("poshmark", 0, name="NWT The North Face jacket").condition == "new_with_tags"
+    assert mapped("poshmark", 0, description="Not brand new, worn twice").condition is None
 
 
 def test_poshmark_original_price_is_the_retail_price_not_a_markdown():

@@ -51,8 +51,8 @@ _CERTS = {
 }
 _FLAGS = {
     "is_vintage": r"\b(?:vintage|vtg)\b(?![\s-]*(?:wash|style|inspired|fit|look|fade|effect))",
-    "is_deadstock": r"\bdead[\s-]?stock\b|\bnew old stock\b",
-    "is_upcycled": r"\bup[\s-]?cycl(?:ed|e)\b",
+    "is_deadstock": r"\bdead[\s-]?stock\b|\bnew old stock\b|\b(?-i:NOS)\b",        # NOS: capitals only ("Nos Amis")
+    "is_upcycled": r"\bup[\s-]?cycl(?:ed|e)\b|(?<!not )\breworked\b",           # reworked: remade from a garment
 }
 _RETAIL = re.compile(r"\b(?:retail(?:s|ed)?(?:\s+(?:price|value))?(?:\s+(?:for|at))?|msrp)\s*[:\-]?\s*"
                      r"\$\s*(\d[\d,]*(?:\.\d{1,2})?)", re.I)
@@ -83,6 +83,7 @@ class ProductLine(BaseModel):
     title_has: list[str]
     note: str
     fibers: list[Fiber]
+    durable: bool = False  # True: a known long-lived line (quality +2); False: the line only tells us its fabric
 
 
 PRODUCT_LINES = [ProductLine(**p) for p in yaml.safe_load(Path(__file__).with_name("product_lines.yaml").read_text(encoding="utf-8"))]
@@ -157,13 +158,16 @@ def extract(n: Normalized, lines: list[ProductLine] = PRODUCT_LINES) -> Listing:
     if not fibers or (all(f.pct is None for f in fibers) and any(f.pct is not None for f in in_text)
                       and {f.fiber for f in fibers} <= {f.fiber for f in in_text}):
         fibers, snippet, source = in_text, text_snippet, "listing_text"
+    line = match_product_line(n.brand, f"{n.title} {spec.get('product line', '')} {spec.get('model', '')}", lines)
     if fibers:
         note("materials.fibers", "claimed", source, snippet)
-    elif line := match_product_line(n.brand, f"{n.title} {spec.get('product line', '')} {spec.get('model', '')}", lines):
+    elif line:
         fibers = line.fibers
         note("materials.fibers", "inferred", "product_line", line.note)
     else:
         note("materials.fibers", "unknown", "listing_text")
+    if line and line.durable:  # a known durable line is its own evidence (quality credits it), whatever the seller stated
+        note("product_line", "inferred", "product_line", line.note)
 
     certs = {}
     for source, where in (("specifics", " ".join(spec.values())), ("listing_text", text)):

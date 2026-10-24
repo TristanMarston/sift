@@ -110,3 +110,21 @@ def test_import_ignores_zip_members_outside_the_snapshot(tmp_path):
     dst = tmp_path / "dst"
     assert L.import_snapshot(dst, tmp_path / "evil.zip") == {"runs": 1}
     assert not (tmp_path / "outside.txt").exists() and not (dst / "notes.txt").exists()
+
+
+def test_care_tag_answers_travel_with_a_snapshot_so_nobody_pays_for_them_twice(tmp_path):
+    src, dst = snapshot_dir(tmp_path), tmp_path / "dst"
+    jsonl.append(src / "tags.jsonl", {"id": "depop:1", "as_of": "2026-10-24", "tag_found": True, "composition": "100% wool"})
+    jsonl.append(src / "tags.jsonl", {"id": "depop:2", "as_of": "2026-10-24", "tag_found": False, "composition": None,
+                                      "error": "TimeoutError: "})       # a failed call is retried, not shared
+    L.export(src, tmp_path / "snap.zip")
+    assert L.import_snapshot(dst, tmp_path / "snap.zip")["tags"] == 1
+    assert [t["id"] for t in jsonl.load(dst / "tags.jsonl")] == ["depop:1"]
+    assert "tags" not in L.import_snapshot(dst, tmp_path / "snap.zip")   # importing twice changes nothing
+
+
+def test_depop_shipping_answers_travel_with_a_snapshot_too(tmp_path):
+    src, dst = snapshot_dir(tmp_path), tmp_path / "dst"
+    jsonl.append(src / "depop_shipping.jsonl", {"id": "1", "as_of": "2026-10-24", "shipping_cents": 199, "free_shipping": False})
+    L.export(src, tmp_path / "snap.zip")
+    assert L.import_snapshot(dst, tmp_path / "snap.zip")["shipping"] == 1
