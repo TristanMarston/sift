@@ -84,7 +84,7 @@ class ProductLine(BaseModel):
     fibers: list[Fiber]
 
 
-PRODUCT_LINES = [ProductLine(**p) for p in yaml.safe_load(Path(__file__).with_name("product_lines.yaml").read_text())]
+PRODUCT_LINES = [ProductLine(**p) for p in yaml.safe_load(Path(__file__).with_name("product_lines.yaml").read_text(encoding="utf-8"))]
 
 
 def parse_fibers(text: str, field: bool = False) -> tuple[list[Fiber], str]:
@@ -209,7 +209,7 @@ def extract_file(src, dst) -> Counter:
             out.append(jsonl.dumps(extract(Normalized.model_validate_json(line)).model_dump(mode="json")) + "\n")
         except ValidationError:
             stats["invalid"] += 1
-    Path(dst).with_suffix(".tmp").write_text("".join(out))
+    Path(dst).with_suffix(".tmp").write_text("".join(out), encoding="utf-8")
     Path(dst).with_suffix(".tmp").replace(dst)
     stats["kept"] = len(out)
     return stats

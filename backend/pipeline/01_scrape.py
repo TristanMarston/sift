@@ -28,6 +28,7 @@ HERE = Path(__file__).resolve().parent
 
 
 def main():
+    sys.stdout.reconfigure(encoding="utf-8")   # the report has non-ASCII characters; Windows log files are cp1252 otherwise
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--test", action="store_true", help="20 items from the first query of each marketplace")
     ap.add_argument("--dry-run", action="store_true", help="print the plan and cost estimate, call nothing")

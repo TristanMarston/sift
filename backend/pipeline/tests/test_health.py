@@ -16,7 +16,7 @@ NOW = datetime(2026, 10, 24, tzinfo=timezone.utc)
 
 
 def log(name):
-    return (LOGS / f"{name}.log").read_text()
+    return (LOGS / f"{name}.log").read_text(encoding="utf-8")
 
 
 def rows(good=0, described=None, filtered=None, bad=None, dup=0):
@@ -149,7 +149,7 @@ def test_far_fewer_rows_than_asked_is_only_a_warning():
 
 def test_row_classification_good_filtered_bad():
     import json
-    raw = json.loads((Path(__file__).parent / "fixtures" / "depop.json").read_text())[0]
+    raw = json.loads((Path(__file__).parent / "fixtures" / "depop.json").read_text(encoding="utf-8"))[0]
     kind, reason, n = H.classify_row(depop.map_item, raw, "tshirts", NOW)
     assert (kind, reason) == ("good", None) and n.id.startswith("depop:")
     assert H.classify_row(depop.map_item, {**raw, "price": {"amount": 5, "currency": "GBP"}}, "tshirts", NOW)[:2] == ("filtered", "non_usd")

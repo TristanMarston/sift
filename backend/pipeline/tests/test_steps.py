@@ -28,14 +28,14 @@ def mapper(raw, category, scraped_at):
 def write_run(d, run_id, items, category="tshirts", status="SUCCEEDED", at="2026-10-24T01:00:00+00:00", file=True, verdict=None):
     (d / "raw" / "depop").mkdir(parents=True, exist_ok=True)
     if file:
-        (d / "raw" / "depop" / f"{run_id}.jsonl").write_text("".join(json.dumps(i) + "\n" for i in items))
-    with (d / "runs.jsonl").open("a") as f:
+        (d / "raw" / "depop" / f"{run_id}.jsonl").write_text("".join(json.dumps(i) + "\n" for i in items), encoding="utf-8")
+    with (d / "runs.jsonl").open("a", encoding="utf-8") as f:
         f.write(json.dumps(dict(marketplace="depop", category=category, query="q", run_id=run_id, status=status,
                                 items=len(items), at=at, **({"verdict": verdict} if verdict else {}))) + "\n")
 
 
 def read_ids(d):
-    return [json.loads(line)["id"] for line in (d / "normalized.jsonl").read_text().splitlines()]
+    return [json.loads(line)["id"] for line in (d / "normalized.jsonl").read_text(encoding="utf-8").splitlines()]
 
 
 def test_normalize_keeps_good_rows_and_counts_every_drop_reason(tmp_path):
@@ -52,7 +52,7 @@ def test_normalize_keeps_good_rows_and_counts_every_drop_reason(tmp_path):
 def test_mapper_gets_the_queries_category_and_the_run_time(tmp_path):
     write_run(tmp_path, "r1", [{"id": "a", "price": 100}], category="sneakers", at="2026-10-23T05:00:00+00:00")
     N.normalize_all(tmp_path, {"depop": mapper})
-    row_ = json.loads((tmp_path / "normalized.jsonl").read_text())
+    row_ = json.loads((tmp_path / "normalized.jsonl").read_text(encoding="utf-8"))
     assert row_["category"] == "sneakers" and row_["scraped_at"].startswith("2026-10-23T05:00:00")
 
 
@@ -60,7 +60,7 @@ def test_duplicates_keep_the_newest_scrape(tmp_path):
     write_run(tmp_path, "old", [{"id": "a", "price": 100}], at="2026-10-23T01:00:00+00:00")
     write_run(tmp_path, "new", [{"id": "a", "price": 150}], at="2026-10-24T01:00:00+00:00")
     stats = N.normalize_all(tmp_path, {"depop": mapper})
-    (only,) = [json.loads(line) for line in (tmp_path / "normalized.jsonl").read_text().splitlines()]
+    (only,) = [json.loads(line) for line in (tmp_path / "normalized.jsonl").read_text(encoding="utf-8").splitlines()]
     assert only["cost"]["price_cents"] == 150 and stats["duplicates"] == 1 and stats["kept"] == 1
 
 
@@ -70,7 +70,7 @@ def test_titles_and_descriptions_are_cleaned_of_invisible_characters(tmp_path):
         return n.model_copy(update={"title": "\u200bWoolrich  vest", "description": "100%\u200bwool\u00a0blend"})
     write_run(tmp_path, "r1", [{"id": "a", "price": 100}])
     N.normalize_all(tmp_path, {"depop": noisy})
-    (only,) = [json.loads(line) for line in (tmp_path / "normalized.jsonl").read_text().splitlines()]
+    (only,) = [json.loads(line) for line in (tmp_path / "normalized.jsonl").read_text(encoding="utf-8").splitlines()]
     assert (only["title"], only["description"]) == ("Woolrich vest", "100%wool blend")
 
 
@@ -91,9 +91,9 @@ def test_rows_from_runs_judged_bad_never_reach_the_catalog(tmp_path, verdict, ke
 def test_output_is_sorted_and_reruns_are_identical(tmp_path):
     write_run(tmp_path, "r1", [{"id": "b", "price": 1}, {"id": "a", "price": 1}])
     N.normalize_all(tmp_path, {"depop": mapper})
-    first = (tmp_path / "normalized.jsonl").read_text()
+    first = (tmp_path / "normalized.jsonl").read_text(encoding="utf-8")
     N.normalize_all(tmp_path, {"depop": mapper})
-    assert read_ids(tmp_path) == ["depop:a", "depop:b"] and (tmp_path / "normalized.jsonl").read_text() == first
+    assert read_ids(tmp_path) == ["depop:a", "depop:b"] and (tmp_path / "normalized.jsonl").read_text(encoding="utf-8") == first
 
 
 # --- 03 extract driver ----------------------------------------------------------------------
@@ -101,9 +101,9 @@ def test_output_is_sorted_and_reruns_are_identical(tmp_path):
 def test_extract_file_writes_listings_and_counts_bad_lines(tmp_path):
     good = Normalized(**row(description="100% cotton", specifics={"Material": "Cotton"}))
     src, dst = tmp_path / "normalized.jsonl", tmp_path / "listings.jsonl"
-    src.write_text(good.model_dump_json() + "\n" + json.dumps({"id": "nope"}) + "\n")
+    src.write_text(good.model_dump_json() + "\n" + json.dumps({"id": "nope"}) + "\n", encoding="utf-8")
     stats = X.extract_file(src, dst)
-    (line,) = dst.read_text().splitlines()
+    (line,) = dst.read_text(encoding="utf-8").splitlines()
     parsed = Listing.model_validate_json(line)
     assert [f.fiber for f in parsed.materials.fibers] == ["cotton"] and "specifics" not in json.loads(line)
     assert (stats["kept"], stats["invalid"]) == (1, 1)

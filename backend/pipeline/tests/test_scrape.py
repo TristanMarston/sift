@@ -52,7 +52,7 @@ def t(mp="depop", cat="tshirts", q="boxy tee", n=100):
 
 
 def read_jsonl(path):
-    return [json.loads(line) for line in Path(path).read_text().splitlines()]
+    return [json.loads(line) for line in Path(path).read_text(encoding="utf-8").splitlines()]
 
 
 # --- plan ----------------------------------------------------------------------------------
@@ -145,7 +145,7 @@ def test_ebay_raw_files_keep_only_whitelisted_fields_so_page_modules_with_the_se
            "feedback": [{"buyer": "otherperson"}], "sellerFeedbackScore": 17}
     S.run_plan(FakeClient(rows=[row]), [t("ebay")], None, tmp_path)
     (path,) = (tmp_path / "raw" / "ebay").glob("*.jsonl")
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
     assert "somehandle" not in text and "otherperson" not in text
     assert json.loads(text) == {"title": "NF jacket", "itemSpecifics": {"Brand": "The North Face"}, "priceValue": 50,
                                 "sellerFeedbackScore": 17}
@@ -163,7 +163,7 @@ def test_depop_raw_files_drop_the_city_and_the_slug_that_starts_with_the_seller_
            "slug": "somehandle-tnf-jacket-23c6", "url": "https://www.depop.com/products/somehandle-tnf-jacket-23c6/"}
     S.run_plan(FakeClient(rows=[row]), [t("depop")], None, tmp_path)
     (path,) = (tmp_path / "raw" / "depop").glob("*.jsonl")
-    assert json.loads(path.read_text()) == {"id": 1, "title": "TNF jacket", "country": "US", "url": row["url"]}
+    assert json.loads(path.read_text(encoding="utf-8")) == {"id": 1, "title": "TNF jacket", "country": "US", "url": row["url"]}
 
 
 def test_scrub_does_not_touch_item_ids_outside_seller_blocks():
@@ -292,7 +292,7 @@ def test_kids_filter_words_never_exclude_adult_terms():
 def test_raw_files_are_ascii_so_unicode_line_separators_cannot_split_a_record(tmp_path):
     S.run_plan(FakeClient(rows=[{"id": 1, "description": "a\u2028b caf\u00e9"}, {"id": 2}]), [t()], None, tmp_path)
     (path,) = (tmp_path / "raw" / "depop").glob("*.jsonl")
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
     assert text.isascii() and len(text.splitlines()) == 2
 
 
@@ -301,7 +301,7 @@ def test_free_summary_rows_are_neither_written_nor_counted(tmp_path):
     rows = [{"type": "search"}, listing, {"type": "status"}, {**listing, "listingId": "m2"}, {"type": "summary"}]
     S.run_plan(FakeClient(rows=rows), [t("mercari")], None, tmp_path)
     (path,) = (tmp_path / "raw" / "mercari").glob("*.jsonl")
-    assert [json.loads(line)["listingId"] for line in path.read_text().splitlines()] == ["m1", "m2"]
+    assert [json.loads(line)["listingId"] for line in path.read_text(encoding="utf-8").splitlines()] == ["m1", "m2"]
     (log,) = read_jsonl(tmp_path / "runs.jsonl")
     assert log["items"] == 2 and log["est_charge_usd"] == pytest.approx(2 * 0.00273 + 0.006)
 

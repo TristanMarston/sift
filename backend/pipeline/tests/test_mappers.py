@@ -17,7 +17,7 @@ MAPPERS = {"depop": depop.map_item, "poshmark": poshmark.map_item, "grailed": gr
 
 
 def fx(mp):
-    return json.loads((FIX / f"{mp}.json").read_text())
+    return json.loads((FIX / f"{mp}.json").read_text(encoding="utf-8"))
 
 
 def mapped(mp, i=0, query_category="tshirts", **override):

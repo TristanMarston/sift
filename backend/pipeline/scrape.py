@@ -120,7 +120,7 @@ class Config:
 
 
 def load_config(path) -> Config:
-    raw = yaml.safe_load(Path(path).read_text())
+    raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
     default = raw["max_items"]
     queries = {cat: {mp: [(q, default[mp]) if isinstance(q, str) else (q["query"], q["max_items"]) for q in qs]
                      for mp, qs in by_mp.items()} for cat, by_mp in raw["queries"].items()}
@@ -197,7 +197,7 @@ def _execute(client, task: Task, cap: Decimal, data_dir: Path, classify, seen: s
     path.parent.mkdir(parents=True, exist_ok=True)
     n = 0
     try:
-        with path.with_suffix(".tmp").open("w") as f:
+        with path.with_suffix(".tmp").open("w", encoding="utf-8") as f:
             for item in client.dataset(run.default_dataset_id).iterate_items():
                 if actor.is_item is not None and not actor.is_item(item):
                     continue
@@ -267,7 +267,7 @@ def run_plan(client, plan, quotas, data_dir, max_spend: Decimal | None = None, l
                       verdict=verdict.kind, reasons=verdict.reasons, notes=verdict.notes, run_id=entry["run_id"], action=action)
         summary.alerts.append(record)
         alerts_path.parent.mkdir(parents=True, exist_ok=True)
-        with alerts_path.open("a") as f:
+        with alerts_path.open("a", encoding="utf-8") as f:
             f.write(jsonl.dumps(record) + "\n")
 
     try:
@@ -296,7 +296,7 @@ def run_plan(client, plan, quotas, data_dir, max_spend: Decimal | None = None, l
             entry.update(verdict=verdict.kind, reasons=verdict.reasons, notes=verdict.notes, rows_good=c.good,
                          rows_duplicate=c.duplicates, rows_filtered=sum(c.filtered.values()), rows_bad=sum(c.bad.values()))
             runs_path.parent.mkdir(parents=True, exist_ok=True)
-            with runs_path.open("a") as f:
+            with runs_path.open("a", encoding="utf-8") as f:
                 f.write(jsonl.dumps(entry) + "\n")
             est = Decimal(str(entry["est_charge_usd"]))
             spent += est

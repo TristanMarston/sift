@@ -10,7 +10,7 @@ import scrape as S
 import scrape_report as R
 from test_scrape import FakeClient, read_jsonl, t
 
-MERCARI_403_LOG = (Path(__file__).parent / "fixtures" / "logs" / "mercari.log").read_text()  # real: two 403s, recovered
+MERCARI_403_LOG = (Path(__file__).parent / "fixtures" / "logs" / "mercari.log").read_text(encoding="utf-8")  # real: two 403s, recovered
 
 
 def classify(task, raw):
@@ -110,7 +110,7 @@ def test_rows_of_a_bad_run_do_not_count_toward_the_quota(tmp_path):
 # --- the operator's brake and Ctrl-C ---------------------------------------------------------------------
 
 def test_a_STOP_file_halts_the_run_before_the_next_actor_call(tmp_path):
-    (tmp_path / "STOP").write_text("")
+    (tmp_path / "STOP").write_text("", encoding="utf-8")
     client = FakeClient()
     summary, lines = run(client, [t(q="a")], tmp_path)
     assert client.calls == [] and summary.manual_stop and R.exit_code(summary) == 4
@@ -132,9 +132,9 @@ def test_report_counts_good_filtered_bad_duplicate_rows_and_money(tmp_path):
     m = summary.markets["depop"]
     assert (m.rows.good, m.rows.duplicates, dict(m.rows.filtered), dict(m.rows.bad), m.rows.saved) == (3, 1, {"kids": 1}, {"no_price": 1}, 6)
     assert m.queries_ok + m.queries_short == 2 and m.queries_bad == 0 and m.est_spend == Decimal("0.006")
-    md = (tmp_path / "run_report.md").read_text()
+    md = (tmp_path / "run_report.md").read_text(encoding="utf-8")
     assert "| depop |" in md and "good rows saved: 3" in md and "kids 1" in md and "no_price 1" in md
-    data = json.loads((tmp_path / "run_report.json").read_text())
+    data = json.loads((tmp_path / "run_report.json").read_text(encoding="utf-8"))
     assert data["markets"]["depop"]["rows_good"] == 3 and data["exit_code"] == 0
 
 

@@ -128,6 +128,6 @@ def write(s: Summary, data_dir) -> str:
     data_dir = Path(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
     text = render(s)
-    (data_dir / "run_report.md").write_text(text)
-    (data_dir / "run_report.json").write_text(json.dumps(to_dict(s), indent=1))
+    (data_dir / "run_report.md").write_text(text, encoding="utf-8")
+    (data_dir / "run_report.json").write_text(json.dumps(to_dict(s), indent=1), encoding="utf-8")
     return text
