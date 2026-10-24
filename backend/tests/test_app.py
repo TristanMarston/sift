@@ -220,3 +220,13 @@ def _green_jpeg():
     buf = io.BytesIO()
     Image.new("RGB", (64, 64), (20, 90, 40)).save(buf, "JPEG")
     return buf.getvalue()
+
+
+def test_search_takes_the_brand_haiku_read_and_lifts_it():
+    rows = [make_row("other", brand="Champion", **price(1000)), make_row("gap", brand="Gap", **price(1000))]
+    index = Index(np.array([[1.0, 0.0, 0.0], [0.94, 0.34, 0.0]], np.float32), rows)
+    c = TestClient(A.create_app(index=index, cfg=CFG, embed=lambda im: np.array([1.0, 0.0, 0.0], np.float32),
+                                categorize=lambda vec: "jackets_outerwear"))
+    body = valid("SearchResponse", search(c, {"category": "jackets_outerwear", "brand": "GAP"}).json())
+    assert body["orders"]["match"] == ["depop:gap", "depop:other"] and body["query"]["brand"] == "GAP"
+    assert search(c, {"brand": 5}).status_code == 400

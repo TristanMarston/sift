@@ -52,7 +52,7 @@ export function ResultsScreen({ shot, garments, searches, selected, onSelect, on
     // A whole-photo search is titled by the category the backend read from it ("Jackets"), not "Your photo".
     const title = (!garment.category && categoryLabel(resp?.query.category)) || garment.label;
 
-    const status = !current || current.status === 'loading' ? 'Searching…' : current.status === 'error' ? "The search didn't finish" : `${list.length} look-${list.length === 1 ? 'alike' : 'alikes'}`;
+    const status = !current || current.status === 'loading' ? 'Searching…' : current.status === 'error' ? "The search didn't finish" : resp?.headline.match === 'similar' ? `Nothing close — ${list.length} similar ${categoryLabel(resp.query.category, 'lower') ?? 'items'}` : `${list.length} look-${list.length === 1 ? 'alike' : 'alikes'}`;
 
     return (
         <motion.div className='fixed inset-0 z-10' exit={{ opacity: 0, transition: { duration: 0.25 } }}>

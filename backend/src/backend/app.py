@@ -46,6 +46,7 @@ class Filters(_Strict):
 
 class SearchParams(_Strict):
     category: Category | None = None
+    brand: str | None = Field(None, max_length=80)   # a brand /detect read off the garment (logo, label)
     filters: Filters | None = None
 
 
@@ -151,7 +152,7 @@ def create_app(index=None, cfg=None, embed=None, detect=None, categorize=None, o
         f = q.filters or Filters()
         hits = idx.search(vec, k=K, min_sim=MIN_SIM, category=category, max_price_cents=f.max_price_cents,
                           marketplaces=f.marketplaces, sizes=f.sizes, conditions=f.conditions, dedupe=DUPLICATE,
-                          color=garment_color(im))   # re-ranks by colour once the index has colors.npy
+                          color=garment_color(im), brand=q.brand)   # colour re-rank (colors.npy); brand lift
         return ranker.rank(hits, {**q.model_dump(exclude_unset=True), "category": category}, conf)
 
     return app

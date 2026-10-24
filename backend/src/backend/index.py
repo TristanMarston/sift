@@ -6,6 +6,9 @@ from pathlib import Path
 import numpy as np
 
 from backend import color as C
+from backend.markers import brand_key
+
+BRAND_BOOST = 0.1   # a brand Haiku read off the photo (a logo, a label) outranks a look-alike of another brand
 
 
 class Index:
@@ -22,6 +25,7 @@ class Index:
         self._size = col(lambda r: (r.get("size") or "").lower())
         self._condition = col(lambda r: r.get("condition"))
         self._total = np.array([r["cost"]["total_cents"] for r in rows], dtype=np.int64)
+        self._brand = col(lambda r: brand_key(r.get("brand")))
 
     @classmethod
     def load(cls, path) -> "Index":
@@ -35,17 +39,20 @@ class Index:
 
     def search(self, query: np.ndarray, k: int = 50, min_sim: float = 0.0, category=None, max_price_cents=None,
                marketplaces=None, sizes=None, conditions=None, dedupe: float | None = None,
-               color=None) -> list[tuple[dict, float]]:
+               color=None, brand: str | None = None) -> list[tuple[dict, float]]:
         """Up to k (row, cosine) pairs above min_sim that pass every filter, most similar first. With `dedupe`, listings
         whose photos are at least that similar to each other are one item (cross-posted or relisted): the cheapest
         copy is kept, and duplicates don't use up result slots. With `color` (the query's CIELAB) and an index that
-        has colours, the order is similarity minus a colour penalty (backend.color); the returned cosine is unchanged."""
+        has colours, the order is similarity minus a colour penalty (backend.color); the returned cosine is unchanged.
+        `brand` (read off the photo) adds BRAND_BOOST to that brand's listings."""
         if not self.rows:
             return []
         sims = self.vecs @ np.asarray(query, np.float32)
         score = sims
         if color is not None and self.colors is not None and not np.isnan(np.asarray(color, np.float64)).any():
             score = sims - C.penalty(self.colors, color)
+        if brand and brand_key(brand):
+            score = score + BRAND_BOOST * (self._brand == brand_key(brand))
         keep = sims >= min_sim
         if category:
             keep &= self._category == category

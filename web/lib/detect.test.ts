@@ -14,13 +14,13 @@ test('detected garments map to traceable boxes, most confident first, labels in 
     const res = {
         image: { width: 768, height: 1024 },
         garments: [
-            { id: 'g1', category: 'jeans_pants', label: 'jeans', box: { x: 0.2, y: 0.5, w: 0.5, h: 0.45 }, confidence: 0.7 },
-            { id: 'g0', category: 'jackets_outerwear', label: 'jacket', box: { x: 0.12, y: 0.08, w: 0.55, h: 0.7 }, confidence: 0.91 },
+            { id: 'g1', category: 'jeans_pants', label: 'jeans', brand: null, box: { x: 0.2, y: 0.5, w: 0.5, h: 0.45 }, confidence: 0.7 },
+            { id: 'g0', category: 'jackets_outerwear', label: 'jacket', brand: null, box: { x: 0.12, y: 0.08, w: 0.55, h: 0.7 }, confidence: 0.91 },
         ],
     };
     assert.deepEqual(toGarments(res), [
-        { id: 'g0', category: 'jackets_outerwear', label: 'Jacket', attributes: {}, bbox: { x: 0.12, y: 0.08, w: 0.55, h: 0.7 } },
-        { id: 'g1', category: 'jeans_pants', label: 'Jeans', attributes: {}, bbox: { x: 0.2, y: 0.5, w: 0.5, h: 0.45 } },
+        { id: 'g0', category: 'jackets_outerwear', label: 'Jacket', brand: null, attributes: {}, bbox: { x: 0.12, y: 0.08, w: 0.55, h: 0.7 } },
+        { id: 'g1', category: 'jeans_pants', label: 'Jeans', brand: null, attributes: {}, bbox: { x: 0.2, y: 0.5, w: 0.5, h: 0.45 } },
     ]);
 });
 
@@ -30,6 +30,6 @@ test('boxes that spill past the photo are clamped to its edges', () => {
 });
 
 test('a garment the backend could not categorize (null) searches with no category, like the whole photo', () => {
-    const res = { image: { width: 768, height: 1024 }, garments: [{ id: 'g0', category: null, label: 'jumpsuit', box: { x: 0.1, y: 0.1, w: 0.5, h: 0.8 }, confidence: 0.9 }] };
+    const res = { image: { width: 768, height: 1024 }, garments: [{ id: 'g0', category: null, label: 'jumpsuit', brand: null, box: { x: 0.1, y: 0.1, w: 0.5, h: 0.8 }, confidence: 0.9 }] };
     assert.equal(toGarments(res)[0].category, '');
 });

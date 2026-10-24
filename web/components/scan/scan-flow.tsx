@@ -53,7 +53,7 @@ export function ScanFlow({ onClose, initialFile }: Props) {
 
     const searchOne = async (id: number, shot: Shot, g: Garment) => {
         try {
-            const resp = await search(await cropShot(shot, g.bbox), g.category);
+            const resp = await search(await cropShot(shot, g.bbox), g.category, g.brand ?? null);
             if (id !== run.current) return;
             setSearches((s) => ({ ...s, [g.id]: { status: 'done', resp } }));
             // With no category, the backend reads one from the photo: "Searched jackets".

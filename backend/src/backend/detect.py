@@ -69,8 +69,9 @@ def _clamp(x, y, w, h) -> dict:
     return {"x": round(x0, 4), "y": round(y0, 4), "w": round(x1 - x0, 4), "h": round(y1 - y0, 4)}
 
 
-def _region(label, category, box, confidence) -> dict:
-    return {"label": label, "category": category, "box": _clamp(*box), "confidence": round(float(confidence), 4)}
+def _region(label, category, box, confidence, brand=None) -> dict:
+    return {"label": label, "category": category, "brand": brand, "box": _clamp(*box),
+            "confidence": round(float(confidence), 4)}
 
 
 # --- SegFormer -------------------------------------------------------------------------
@@ -167,20 +168,23 @@ PROMPT = """This is a crop from a shopper's photo. Its main item is the "{hint}"
 List that item, plus any item layered with it (a jacket worn open over a t-shirt is two items). Ignore garments that \
 are only partly in the crop at its edges, accessories, skin and background. Outermost or largest item first.
 For each item give: label (2-3 plain words, e.g. "denim jacket"), category (one of the allowed values, or null if \
-none fits), and box (x, y, w, h as fractions of this crop, origin top-left)."""
+none fits), brand (the brand name only if a logo, wordmark or label on the item is clearly readable, else null), and \
+box (x, y, w, h as fractions of this crop, origin top-left)."""
 
 PHOTO_PROMPT = """This is a shopper's photo. List each separate clothing item clearly visible that someone could buy \
 secondhand. A jacket worn open over a t-shirt is two items. Ignore accessories, skin and background. Largest item first.
 For each item give: label (2-3 plain words, e.g. "denim jacket"), category (one of the allowed values, or null if \
-none fits), and box (x, y, w, h as fractions of the photo, origin top-left)."""
+none fits), brand (the brand name only if a logo, wordmark or label on the item is clearly readable, else null), and \
+box (x, y, w, h as fractions of the photo, origin top-left)."""
 
 SCHEMA = {
     "type": "object", "additionalProperties": False, "required": ["garments"],
     "properties": {"garments": {"type": "array", "items": {
-        "type": "object", "additionalProperties": False, "required": ["label", "category", "box"],
+        "type": "object", "additionalProperties": False, "required": ["label", "category", "brand", "box"],
         "properties": {
             "label": {"type": "string"},
             "category": {"anyOf": [{"type": "string", "enum": CATEGORIES}, {"type": "null"}]},
+            "brand": {"anyOf": [{"type": "string"}, {"type": "null"}]},
             "box": {"type": "object", "additionalProperties": False, "required": ["x", "y", "w", "h"],
                     "properties": {k: {"type": "number"} for k in "xywh"}},
         }}}},
@@ -197,7 +201,8 @@ def describe(jpeg: bytes, hint: str | None) -> list[dict]:
     """Ask Haiku what garments are in one crop (hint: the segmentation label) or the whole photo (hint None).
     Raises on API errors; the caller falls back."""
     msg = _client().messages.create(
-        model=HAIKU, max_tokens=1024, output_config={"effort": "low", "format": {"type": "json_schema", "schema": SCHEMA}},
+        model=HAIKU, max_tokens=1024, temperature=0,   # the same photo gets the same garments twice
+        output_config={"effort": "low", "format": {"type": "json_schema", "schema": SCHEMA}},
         messages=[{"role": "user", "content": [
             {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
                                          "data": base64.standard_b64encode(jpeg).decode()}},
@@ -211,7 +216,7 @@ def describe(jpeg: bytes, hint: str | None) -> list[dict]:
 
 def clean(g: dict) -> dict:
     return {"label": g["label"].strip().lower(), "category": g["category"] if g["category"] in CATEGORIES else None,
-            "box": _clamp(*(g["box"][k] for k in "xywh"))}
+            "brand": (g.get("brand") or "").strip() or None, "box": _clamp(*(g["box"][k] for k in "xywh"))}
 
 
 def _jpeg(im: Image.Image) -> bytes:
@@ -235,10 +240,11 @@ def _haiku(im: Image.Image, region: dict, llm, pad: float) -> list[dict]:
     except Exception:  # noqa: BLE001  any Haiku failure: keep what SegFormer saw
         return [region]
     if len(found) <= 1:
-        return [{**region, "label": g["label"], "category": g["category"] or region["category"]} for g in found] or [region]
+        return [{**region, "label": g["label"], "category": g["category"] or region["category"], "brand": g["brand"]}
+                for g in found] or [region]
     # later (inner, smaller) layers rank lower, but never below 0.1x, so confidence stays in 0-1
     return [_region(g["label"], g["category"], (cx + g["box"]["x"] * cw, cy + g["box"]["y"] * ch, g["box"]["w"] * cw,
-                                                g["box"]["h"] * ch), region["confidence"] * max(0.1, 1 - 0.1 * i))
+                                                g["box"]["h"] * ch), region["confidence"] * max(0.1, 1 - 0.1 * i), g["brand"])
             for i, g in enumerate(found)]
 
 
@@ -283,7 +289,7 @@ def _haiku_only(im: Image.Image, llm) -> list[dict]:
         found = [clean(g) for g in llm(_jpeg(im), None)]
     except Exception:  # noqa: BLE001
         return []
-    return merge([_region(g["label"], g["category"], [g["box"][k] for k in "xywh"], 0.5) for g in found])
+    return merge([_region(g["label"], g["category"], [g["box"][k] for k in "xywh"], 0.5, g["brand"]) for g in found])
 
 
 # --- FashionSigLIP zero-shot category -----------------------------------------------------
@@ -333,7 +339,7 @@ def _whole(im: Image.Image) -> list[dict]:
 def response(im: Image.Image, regions: list[dict]) -> dict:
     ranked = sorted(regions, key=lambda r: -r["confidence"])
     return {"image": {"width": im.width, "height": im.height},
-            "garments": [{"id": f"g{i}", **r} for i, r in enumerate(ranked)]}
+            "garments": [{"id": f"g{i}", "brand": None, **r} for i, r in enumerate(ranked)]}   # SegFormer/YOLOS regions carry no brand
 
 
 DEFAULT_LLM = describe if os.getenv("ANTHROPIC_API_KEY") else None
