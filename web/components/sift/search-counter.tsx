@@ -10,11 +10,12 @@ type Props = {
     total: number; // the real index size
     marketplaces: readonly string[];
     elapsedMs?: number; // set when the search returns; until then the timer runs
+    label?: string | null; // what's being searched: "jackets"
     className?: string;
 };
 
 /** "Searching 18,432 listings" with marketplace names lighting up and a real timer. */
-export function SearchCounter({ total, marketplaces, elapsedMs, className }: Props) {
+export function SearchCounter({ total, marketplaces, elapsedMs, label, className }: Props) {
     const done = elapsedMs !== undefined;
     const [lit, setLit] = useState(0);
     const ms = useMotionValue(0);
@@ -38,7 +39,10 @@ export function SearchCounter({ total, marketplaces, elapsedMs, className }: Pro
     return (
         <div className={cn('flex flex-col gap-2 rounded-card bg-camera-control p-4 text-camera-foreground backdrop-blur-xl', className)} role='status' aria-live='polite'>
             <div className='flex items-center justify-between type-footnote text-camera-muted'>
-                <span>{done ? 'Searched' : 'Searching'}</span>
+                <span>
+                    {done ? 'Searched' : 'Searching'}
+                    {label ? ` ${label}` : ''}
+                </span>
                 <motion.span className='type-data tabular text-camera-foreground'>{timer}</motion.span>
             </div>
             <p className='flex items-baseline gap-2'>

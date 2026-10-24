@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { CameraHandoff, type HandoffFrom } from './camera-handoff';
 import { Logo } from '@/components/sift/logo';
+import { health } from '@/lib/api';
 import { ComparisonBar } from './comparison-bar';
 import type { Variant } from './variants';
 
@@ -38,6 +39,9 @@ export function LandingShell({ variant, scanButton = true, compare = false, hero
     const [file, setFile] = useState<File | null>(null);
 
     // The camera lives at /scan over this page: Back (button or swipe) shrinks it back into the lens.
+    // Wake the API while people look at the landing, so the first scan doesn't wait on a cold start.
+    useEffect(() => void health(), []);
+
     // The home page is always forest, even after visiting a light ("Ink") comparison page.
     useEffect(() => {
         if (!compare) delete document.documentElement.dataset.palette;

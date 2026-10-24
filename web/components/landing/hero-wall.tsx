@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { photoOf } from '@/components/results/result-row';
 import { ReceiptSheet } from '@/components/results/receipt-sheet';
+import { health } from '@/lib/api';
 import { MARKET, perWearText, priceText } from '@/lib/results';
 import type { Result, SearchResponse } from '@/lib/search';
 import { useMedia } from '@/lib/use-media';
@@ -25,12 +26,14 @@ export function HeroWall() {
     // Three columns everywhere: on a phone, smaller square cards so several rows show at once and it reads as a wall.
     const [wall, setWall] = useState<Wall | null>(null);
     const [open, setOpen] = useState<WallItem | null>(null);
+    const [live, setLive] = useState<number | null>(null); // the live index size from /health
 
     useEffect(() => {
         let alive = true;
         fetch('/landing/wall.json')
             .then((r) => r.json() as Promise<Wall>)
             .then((w) => alive && setWall(w), () => {});
+        health().then((n) => alive && n && setLive(n));
         return () => {
             alive = false;
         };
@@ -62,7 +65,7 @@ export function HeroWall() {
             {/* The one line to read from across the room. */}
             <div className='pointer-events-none absolute inset-x-0 bottom-0 flex justify-center bg-linear-to-t from-stage via-stage/90 to-transparent px-4 pt-14 pb-2 lg:pt-20'>
                 <p className='rounded-pill bg-stage-foreground px-4 py-2 text-center type-headline text-stage lg:px-6 lg:py-3 lg:text-[24px] lg:leading-8'>
-                    {(wall?.meta.index_size ?? 20501).toLocaleString('en-US')} listings, ranked by cost per wear
+                    {(live ?? wall?.meta.index_size ?? 20501).toLocaleString('en-US')} listings, ranked by cost per wear
                 </p>
             </div>
 

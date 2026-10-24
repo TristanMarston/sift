@@ -43,7 +43,7 @@ export function MarkerLine({ r, className }: { r: Result; className?: string }) 
     );
 }
 
-export const STATUS_WORD: Record<FactStatus, string> = { verified: 'verified', claimed: 'as declared', inferred: 'likely', unknown: 'unknown' };
+export const STATUS_WORD: Record<FactStatus, string> = { verified: 'Verified', claimed: 'As declared', inferred: 'Likely', unknown: 'Unknown' };
 
 const SOURCE: Record<string, string> = {
     specifics: 'Listing details',
@@ -55,32 +55,38 @@ const SOURCE: Record<string, string> = {
     baseline: 'Sift assumption',
 };
 
+/** "cotton" reads as "Cotton"; "eBay" stays as it is. */
+const sentence = (v: string) => (/^[a-z](?![A-Z])/.test(v) ? v[0].toUpperCase() + v.slice(1) : v);
+
 const date = (iso: string) => {
     const d = new Date(`${iso}T12:00:00`);
     return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
-/** One receipt line. Tap it for where it came from: source, the words it was read from, and the date. */
+/**
+ * One receipt line: a small label and how sure we are on top, the value below in full size. Tap it for where it
+ * came from: source, the words it was read from, and the date.
+ */
 export function FactLine({ fact }: { fact: Fact }) {
     const [open, setOpen] = useState(false);
     return (
         <li>
-            <button type='button' aria-expanded={open} onClick={() => setOpen((o) => !o)} className='flex w-full items-start gap-2 rounded-md py-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring'>
-                <StatusDot status={fact.status} className='mt-[5px]' />
-                <span className='min-w-0 flex-1 type-receipt'>
-                    <span className='text-receipt-ink/70'>{fact.label} </span>
-                    <span className='text-receipt-ink'>{fact.value}</span>
+            <button type='button' aria-expanded={open} onClick={() => setOpen((o) => !o)} className='w-full rounded-md py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring'>
+                <span className='flex items-center gap-1.5 type-footnote text-muted-foreground'>
+                    <StatusDot status={fact.status} />
+                    <span className='min-w-0 flex-1 truncate'>{fact.label}</span>
+                    <span className='shrink-0'>{STATUS_WORD[fact.status]}</span>
+                    <ChevronDown className={cn('size-4 shrink-0 transition-transform duration-200', open && 'rotate-180')} strokeWidth={1.75} aria-hidden />
                 </span>
-                <span className='shrink-0 pt-px type-footnote text-receipt-ink/70'>{STATUS_WORD[fact.status]}</span>
-                <ChevronDown className={cn('mt-0.5 size-4 shrink-0 text-receipt-ink/50 transition-transform duration-200', open && 'rotate-180')} strokeWidth={1.75} aria-hidden />
+                <span className='mt-0.5 block pl-4 type-callout font-medium text-pretty text-receipt-ink'>{sentence(fact.value)}</span>
             </button>
             <AnimatePresence initial={false}>
                 {open && (
                     <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25, ease: ease.out }} className='overflow-hidden'>
-                        <div className='mb-2 ml-[18px] flex flex-col gap-1 border-l border-dashed border-receipt-ink/25 pl-3 type-footnote text-receipt-ink/80'>
+                        <div className='mb-2 ml-1 flex flex-col gap-1 border-l-2 border-receipt-ink/15 pl-3 type-footnote text-muted-foreground'>
                             {fact.snippet && <p className='text-pretty italic'>“{fact.snippet}”</p>}
                             <p>
-                                {SOURCE[fact.source] ?? fact.source} · {date(fact.as_of)}
+                                {SOURCE[fact.source] ?? fact.source}, {date(fact.as_of)}
                             </p>
                             {fact.source_url && (
                                 <a href={fact.source_url} target='_blank' rel='noreferrer' className='inline-flex items-center gap-1 self-start text-primary underline-offset-2 hover:underline'>

@@ -14,6 +14,12 @@ const nextConfig: NextConfig = {
       "di2ponv0v5otw.cloudfront.net",
     ].map((hostname) => ({ protocol: "https" as const, hostname })),
   },
+  // /api/sift/* forwards to the backend, so development (a phone on wifi, the HTTPS dev server) is never blocked
+  // by the API's allowed-origins list. Production calls the API directly and only falls back to this route.
+  async rewrites() {
+    const api = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+    return api ? [{ source: "/api/sift/:path*", destination: `${api}/:path*` }] : [];
+  },
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

@@ -18,6 +18,7 @@ type Props = {
     onSelect?: (id: string) => void;
     onTapEmpty?: (x: number, y: number) => void; // mark a garment the scan missed (fractions)
     onTraced?: () => void; // after the last label lands
+    scanningHint?: string; // under the scan line, default "Finding garments…"
     className?: string;
 };
 
@@ -37,7 +38,7 @@ const pathOf = (g: Garment, W: number, H: number) => {
  * tracing: a white line draws around each garment (top to bottom), the rest of the photo dims,
  * and a label springs out of each garment. done: labels are tappable.
  */
-export function ScanTrace({ garments, phase, photo, children, aspect = 3 / 4, selectedId, onSelect, onTapEmpty, onTraced, className }: Props) {
+export function ScanTrace({ garments, phase, photo, children, aspect = 3 / 4, selectedId, onSelect, onTapEmpty, onTraced, scanningHint = 'Finding garments…', className }: Props) {
     const maskId = 'lift' + useId().replace(/:/g, '');
     const [ripple, setRipple] = useState<{ x: number; y: number; k: number } | null>(null);
     const W = 300;
@@ -79,7 +80,11 @@ export function ScanTrace({ garments, phase, photo, children, aspect = 3 / 4, se
                             animate={{ top: '100%' }}
                             transition={{ duration: 1.8, ease: ease.trace, repeat: Infinity, repeatDelay: 0.25 }}
                         />
-                        <p className='absolute inset-x-0 bottom-6 text-center type-callout text-camera-foreground'>Finding garments…</p>
+                        <AnimatePresence mode='wait' initial={false}>
+                            <motion.p key={scanningHint} className='absolute inset-x-0 bottom-6 text-center type-callout text-camera-foreground' initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+                                {scanningHint}
+                            </motion.p>
+                        </AnimatePresence>
                     </motion.div>
                 )}
             </AnimatePresence>

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { bigNumber, cropRect, dots, headline, marketLine, ordered, perWearText, sampleCategory } from './results.ts';
+import { bigNumber, categoryLabel, cropRect, dots, headline, marketLine, ordered, perWearText, sampleCategory, sliderOrder } from './results.ts';
 
 const r = (id: string, extra: Record<string, unknown> = {}) =>
     ({
@@ -80,4 +80,26 @@ test('sampleCategory uses the matching sample, else the jacket demo prop', () =>
     assert.equal(sampleCategory('sweaters_knitwear'), 'sweaters_knitwear');
     assert.equal(sampleCategory('jeans_pants'), 'jackets_outerwear');
     assert.equal(sampleCategory(''), 'jackets_outerwear');
+});
+
+test('categoryLabel names a category for a title, or for a sentence', () => {
+    assert.equal(categoryLabel('jackets_outerwear'), 'Jackets');
+    assert.equal(categoryLabel('tshirts'), 'T-shirts');
+    assert.equal(categoryLabel('jeans_pants', 'lower'), 'jeans and pants');
+    assert.equal(categoryLabel('sneakers', 'lower'), 'sneakers');
+});
+
+test('categoryLabel says nothing for an unknown or missing category', () => {
+    assert.equal(categoryLabel(null), null);
+    assert.equal(categoryLabel(''), null);
+    assert.equal(categoryLabel('hats'), null);
+});
+
+test('sliderOrder picks the backend list for the slider position, clamped to its 11 stops', () => {
+    const x = resp(2) as { slider?: string[][] };
+    x.slider = Array.from({ length: 11 }, (_, i) => (i < 5 ? ['c', 'a', 'b'] : ['b', 'c', 'a']));
+    assert.deepEqual(sliderOrder(x as never, 0).map((y) => y.id), ['c', 'a', 'b']);
+    assert.deepEqual(sliderOrder(x as never, 10).map((y) => y.id), ['b', 'c', 'a']);
+    assert.deepEqual(sliderOrder(x as never, 14).map((y) => y.id), ['b', 'c', 'a']);
+    assert.deepEqual(sliderOrder(x as never, -3).map((y) => y.id), ['c', 'a', 'b']);
 });
