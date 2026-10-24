@@ -26,24 +26,29 @@ def test_rows_are_split_in_the_quota_ratio_and_queries_stay_breadth_first():
     assert lanes["depop"].quota == 300 and lanes["ebay"].quota == 100
 
 
-def test_done_queries_are_skipped_bad_ones_retried_and_a_lane_never_passes_its_quota():
+def test_done_queries_are_skipped_bad_ones_retried_and_rows_so_far_never_cap_a_batch():
     past = [ran("depop", "tshirts", "t1"), ran("depop", "sneakers", "s1", verdict="blocked"),
-            *[ran("depop", "tshirts", q, items=300) for q in ("x1", "x2")]]
+            *[ran("depop", "tshirts", q, items=600) for q in ("x1", "x2")]]       # 1,300 rows: past depop's quota of 900
     lanes = B.plan_batch(cfg(), past, 4000)
     assert [t.query for t in lanes["depop"].tasks] == ["s1", "t2", "s2", "t3"]
-    assert lanes["depop"].rows == 900 - 700 and lanes["depop"].quota == 900     # 700 rows so far (the blocked run's don't count)
+    assert lanes["depop"].rows == 3000 and lanes["depop"].quota == 1300 + 3000  # the blocked run's rows don't count
 
 
-def test_a_marketplace_with_a_full_quota_or_no_queries_left_is_not_in_the_batch():
+def test_a_marketplace_with_no_queries_left_gives_its_share_to_the_others():
     full = [ran("ebay", "tshirts", "x", items=300)]
-    assert set(B.plan_batch(cfg(), full, 400)) == {"depop"}
+    assert {mp: l.rows for mp, l in B.plan_batch(cfg(), full, 400).items()} == {"depop": 300, "ebay": 100}
     used_up = [ran("ebay", c, q, items=10) for c, q in (("tshirts", "e1"), ("tshirts", "e2"), ("sneakers", "f1"))]
-    assert set(B.plan_batch(cfg(), used_up, 400)) == {"depop"}
+    assert {mp: l.rows for mp, l in B.plan_batch(cfg(), used_up, 400).items()} == {"depop": 400}
+
+
+def test_a_zero_quota_keeps_a_marketplace_out_of_batches():
+    assert list(B.plan_batch(cfg({"depop": 900, "ebay": 0}), [], 400)) == ["depop"]
+    assert B.plan_batch(cfg({"depop": 0, "ebay": 0}), [], 400) == {}
 
 
 def test_filters_choose_marketplaces_and_categories_and_the_rows_go_to_what_is_chosen():
     lanes = B.plan_batch(cfg(), [], 400, only={"ebay"}, categories={"sneakers"})
-    assert list(lanes) == ["ebay"] and lanes["ebay"].rows == 300   # capped by its quota
+    assert list(lanes) == ["ebay"] and lanes["ebay"].rows == 400
     assert [t.query for t in lanes["ebay"].tasks] == ["f1"]
     assert list(B.plan_batch(cfg(), [], 400, skip={"depop"})) == ["ebay"]
 
@@ -117,7 +122,7 @@ def test_lanes_run_side_by_side_and_every_entry_lands_whole(tmp_path):
 def test_batches_all_keeps_going_until_nothing_is_left(tmp_path):
     client = FakeApify()
     code, lines = go(client, tmp_path, batches=None)
-    assert code == 0 and len(batch_dirs(tmp_path)) == 2 and len(client.calls) == 5      # depop's quota fills before s2
+    assert code == 0 and len(batch_dirs(tmp_path)) == 2 and len(client.calls) == 6      # every query, past the quotas
     assert any("nothing left to scrape" in l for l in lines)
 
 

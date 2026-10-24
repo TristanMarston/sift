@@ -2,7 +2,7 @@
 
   uv run python pipeline/run/cli.py batch --rows 5000 --dry-run     # what the next batch would scrape and cost
   uv run python pipeline/run/cli.py batch --rows 5000               # one batch, then its checks
-  uv run python pipeline/run/cli.py batch --rows 5000 --batches all > batch.log 2>&1 &   # until money or queries run out
+  uv run python pipeline/run/cli.py batch --rows 5000 --batches all --max-spend 50 > batch.log 2>&1 &   # until $50, the money or the queries run out
   uv run python pipeline/run/cli.py sync                            # get the team's runs from Apify
   uv run python pipeline/run/cli.py export sift-data.zip            # one file with everything scraped so far
   uv run python pipeline/run/cli.py import sift-data.zip            # add a teammate's file
@@ -61,7 +61,7 @@ def dry_run(cfg, data_dir, rows, filters) -> None:
     print(f"{'total':12} {sum(l.rows for l in lanes.values()):>6} {sum(l.runs for l in lanes.values()):>5} "
           f"{sum(l.est_usd for l in lanes.values()):>8.2f} {sum(l.cap_usd for l in lanes.values()):>8.2f}")
     if not lanes:
-        print("nothing left to scrape: every chosen quota is full or every query has run.")
+        print("nothing left to scrape: every chosen query has run.")
     if token(required=False):
         lim = ApifyClient(token()).user().limits()
         print(f"account: ${lim.limits.max_monthly_usage_usd - lim.current.monthly_usage_usd:.2f} left this month, "
@@ -76,7 +76,8 @@ def main():
     sub = ap.add_subparsers(dest="command", required=True)
     b = sub.add_parser("batch", parents=[common], help="scrape batches and check each one")
     b.add_argument("--rows", type=int, default=5000, help="raw rows per batch, split in the quota ratio (default 5000)")
-    b.add_argument("--batches", type=lambda v: None if v == "all" else int(v), default=1, help="how many, or 'all' (default 1)")
+    b.add_argument("--batches", type=lambda v: None if v == "all" else int(v), default=1,
+                   help="how many, or 'all' (needs --max-spend) (default 1)")
     b.add_argument("--only", help="comma-separated marketplaces, e.g. depop,ebay")
     b.add_argument("--categories", help="comma-separated categories, e.g. tshirts,sneakers")
     b.add_argument("--max-spend", type=Decimal, help="estimated USD this command may spend in total")
@@ -100,6 +101,8 @@ def main():
                        categories=names(args.categories, get_args(listing.Category), "category"))
         if args.dry_run:
             return dry_run(cfg, data_dir, args.rows, filters)
+        if args.batches is None and args.max_spend is None:   # quotas no longer stop it: only the queries or the money
+            ap.error("--batches all needs --max-spend (USD this command may spend), or it runs until the account is empty")
         key = token()
         sys.exit(B.run_batches(ApifyClient(key), cfg, data_dir, rows=args.rows, batches=args.batches,
                                max_spend=args.max_spend, who=args.who, force=args.force,

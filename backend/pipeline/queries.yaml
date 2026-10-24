@@ -1,16 +1,17 @@
-# Query plan (SPEC.md §7). Used by 01_scrape.py.
+# Query plan (SPEC.md §7). Used by 01_scrape.py and run/cli.py batch.
 #
 # ORDER MATTERS. The runner goes breadth first: query 1 of every category and marketplace, then query 2, ...
-# and stops a marketplace when it reaches its quota. A 20k run therefore only uses the first few queries
+# and 01_scrape.py stops a marketplace when it reaches its quota. A 20k run therefore only uses the first few queries
 # of each list; the rest is the pool for the 50k stage. Put the most valuable queries first:
 # a broad brand query (also the go/no-go test query), the demo props, material-rich phrases, other brands.
 #
 # A query is a string (uses the marketplace default in `max_items`) or {query: ..., max_items: ...}.
 # Caps stay <= 500 so one long tail cannot eat the budget.
 
-quotas:        # raw rows per marketplace in total. The "cheap-heavy" mix for the ~$190 the token has left: Grailed ($0.012 a row)
-               # keeps its 20k-stage 3,900 rows; the rest is the 20k-stage ratio of the other four, scaled 3.16x.
-               # 73,600 raw rows, about $190; Depop is 45% (max 50%). run/cli.py batch splits each batch in this ratio.
+quotas:        # two uses. run/cli.py batch: ONLY the ratio each batch is split in (--rows, --batches and --max-spend decide
+               # how much; a marketplace with no queries left hands its share to the others; 0 keeps one out).
+               # 01_scrape.py: raw rows per marketplace in total, where it stops. The numbers are the "cheap-heavy" mix
+               # sized for one ~$190 account: Grailed ($0.012 a row, 12x Depop) stays small; Depop is 45% (max 50%).
   depop: 32800
   poshmark: 16400
   grailed: 3900

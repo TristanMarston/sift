@@ -27,13 +27,16 @@ All commands below run from `backend/`.
 | --- | --- |
 | See what the next batch would scrape and cost (free) | `uv run python pipeline/run/cli.py batch --rows 5000 --dry-run` |
 | Run **one** batch, then stop so I can look | `uv run python pipeline/run/cli.py batch --rows 5000` |
-| Run batches until the money or the queries run out (overnight) | `uv run python pipeline/run/cli.py batch --rows 5000 --batches all > batch.log 2>&1 &` |
+| Run batches until $50, the money or the queries run out (overnight) | `uv run python pipeline/run/cli.py batch --rows 5000 --batches all --max-spend 50 > batch.log 2>&1 &` |
 | Get everything the team has scraped | `uv run python pipeline/run/cli.py sync` |
 | Save everything in one file | `uv run python pipeline/run/cli.py export sift-data.zip` |
 | Load a file a teammate sent | `uv run python pipeline/run/cli.py import sift-data.zip` |
 
-- **How much:** `--rows` is the size of one batch in raw rows. About 93% become listings. A batch is split across the
-  5 marketplaces in the ratio of the `quotas` in `../queries.yaml`. `--max-spend 50` caps what this command may spend.
+- **How much:** `--rows` × `--batches` raw rows. About 93% become listings. `--max-spend 50` caps what this command may
+  spend; `--batches all` requires it.
+- **Split:** a batch is split across the marketplaces in the ratio of the `quotas` in `../queries.yaml`. That is all
+  they do here: they never stop a batch, however much the team has already scraped. A marketplace with no queries
+  left hands its share to the others, and a quota of 0 keeps one out. Grailed's share is small on purpose ($0.012 a row).
 - **What:** `--only depop,ebay` and `--categories tshirts,sneakers` narrow it down.
 - A 5,000-row batch costs about $15 and takes about 15 minutes. The runner never plans past the account's balance, minus $2.
 
