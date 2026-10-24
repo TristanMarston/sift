@@ -27,6 +27,7 @@ class Lane:
     tasks: list           # the queries still to run, best first
     rows: int             # this batch's target in raw rows
     quota: int            # rows collected so far + the target: where scrape.run_plan stops this lane
+    runs: int             # expected actor runs (fewer rows per query than max_items means more runs)
     est_usd: Decimal      # best case: every query fills its max_items
     cap_usd: Decimal      # worst case: every run costs its charge cap
 
@@ -44,7 +45,7 @@ def plan_batch(cfg: S.Config, past: list[dict], rows: int, only=None, categories
                  and (categories is None or t.category in categories)]
         if target > 0 and tasks:
             e = S.estimate(tasks, {mp: target})[mp]
-            lanes[mp] = Lane(mp, tasks, target, have[mp] + target, e["est_usd"], e["cap_usd"])
+            lanes[mp] = Lane(mp, tasks, target, have[mp] + target, e["runs"], e["est_usd"], e["cap_usd"])
     return lanes
 
 
@@ -97,8 +98,7 @@ def run_lanes(make_client, lanes: dict[str, Lane], data_dir, classify, log=S.say
             crashed[l.marketplace] = f"lane crashed: {type(e).__name__}: {e}"
 
     threads = [threading.Thread(target=lane, args=(l,), daemon=True) for l in lanes.values()]
-    pending, interrupted, stop = list(threads), False, data_dir / "STOP"
-    made_stop = False
+    pending, interrupted, made_stop, stop = list(threads), False, False, data_dir / "STOP"
     while True:
         try:
             while pending:
@@ -133,7 +133,7 @@ def rebuild(data_dir, mappers=MAPPERS, log=S.say) -> None:
 
 
 def _entries(data_dir, run_ids) -> list[dict]:
-    return [e for e in jsonl.load(Path(data_dir) / "runs.jsonl") if key(e) in run_ids]
+    return [e for e in jsonl.load(Path(data_dir) / "runs.jsonl") if e.get("run_id") in run_ids]
 
 
 def _write(data_dir, batch_id, record, checks, summary=None) -> None:
@@ -196,7 +196,8 @@ def run_batches(client, cfg: S.Config, data_dir, rows=5000, batches=1, only=None
                     f"(account balance ${balance + MARGIN:.2f} minus a ${MARGIN} margin, or --max-spend).")
                 code = R.EXIT_BUDGET
             else:
-                log("nothing left to scrape: every chosen quota is full or every query has run.")
+                log("nothing left to scrape: every chosen quota is full or every query has run"
+                    + (f" (stopped in this command: {', '.join(stopped)})." if stopped else "."))
             break
         n += 1
         batch_id, started = f"{now():%Y%m%d-%H%M%S}-{who}-{n}", now()
@@ -216,7 +217,7 @@ def run_batches(client, cfg: S.Config, data_dir, rows=5000, batches=1, only=None
                       finished=now().isoformat(timespec="seconds"), rows=size, only=sorted(only or []) or None,
                       categories=sorted(categories or []) or None,
                       lanes={mp: dict(rows=l.rows, est_usd=float(l.est_usd), cap_usd=float(l.cap_usd)) for mp, l in lanes.items()},
-                      run_ids=[key(e) for e in entries], **_spend(entries, real))
+                      run_ids=[e["run_id"] for e in entries if e.get("run_id")], **_spend(entries, real))
         _write(data_dir, batch_id, record, checks, summary)
         spent += Decimal(str(record["est_usd"]))
         for mp, reasons in C.failed(checks).items():
@@ -230,6 +231,9 @@ def run_batches(client, cfg: S.Config, data_dir, rows=5000, batches=1, only=None
             break
         if summary.interrupted or summary.manual_stop:
             code = R.EXIT_INTERRUPTED if summary.interrupted else R.EXIT_MANUAL
+            break
+        if not entries:
+            log(f"batch {batch_id} made no runs: stopping instead of trying the same plan again.")
             break
     rebuild(data_dir, mappers, log)
     if code == R.EXIT_OK and stopped:

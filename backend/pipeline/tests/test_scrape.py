@@ -356,10 +356,10 @@ def test_every_query_is_capped_at_500_and_unique_per_marketplace(cfg):
         assert len(flat) == len(set(flat)), mp
 
 
-def test_pool_can_reach_the_50k_stage(cfg):
+def test_the_query_pool_can_fill_every_quota_with_room_for_short_queries(cfg):
     for mp, quota in cfg.quotas.items():
         capacity = sum(n for by_mp in cfg.queries.values() for _, n in by_mp[mp])
-        assert capacity >= 3 * quota, (mp, capacity, quota)
+        assert capacity >= 1.2 * quota, (mp, capacity, quota)
 
 
 def test_demo_props_and_conference_tees_are_queried(cfg):

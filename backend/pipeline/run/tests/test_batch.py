@@ -50,6 +50,7 @@ def test_filters_choose_marketplaces_and_categories_and_the_rows_go_to_what_is_c
 
 def test_each_lane_carries_its_best_and_worst_case_cost():
     lane = B.plan_batch(cfg(), [], 400)["ebay"]                  # 2 eBay runs of 50 rows
+    assert lane.runs == 2
     assert lane.est_usd == 2 * (50 * Decimal("0.005") + Decimal("0.02"))
     assert lane.cap_usd == 2 * S.charge_cap("ebay", 50)
 
