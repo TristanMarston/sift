@@ -60,7 +60,7 @@ uv run python pipeline/06_query.py some_photo.jpg --test   # eyeball the top mat
 
 # the real run, in batches that are checked one by one (spends money): see run/README.md
 uv run python pipeline/run/cli.py batch --rows 5000 --dry-run                        # next batch and its cost
-uv run python pipeline/run/cli.py batch --rows 5000 --batches all > batch.log 2>&1 &  # until money or queries run out
+uv run python pipeline/run/cli.py batch --rows 5000 --batches all --max-spend 50 > batch.log 2>&1 &  # until $50, money or queries run out
 uv run python pipeline/04_report.py                # writes pipeline/REPORT.md (the batch runner already ran 02 and 03)
 uv run python pipeline/05_embed.py                 # image vectors for search; resumable, rerun after a crash
 ```
@@ -90,7 +90,8 @@ How it behaves:
 
 - **Breadth first.** Query 1 of every category and marketplace, then query 2, and so on. Stopping early still leaves
   every category covered, so **put the best queries first** in each list.
-- **Quotas.** A marketplace stops when its raw rows reach its quota in `queries.yaml`.
+- **Quotas.** In `01_scrape.py`, a marketplace stops when its raw rows reach its quota in `queries.yaml`. The batch
+  runner (`run/`) uses the quotas only as the ratio it splits `--rows` in; it never stops at them.
 - **Resumable.** Rerun the same command after a crash or Ctrl-C. Queries that already succeeded are skipped, and
   quotas count the rows already saved. Bad runs (blocked, empty, junk, failed) are retried; a query that comes back
   empty twice is treated as really empty.
@@ -195,7 +196,7 @@ embeds the photos with `backend.embed` (Marqo-FashionSigLIP, 768-d unit vectors)
 **`queries.yaml`:**
 
 ```yaml
-quotas:            # raw rows to collect per marketplace, in total (run/ splits each batch in this ratio)
+quotas:            # run/: the ratio each batch is split in. 01_scrape.py: raw rows per marketplace in total
   depop: 32800
 max_items:         # default cap per query
   depop: 200
@@ -341,7 +342,9 @@ that is not mirrored in `listing.py` fails a test.
 
 - **Add or reorder queries:** edit `queries.yaml`, then `01_scrape.py --dry-run` to see the cost. Already-finished
   queries are not repeated.
-- **Collect more rows (the 50k stage):** raise the `quotas`, add queries at the end of the lists, and rerun step 01.
+- **Collect more rows:** `run/cli.py batch --rows N --batches K` (or `--batches all --max-spend X`) scrapes that much,
+  whatever the quotas say; they only set the split. When `--dry-run` shows few queries left, add queries at the end of
+  the lists. With `01_scrape.py`, raise the `quotas` too.
 - **Add a product line:** add an entry to `product_lines.yaml`.
 - **Add a marketplace:** add an `Actor` to `scrape.py`, a `normalize/<name>.py` mapper (copy the closest one), a
   fixture from a 20-item test run, tests, queries and a quota. The name must already be in the API's marketplace enum.
