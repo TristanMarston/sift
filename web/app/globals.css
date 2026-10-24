@@ -1,0 +1,8 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* Token values (generated from design-system/project/tokens.json) */
+@import "./tokens.css";
+/* Tailwind mapping, type styles, Sift effects and base styles */
+@import "./theme.css";

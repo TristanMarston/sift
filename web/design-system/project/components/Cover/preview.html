@@ -1,0 +1,44 @@
+<!-- @dsCard height=300 -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Cover</title>
+<style>
+html, body { margin: 0; height: 100%; background: var(--background); }
+.cover { position: relative; width: 960px; height: 300px; overflow: hidden; }
+svg { position: absolute; inset: 0; }
+.brand { fill: var(--primary); }
+.paper { fill: var(--receipt-paper); }
+.rule { stroke: var(--receipt-ink); stroke-width: 1.5; stroke-dasharray: 4 5; opacity: 0.45; }
+.wheat { fill: var(--fiber-plant); }
+.ink { fill: var(--foreground); }
+.field { rx: var(--radius-sheet); }
+.pill { rx: 22px; }
+.name { position: absolute; left: 48px; bottom: 76px; margin: 0; font-family: var(--font-serif); font-size: 120px; line-height: 0.92; letter-spacing: -0.03em; color: var(--foreground); }
+.tag { position: absolute; left: 52px; bottom: 44px; margin: 0; max-width: 440px; font-family: var(--font-sans); font-size: 14px; line-height: 20px; color: var(--muted-foreground); }
+</style>
+</head>
+<body>
+<div class="cover">
+<svg viewBox="0 0 960 300" width="960" height="300" aria-hidden="true">
+<!--
+blocks: primary field 280x296 (radius-sheet corners, bleeds off the top), receipt-paper ticket 184x196 on it, fiber-plant disc r40, foreground pill 112x44 (radius-pill)
+arrangement: one tall field with the receipt laid on it, two satellites on the ground to the right
+pattern: literal motif (ticket): the torn zigzag edge and four dashed rules, because the impact receipt is Sift's signature object
+scales: space-12 (48) insets and rule pitch 32 (space-8), teeth 12 (space-3), radius-sheet 28, radius-pill
+-->
+<rect class="brand field" x="520" y="-28" width="280" height="296" />
+<polygon class="paper" points="568,40 752,40 752,236 746,228 740,236 734,228 728,236 722,228 716,236 710,228 704,236 698,228 692,236 686,228 680,236 674,228 668,236 662,228 656,236 650,228 644,236 638,228 632,236 626,228 620,236 614,228 608,236 602,228 596,236 590,228 584,236 578,228 572,236 566,228" />
+<line class="rule" x1="592" y1="88" x2="728" y2="88" />
+<line class="rule" x1="592" y1="120" x2="728" y2="120" />
+<line class="rule" x1="592" y1="152" x2="728" y2="152" />
+<line class="rule" x1="592" y1="184" x2="672" y2="184" />
+<circle class="wheat" cx="872" cy="84" r="40" />
+<rect class="ink pill" x="824" y="196" width="112" height="44" />
+</svg>
+<p class="name">Sift</p>
+<p class="tag">The clothes you like already exist secondhand.</p>
+</div>
+</body>
+</html>

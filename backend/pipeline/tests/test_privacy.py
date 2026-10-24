@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pytest
 
+import jsonl
+
 from test_mappers import FIX, MAPPERS, NOW, fx
 
 ROOT = Path(__file__).parents[1]
@@ -48,5 +50,5 @@ def real_files():
 def test_real_scraped_output_on_disk_has_no_identity_keys():
     """Scans whatever real data exists locally (data/ is gitignored); passes trivially when there is none."""
     for path in real_files():
-        for n, line in enumerate(path.read_text().splitlines(), 1):
+        for n, line in enumerate(jsonl.read(path), 1):
             assert not list(forbidden_keys(json.loads(line))), f"{path}:{n}"
