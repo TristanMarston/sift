@@ -36,7 +36,9 @@ All commands below run from `backend/`.
   spend; `--batches all` requires it.
 - **Split:** a batch is split across the marketplaces in the ratio of the `quotas` in `../queries.yaml`. That is all
   they do here: they never stop a batch, however much the team has already scraped. A marketplace with no queries
-  left hands its share to the others, and a quota of 0 keeps one out. Grailed's share is small on purpose ($0.012 a row).
+  left hands its share only to marketplaces that cost no more per row (Depop's rows never become Grailed rows; rows
+  nobody cheap enough can take stay unspent, so a batch may come out smaller), and a quota of 0 keeps one out. Grailed's
+  share is small on purpose ($0.012 a row: 5% of a batch's rows is 31% of its money).
 - **What:** `--only depop,ebay` and `--categories tshirts,sneakers` narrow it down.
 - A 5,000-row batch costs about $15 and takes about 15 minutes. The runner never plans past the account's balance, minus $2.
 

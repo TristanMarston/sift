@@ -9,7 +9,8 @@
 # Caps stay <= 500 so one long tail cannot eat the budget.
 
 quotas:        # two uses. run/cli.py batch: ONLY the ratio each batch is split in (--rows, --batches and --max-spend decide
-               # how much; a marketplace with no queries left hands its share to the others; 0 keeps one out).
+               # how much; a marketplace with no queries left hands its share only to ones as cheap per row, so
+               # Depop's rows never become Grailed rows; 0 keeps one out).
                # 01_scrape.py: raw rows per marketplace in total, where it stops. The numbers are the "cheap-heavy" mix
                # sized for one ~$190 account: Grailed ($0.012 a row, 12x Depop) stays small; Depop is 45% (max 50%).
   depop: 32800

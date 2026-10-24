@@ -33,20 +33,34 @@ class Lane:
     cap_usd: Decimal      # worst case: every run costs its charge cap
 
 
+def split_rows(quotas: dict[str, int], has_queries: set[str], rows: int) -> dict[str, int]:
+    """`rows` split in the quota ratio. A marketplace with no queries left hands its share only to marketplaces that
+    cost no more per row: Depop ($0.001) runs out first, and letting its rows become Grailed rows ($0.012, 31% of a
+    batch's money for 5% of its rows already) would make each batch dearer and dearer. Rows nobody cheap enough can
+    take stay unspent, so the batch comes out smaller than `rows`."""
+    total = sum(quotas.values())
+    share = {mp: rows * q / total for mp, q in quotas.items()}
+    for mp in quotas.keys() - has_queries:
+        takers = {t: quotas[t] for t in has_queries if S.ACTORS[t].item_usd <= S.ACTORS[mp].item_usd}
+        for t, q in takers.items():
+            share[t] += share[mp] * q / sum(takers.values())
+    return {mp: round(share[mp]) for mp in has_queries}
+
+
 def plan_batch(cfg: S.Config, past: list[dict], rows: int, only=None, categories=None, skip=()) -> dict[str, Lane]:
     """The next batch per marketplace: `rows` raw rows, split in the quota ratio among the marketplaces that still have
-    queries to run. The quotas are only that split, never a cap: `rows` (and the money) decide how much; a quota of 0
-    keeps a marketplace out. `past` is every run known (runs.jsonl): its finished queries are skipped. `only` /
-    `categories` choose what to scrape, `skip` leaves marketplaces out."""
+    queries to run (split_rows: a marketplace that ran out hands its share only to ones as cheap). The quotas are only
+    that split, never a cap: `rows` (and the money) decide how much; a quota of 0 keeps a marketplace out. `past` is
+    every run known (runs.jsonl): its finished queries are skipped. `only` / `categories` choose what to scrape, `skip`
+    leaves marketplaces out."""
     done, have = S.finished_queries(past), S.quota_rows(past)
     tasks = {mp: [t for t in S.build_plan(cfg.queries) if t.marketplace == mp and (mp, t.category, t.query) not in done
                   and (categories is None or t.category in categories)]
              for mp in cfg.quotas if cfg.quotas[mp] > 0 and (only is None or mp in only) and mp not in skip}
-    tasks = {mp: ts for mp, ts in tasks.items() if ts}
-    total = sum(cfg.quotas[mp] for mp in tasks)
+    targets = split_rows({mp: cfg.quotas[mp] for mp in tasks}, {mp for mp, ts in tasks.items() if ts}, rows)
     lanes = {}
-    for mp, ts in tasks.items():
-        target = round(rows * cfg.quotas[mp] / total)
+    for mp, target in targets.items():
+        ts = tasks[mp]
         if target > 0:
             e = S.estimate(ts, {mp: target})[mp]
             lanes[mp] = Lane(mp, ts, target, have[mp] + target, e["runs"], e["est_usd"], e["cap_usd"])
