@@ -9,28 +9,36 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, ValidationError
 
+import jsonl
 from listing import Evidence, Fiber, Listing, Materials, Normalized
 from normalize.common import slug
 
-_FIBER = ("cotton|polyester|poly|nylon|polyamide|wool|merino|linen|hemp|silk|viscose|rayon|modal|lyocell|"
-          "tencel|acrylic|elastane|spandex|lycra|cashmere|alpaca|mohair|leather|down")
-# Bare words skip "down" (button-down), "leather" (leather patch), "poly" (poly mailer) and the traps below.
-_BARE = ("cotton(?!\\s+on\\b)|polyester|nylon|wool|merino|linen|hemp|silk(?!\\s*-?\\s*screen)|viscose|rayon|"
-         "modal|lyocell|tencel|acrylic|elastane|spandex|lycra|cashmere|alpaca|mohair")
-_CANON = {"poly": "polyester", "polyamide": "nylon", "spandex": "elastane", "lycra": "elastane",
-          "rayon": "viscose", "tencel": "lyocell", "merino": "wool"}
-_PCT = re.compile(rf"(?<![\d.])(\d{{1,3}}(?:\.\d+)?)\s*%\s*(organic\s+|recycled\s+)?({_FIBER})\b", re.I)
+_LAMBSWOOL = "lamb(?:['’]?s|s['’])?\\s?wool"   # lambswool, lambs wool, lamb's wool
+_FIBER = ("cotton|polyester|poly|nylon|polyamide|wool|merino|" + _LAMBSWOOL + "|linen|hemp|ramie|silk|viscose|rayon|modal|"
+          "lyocell|tencel|acetate|acrylic|modacrylic|elastane|spandex|lycra|polyurethane|cashmere|alpaca|mohair|camel hair|"
+          "leather|down")
+# Bare words skip "down" (button-down), "leather" (leather patch), "poly" (poly mailer), "camel" (a colour) and the traps below.
+_BARE = ("cotton(?!\\s+on\\b)|polyester|nylon|wool|merino|" + _LAMBSWOOL + "|linen|hemp|silk(?!\\s*-?\\s*screen)|viscose|"
+         "rayon|modal|lyocell|tencel|acrylic|elastane|spandex|lycra|cashmere|alpaca|mohair")
+# Keys are letters only, so every spelling of lambswool and "camel hair" find their entry.
+_CANON = {"poly": "polyester", "polyamide": "nylon", "spandex": "elastane", "lycra": "elastane", "rayon": "viscose",
+          "tencel": "lyocell", "merino": "wool", "lambswool": "wool", "lambwool": "wool", "camelhair": "camel",
+          "suede": "leather"}
+# Words sellers put between the percentage and the fiber: "100% pure new wool", "100% Italian boiled wool".
+_ADJ = r"(?:(?:pure|virgin|new|fine|extra[\s-]?fine|super[\s-]?fine|italian|scottish|worsted|boiled|premium|genuine|" \
+       r"shetland|baby)[\s/]+)*"
+_PCT = re.compile(rf"(?<![\d.])(\d{{1,3}}(?:\.\d+)?)\s*%\s*{_ADJ}(organic\s+|recycled\s+)?({_FIBER})\b", re.I)
 _BARE_RE = re.compile(rf"\b(organic\s+|recycled\s+)?({_BARE})\b", re.I)
-# A dedicated material field is unambiguous, so there "leather", "down" and "poly" are fibers too.
-_BARE_FIELD_RE = re.compile(rf"\b(organic\s+|recycled\s+)?({_BARE}|leather|down|poly)\b", re.I)
+# A dedicated material field is unambiguous, so there "leather", "down" and "poly" are fibers too, and suede is leather.
+_BARE_FIELD_RE = re.compile(rf"\b(organic\s+|recycled\s+)?({_BARE}|leather|suede|down|poly)\b", re.I)
 _DOWN = re.compile(r"(?<!button )(?<!button-)\b(?:down\s+(?:jacket|coat|vest|parka|puffer|hooded|hoodie|sweater|fill(?:ed)?|"
                    r"insulat\w+)|(?:goose|duck|feather)\s+down|down-filled)\b", re.I)
 _FAUX_LEATHER = re.compile(r"\b(?:vegan|faux|synthetic)\s+leather\b", re.I)
 _REAL_LEATHER = re.compile(r"\b(?:genuine|real|full[- ]grain|top[- ]grain)\s+leather\b", re.I)
-_SYNTHETIC = {"polyester", "nylon", "acrylic", "elastane"}
+_SYNTHETIC = {"polyester", "nylon", "acrylic", "modacrylic", "elastane", "polyurethane"}
 # Structured specifics we trust for composition. Lining and insulation are left out: they would add up past 100%.
 FLAG_KEYS = ("styles", "style", "era")
-MATERIAL_KEYS = ("material", "outer shell material", "fabric type", "fabric", "composition")
+MATERIAL_KEYS = ("material", "outer shell material", "upper material", "fabric type", "fabric", "composition")
 
 _CERTS = {
     "gots": r"\bgots\b|global organic textile standard",
@@ -42,13 +50,32 @@ _CERTS = {
     "b_corp": r"\bb[\s-]?corp(?:oration)?\b",
 }
 _FLAGS = {
-    "is_vintage": r"\bvintage\b(?![\s-]*(?:wash|style|inspired|fit|look|fade|effect))",
+    "is_vintage": r"\b(?:vintage|vtg)\b(?![\s-]*(?:wash|style|inspired|fit|look|fade|effect))",
     "is_deadstock": r"\bdead[\s-]?stock\b|\bnew old stock\b",
     "is_upcycled": r"\bup[\s-]?cycl(?:ed|e)\b",
 }
 _RETAIL = re.compile(r"\b(?:retail(?:s|ed)?(?:\s+(?:price|value))?(?:\s+(?:for|at))?|msrp)\s*[:\-]?\s*"
                      r"\$\s*(\d[\d,]*(?:\.\d{1,2})?)", re.I)
-_MADE_IN = re.compile(r"\bmade in (?:the )?([a-z]+)", re.I)
+# Countries clothes are made in, by every name sellers and eBay use. A known list, so "made in a smoke free home" and
+# "made in limited quantities" are not countries and "Made in Hong Kong" is not "Hong".
+_COUNTRIES = {name: name.title() for name in (
+    "china", "taiwan", "macau", "japan", "india", "pakistan", "bangladesh", "vietnam", "cambodia", "indonesia", "thailand",
+    "malaysia", "philippines", "myanmar", "laos", "nepal", "mongolia", "turkey", "jordan", "egypt", "israel", "morocco",
+    "tunisia", "madagascar", "mauritius", "kenya", "ethiopia", "lesotho", "mexico", "guatemala", "honduras", "nicaragua",
+    "haiti", "colombia", "peru", "ecuador", "bolivia", "brazil", "argentina", "chile", "canada", "italy", "portugal",
+    "spain", "france", "germany", "austria", "switzerland", "belgium", "netherlands", "denmark", "sweden", "norway",
+    "finland", "iceland", "poland", "romania", "bulgaria", "hungary", "lithuania", "latvia", "estonia", "ukraine",
+    "greece", "albania", "serbia", "croatia", "slovakia", "slovenia", "moldova", "england", "scotland", "wales",
+    "ireland", "australia", "hong kong", "sri lanka", "el salvador", "dominican republic", "south korea", "new zealand",
+    "south africa", "costa rica", "czech republic", "north macedonia")} | {
+    "usa": "USA", "u.s.a.": "USA", "u.s.a": "USA", "u.s.": "USA", "us": "USA", "united states": "USA",
+    "united states of america": "USA", "america": "USA", "uk": "UK", "u.k.": "UK", "united kingdom": "UK",
+    "great britain": "UK", "republic of ireland": "Ireland", "korea": "South Korea", "republic of korea": "South Korea", "korea, republic of": "South Korea",
+    "viet nam": "Vietnam", "macao": "Macau", "burma": "Myanmar", "holland": "Netherlands", "czechia": "Czech Republic",
+    "macedonia": "North Macedonia"}
+_NO_COUNTRY = {"unknown", "n/a", "na", "none", "other", "not specified"}
+_MADE_IN = re.compile(r"\bmade\s+in\s*:?\s*(?:the\s+)?("
+                      + "|".join(re.escape(c) for c in sorted(_COUNTRIES, key=len, reverse=True)) + r")(?![a-z])", re.I)
 
 
 class ProductLine(BaseModel):
@@ -58,7 +85,7 @@ class ProductLine(BaseModel):
     fibers: list[Fiber]
 
 
-PRODUCT_LINES = [ProductLine(**p) for p in yaml.safe_load(Path(__file__).with_name("product_lines.yaml").read_text())]
+PRODUCT_LINES = [ProductLine(**p) for p in yaml.safe_load(Path(__file__).with_name("product_lines.yaml").read_text(encoding="utf-8"))]
 
 
 def parse_fibers(text: str, field: bool = False) -> tuple[list[Fiber], str]:
@@ -67,10 +94,11 @@ def parse_fibers(text: str, field: bool = False) -> tuple[list[Fiber], str]:
     out, snips = [], []
 
     def add(name, pct, modifier, snippet):
-        name, modifier = name.lower(), modifier.strip().lower()
+        """A fiber with no percentage is added only if that fiber is not listed yet."""
+        name, modifier = re.sub(r"[^a-z_]", "", name.lower()), modifier.strip().lower()
         fiber = Fiber(fiber=_CANON.get(name, name), pct=pct, organic=True if modifier == "organic" else None,
                       recycled=True if modifier == "recycled" else None)
-        if fiber not in out:
+        if fiber not in out and (pct is not None or fiber.fiber not in {f.fiber for f in out}):
             out.append(fiber)
             snips.append(snippet)
 
@@ -84,11 +112,9 @@ def parse_fibers(text: str, field: bool = False) -> tuple[list[Fiber], str]:
     for m in _REAL_LEATHER.finditer(text):
         add("leather", None, "", m[0])
     for m in _DOWN.finditer(text):
-        if "down" not in {f.fiber for f in out}:
-            add("down", None, "", m[0])
+        add("down", None, "", m[0])
     for m in (_BARE_FIELD_RE if field else _BARE_RE).finditer(text):
-        if _CANON.get(m[2].lower(), m[2].lower()) not in {f.fiber for f in out}:
-            add(m[2], None, m[1] or "", m[0])
+        add(m[2], None, m[1] or "", m[0])
     return out, "; ".join(snips)
 
 
@@ -126,16 +152,21 @@ def extract(n: Normalized, lines: list[ProductLine] = PRODUCT_LINES) -> Listing:
 
     fibers, snippet = parse_fibers(" ".join(spec.get(k, "") for k in MATERIAL_KEYS), field=True)
     source = "specifics"
-    if not fibers:
-        fibers, snippet = parse_fibers(text)
-        source = "listing_text"
+    in_text, text_snippet = parse_fibers(text)
+    # The field wins, unless it is empty or the text names the same fibers with the percentages the field lacks
+    if not fibers or (all(f.pct is None for f in fibers) and any(f.pct is not None for f in in_text)
+                      and {f.fiber for f in fibers} <= {f.fiber for f in in_text}):
+        fibers, snippet, source = in_text, text_snippet, "listing_text"
+    line = match_product_line(n.brand, f"{n.title} {spec.get('product line', '')} {spec.get('model', '')}", lines)
     if fibers:
         note("materials.fibers", "claimed", source, snippet)
-    elif line := match_product_line(n.brand, f"{n.title} {spec.get('product line', '')} {spec.get('model', '')}", lines):
+    elif line:
         fibers = line.fibers
         note("materials.fibers", "inferred", "product_line", line.note)
     else:
         note("materials.fibers", "unknown", "listing_text")
+    if line:  # a known line is its own evidence (the quality marker credits it), whatever the seller stated
+        note("product_line", "inferred", "product_line", line.note)
 
     certs = {}
     for source, where in (("specifics", " ".join(spec.values())), ("listing_text", text)):
@@ -157,15 +188,19 @@ def extract(n: Normalized, lines: list[ProductLine] = PRODUCT_LINES) -> Listing:
         note("flags.is_vintage", "claimed", "specifics", "Vintage: Yes")
 
     cost = n.cost.model_dump()
-    if cost["retail_price_cents"] is None and (m := _RETAIL.search(text)):
+    if cost["retail_price_cents"] is not None:   # an actor field (Poshmark's "Original Price")
+        note("cost.retail_price_cents", "claimed", "specifics", f"${cost['retail_price_cents'] / 100:.2f}")
+    elif m := _RETAIL.search(text):
         cost["retail_price_cents"] = int(Decimal(m[1].replace(",", "")) * 100)
         note("cost.retail_price_cents", "claimed", "listing_text", m[0])
 
-    country = next((v for k, v in spec.items() if k.startswith("country") and ("manufactur" in k or "origin" in k)), None)
+    country = next((v for k, v in spec.items() if k.startswith("country") and ("manufactur" in k or "origin" in k)
+                    and v.lower() not in _NO_COUNTRY), None)
     if country:
         note("country_of_manufacture", "claimed", "specifics", country)
+        country = _COUNTRIES.get(country.lower(), country)
     elif m := _MADE_IN.search(text):
-        country = m[1].upper() if len(m[1]) <= 3 else m[1].title()
+        country = _COUNTRIES[m[1].lower()]
         note("country_of_manufacture", "claimed", "listing_text", m[0])
 
     data = n.model_dump(exclude={"specifics"})
@@ -177,12 +212,12 @@ def extract(n: Normalized, lines: list[ProductLine] = PRODUCT_LINES) -> Listing:
 def extract_file(src, dst) -> Counter:
     """Step 03 driver: normalized.jsonl -> listings.jsonl. Lines that do not validate are counted and skipped."""
     stats, out = Counter(), []
-    for line in Path(src).read_text().splitlines():
+    for line in jsonl.read(src):
         try:
-            out.append(extract(Normalized.model_validate_json(line)).model_dump_json() + "\n")
+            out.append(jsonl.dumps(extract(Normalized.model_validate_json(line)).model_dump(mode="json")) + "\n")
         except ValidationError:
             stats["invalid"] += 1
-    Path(dst).with_suffix(".tmp").write_text("".join(out))
+    Path(dst).with_suffix(".tmp").write_text("".join(out), encoding="utf-8", newline="\n")
     Path(dst).with_suffix(".tmp").replace(dst)
     stats["kept"] = len(out)
     return stats

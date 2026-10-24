@@ -1,0 +1,10 @@
+ACTOR: Pulling container image of build 5jOkfHLL6gPjTBYiw from registry.
+ACTOR: Creating container.
+ACTOR: Starting container.
+ACTOR: Running under "LIMITED_PERMISSIONS".
+INFO  System info {"apifyVersion":"3.4.2","apifyClientVersion":"2.24.0","crawleeVersion":"3.18.0","osType":"Linux","nodeVersion":"v22.23.2"}
+WARN  CheerioCrawler: Both 'blockedStatusCodes' and 'retryOnBlocked' are set. Please note that the 'retryOnBlocked' feature might not work as expected.
+INFO  CheerioCrawler: Starting the crawler.
+INFO  CheerioCrawler: All requests from the queue have been processed, the crawler will shut down.
+INFO  CheerioCrawler: Final request statistics: {"requestsFinished":21,"requestsFailed":0,"retryHistogram":[21],"requestAvgFailedDurationMillis":null,"requestAvgFinishedDurationMillis":2070,"requestsFinishedPerMinute":102,"requestsFailedPerMinute":0,"requestTotalDurationMillis":43474,"requestsTotal":21,"crawlerRuntimeMillis":12409}
+INFO  CheerioCrawler: Finished! Total 21 requests: 21 succeeded, 0 failed. {"terminal":true}

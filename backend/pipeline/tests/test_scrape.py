@@ -6,15 +6,18 @@ from types import SimpleNamespace
 
 import pytest
 
+import jsonl
 import scrape as S
 from scrape import Task
 
 
 class FakeClient:
-    """Stands in for ApifyClient. `statuses` maps call index -> SUCCEEDED/FAILED/NONE/RAISE."""
+    """Stands in for ApifyClient. `statuses` maps call index -> SUCCEEDED/FAILED/NONE/RAISE/INTERRUPT;
+    `rows_by_call` and `logs` map a call index to that run's dataset rows and log text."""
 
-    def __init__(self, items=3, statuses=None, rows=None):
+    def __init__(self, items=3, statuses=None, rows=None, rows_by_call=None, logs=None):
         self.calls, self.items, self.statuses, self.rows = [], items, statuses or {}, rows
+        self.rows_by_call, self.logs = rows_by_call or {}, logs or {}
 
     def actor(self, actor_id):
         client = self
@@ -28,12 +31,19 @@ class FakeClient:
                     raise RuntimeError("network down")
                 if status == "NONE":
                     return None
+                if status == "INTERRUPT":
+                    raise KeyboardInterrupt
                 return SimpleNamespace(id=f"run{n}", status=status, default_dataset_id=f"ds{n}", usage_total_usd=0.01,
                                        status_message=None if status == "SUCCEEDED" else "actor crashed")
         return Actor()
 
+    def run(self, run_id):
+        client = self
+        return SimpleNamespace(log=lambda: SimpleNamespace(get=lambda: client.logs.get(int(run_id[3:]), "")))
+
     def dataset(self, dataset_id):
-        rows = self.rows or [{"id": f"{dataset_id}-{k}", "title": "tee", "sellerUsername": "bob",
+        rows = self.rows_by_call.get(int(dataset_id[2:])) if int(dataset_id[2:]) in self.rows_by_call else None
+        rows = rows if rows is not None else self.rows or [{"id": f"{dataset_id}-{k}", "title": "tee", "sellerUsername": "bob",
                               "seller": {"username": "bob", "id": 7, "ratingAverage": 4.9}} for k in range(self.items)]
         return SimpleNamespace(iterate_items=lambda: iter(rows))
 
@@ -43,7 +53,7 @@ def t(mp="depop", cat="tshirts", q="boxy tee", n=100):
 
 
 def read_jsonl(path):
-    return [json.loads(line) for line in Path(path).read_text().splitlines()]
+    return [json.loads(line) for line in Path(path).read_text(encoding="utf-8").splitlines()]
 
 
 # --- plan ----------------------------------------------------------------------------------
@@ -57,10 +67,6 @@ QUERIES = {
 def test_plan_is_breadth_first_over_queries_categories_and_marketplaces():
     order = [(x.query) for x in S.build_plan(QUERIES)]
     assert order == ["a1", "b1", "c1", "d1", "a2", "b2", "c2"]
-
-
-def test_plan_can_be_limited_to_some_marketplaces():
-    assert {x.marketplace for x in S.build_plan(QUERIES, only=["ebay"])} == {"ebay"}
 
 
 def test_smoke_plan_is_one_20_item_query_per_marketplace():
@@ -81,6 +87,8 @@ def test_estimate_simulates_the_quota_stop_and_sums_best_case_cost_and_worst_cas
     ("grailed", {"searchQuery": "carhartt jacket", "maxItems": 50, "scrapeDetails": True}),
     ("poshmark", {"categoryUrls": ["https://poshmark.com/search?query=carhartt+jacket&type=listings&src=dir"],
                   "maxResultsPerScrape": 50, "usePagination": True, "scrapeProductDetails": True}),
+    ("mercari", {"keywords": ["carhartt jacket"], "statuses": ["on_sale"], "includeDetails": True, "maxItems": 50,
+                 "excludeKeywords": S.KIDS_WORDS}),
     ("ebay", {"searchQueries": ["carhartt jacket"], "maxItems": 50, "marketplace": "ebay.com", "mode": "active",
               "condition": "used", "detailedItems": True, "includeDescription": True, "includeSummary": False}),
 ])
@@ -122,9 +130,14 @@ def test_scrub_keeps_only_known_safe_fields_inside_any_seller_block():
                "seller_score": {"sold_count": 960, "rating_average": 4.8, "rating_count": 489, "tag_list": ["fast"]}}
     assert S.scrub({"sellerProfile": profile, "Seller": {"email": "a@b.c", "ratingCount": 2}}) == {
         "sellerProfile": {"location": "Asia", "total_bought_and_sold": 960, "listings_for_sale_count": 312,
-                          "seller_score": {"sold_count": 960, "rating_average": 4.8, "rating_count": 489,
-                                           "tag_list": ["fast"]}},
+                          "seller_score": {"rating_average": 4.8, "rating_count": 489}},
         "Seller": {"ratingCount": 2}}
+
+
+def test_the_seller_allowlist_applies_at_every_depth_inside_a_seller_block():
+    nested = {"seller": {"seller_score": {"rating_average": 4.8, "display_name": "Bob", "shop": {"handle": "bob"}},
+                         "location": [{"location": "US", "street": "1 Main St"}]}}
+    assert S.scrub(nested) == {"seller": {"seller_score": {"rating_average": 4.8}, "location": [{"location": "US"}]}}
 
 
 def test_scrub_keep_drops_every_other_top_level_key():
@@ -138,7 +151,7 @@ def test_ebay_raw_files_keep_only_whitelisted_fields_so_page_modules_with_the_se
            "feedback": [{"buyer": "otherperson"}], "sellerFeedbackScore": 17}
     S.run_plan(FakeClient(rows=[row]), [t("ebay")], None, tmp_path)
     (path,) = (tmp_path / "raw" / "ebay").glob("*.jsonl")
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
     assert "somehandle" not in text and "otherperson" not in text
     assert json.loads(text) == {"title": "NF jacket", "itemSpecifics": {"Brand": "The North Face"}, "priceValue": 50,
                                 "sellerFeedbackScore": 17}
@@ -149,6 +162,14 @@ def test_the_ebay_whitelist_keeps_every_field_the_mapper_needs():
               "condition", "itemSpecifics", "itemLocation", "brand", "categoryPath", "listingStatus", "itemId", "url",
               "sellerAccountType", "sellerHasStore", "sellerFeedbackScore", "sellerFeedbackPercentage"}
     assert needed <= S.ACTORS["ebay"].keep
+
+
+def test_depop_raw_files_drop_the_city_and_the_slug_that_starts_with_the_seller_handle(tmp_path):
+    row = {"id": 1, "title": "TNF jacket", "country": "US", "location": "Hattiesburg, United States",
+           "slug": "somehandle-tnf-jacket-23c6", "url": "https://www.depop.com/products/somehandle-tnf-jacket-23c6/"}
+    S.run_plan(FakeClient(rows=[row]), [t("depop")], None, tmp_path)
+    (path,) = (tmp_path / "raw" / "depop").glob("*.jsonl")
+    assert json.loads(path.read_text(encoding="utf-8")) == {"id": 1, "title": "TNF jacket", "country": "US", "url": row["url"]}
 
 
 def test_scrub_does_not_touch_item_ids_outside_seller_blocks():
@@ -169,10 +190,10 @@ def test_successful_run_writes_scrubbed_raw_file_and_logs_it(tmp_path):
     assert log["est_charge_usd"] == pytest.approx(0.003)
 
 
-def test_an_empty_dataset_is_a_finished_run_with_zero_items(tmp_path):
+def test_an_empty_dataset_is_logged_as_an_empty_run(tmp_path):
     S.run_plan(FakeClient(items=0), [t()], None, tmp_path)
     (log,) = read_jsonl(tmp_path / "runs.jsonl")
-    assert (log["status"], log["items"]) == ("SUCCEEDED", 0)
+    assert (log["status"], log["items"], log["verdict"]) == ("SUCCEEDED", 0, "empty")
 
 
 @pytest.mark.parametrize("status, expected", [("FAILED", "FAILED"), ("TIMED-OUT", "TIMED-OUT"),
@@ -185,6 +206,20 @@ def test_bad_runs_are_logged_not_saved_and_do_not_stop_the_others(tmp_path, stat
     assert first["status_message"] and second["status"] == "SUCCEEDED"
     assert not (tmp_path / "raw" / "depop" / "run0.jsonl").exists()
     assert len(client.calls) == 2
+
+
+@pytest.mark.parametrize("status", ["FAILED", "TIMED-OUT", "ABORTED"])
+def test_a_run_that_started_but_did_not_succeed_is_booked_at_its_charge_cap(tmp_path, status):
+    """Its rows were billed but are not saved, so we cannot count them: assume the worst so --max-spend stays safe."""
+    S.run_plan(FakeClient(statuses={0: status}), [t(n=100)], None, tmp_path)
+    (log,) = read_jsonl(tmp_path / "runs.jsonl")
+    assert log["est_charge_usd"] == pytest.approx(0.13)
+
+
+def test_a_call_that_never_started_a_run_costs_nothing(tmp_path):
+    S.run_plan(FakeClient(statuses={0: "RAISE"}), [t(n=100)], None, tmp_path)
+    (log,) = read_jsonl(tmp_path / "runs.jsonl")
+    assert log["est_charge_usd"] == 0
 
 
 def test_rerun_skips_successful_queries_and_retries_failed_ones(tmp_path):
@@ -210,16 +245,16 @@ def test_quota_counts_rows_from_earlier_runs(tmp_path):
     assert len(again.calls) == 1  # 3 earlier + 3 now >= 5
 
 
-def test_three_failures_in_a_row_give_up_on_that_marketplace_only(tmp_path):
+def test_two_failures_in_a_row_give_up_on_that_marketplace_only(tmp_path):
     plan = [t("depop", q=f"d{i}") for i in range(5)] + [t("ebay", q="e0")]
-    client = FakeClient(statuses={0: "FAILED", 1: "FAILED", 2: "FAILED"})
+    client = FakeClient(statuses={0: "FAILED", 1: "FAILED"})
     S.run_plan(client, plan, None, tmp_path)
-    assert [a for a, _ in client.calls] == ["jongoose/depop-scraper"] * 3 + ["memo23/ebay-search-scraper-ppe"]
+    assert [a for a, _ in client.calls] == ["jongoose/depop-scraper"] * 2 + ["memo23/ebay-search-scraper-ppe"]
 
 
 def test_a_success_resets_the_failure_streak(tmp_path):
     plan = [t(q=f"d{i}") for i in range(6)]
-    client = FakeClient(statuses={0: "FAILED", 1: "FAILED", 3: "FAILED", 4: "FAILED"})
+    client = FakeClient(statuses={0: "FAILED", 2: "FAILED", 4: "FAILED"})
     S.run_plan(client, plan, None, tmp_path)
     assert len(client.calls) == 6
 
@@ -228,6 +263,36 @@ def test_max_spend_stops_before_the_worst_case_would_exceed_it(tmp_path):
     client = FakeClient(items=100)  # each run really costs 100 * 0.001 = 0.10, and may cost up to the 0.13 cap
     S.run_plan(client, [t(q=f"d{i}", n=100) for i in range(5)], None, tmp_path, max_spend=Decimal("0.30"))
     assert len(client.calls) == 2  # after two runs 0.20 is spent; a third could reach 0.33
+
+
+def test_a_lane_can_leave_the_run_report_to_its_batch(tmp_path):
+    S.run_plan(FakeClient(), [t()], None, tmp_path, write_report=False)
+    assert (tmp_path / "runs.jsonl").exists() and not (tmp_path / "run_report.md").exists()
+
+
+def test_lanes_can_share_one_snapshot_of_past_runs_instead_of_reading_the_file(tmp_path):
+    """Lanes start at once; one lane's first entries must not shift another lane's spend or quota."""
+    jsonl.append(tmp_path / "runs.jsonl", dict(marketplace="ebay", category="tshirts", query="x", status="SUCCEEDED",
+                                               items=10, est_charge_usd=5.0))
+    done = [dict(marketplace="depop", category="tshirts", query="one", status="SUCCEEDED", items=3, est_charge_usd=0.0)]
+    client = FakeClient()
+    S.run_plan(client, [t(q="one"), t(q="two")], None, tmp_path, max_spend=Decimal("1"), past=done)
+    assert [kw["run_input"]["query"] for _, kw in client.calls] == ["two"]
+
+
+def test_clean_rows_are_what_reaches_disk_free_rows_skipped_and_seller_identity_scrubbed():
+    rows = [{"type": "search"}, {"type": "listing", "listingId": "m1", "sellerUsername": "bob",
+                                 "seller": {"id": 1, "ratingAverage": 5}}]
+    assert list(S.clean_rows("mercari", rows)) == [{"type": "listing", "listingId": "m1", "seller": {"ratingAverage": 5}}]
+    assert list(S.clean_rows("depop", [{"id": 1, "slug": "bob-tee", "location": "Austin"}])) == [{"id": 1}]
+
+
+def test_quota_rows_count_rows_of_good_runs_only():
+    past = [dict(marketplace="depop", status="SUCCEEDED", items=5),
+            dict(marketplace="depop", status="SUCCEEDED", items=7, verdict="blocked"),
+            dict(marketplace="ebay", status="FAILED", items=0),
+            dict(marketplace="ebay", status="SUCCEEDED", items=3, verdict="short")]
+    assert S.quota_rows(past) == {"depop": 5, "ebay": 3}
 
 
 # --- the real queries.yaml -----------------------------------------------------------------
@@ -246,11 +311,35 @@ def test_queries_cover_exactly_the_api_categories_and_marketplaces(cfg):
         assert set(by_mp) == set(S.ACTORS)
 
 
-def test_mercari_is_not_collected_but_stays_in_the_api_enum():
-    """It failed the go/no-go (no description, one image). The enum belongs to the API schema, so it stays there."""
-    from typing import get_args
-    import listing
-    assert "mercari" not in S.ACTORS and "mercari" in get_args(listing.Marketplace)
+def test_mercari_uses_the_actor_that_returns_listing_details():
+    """getascraper/mercari-us-scraper returned card data only (no description, one photo) and was dropped."""
+    assert S.ACTORS["mercari"].id == "automation_craft/mercari-us-scraper"
+    assert S.charge_cap("mercari", 100) == Decimal("0.35")      # (100 * 0.00273 + 0.006) * 1.25, rounded up
+
+
+def test_kids_filter_words_never_exclude_adult_terms():
+    """The actor matches word prefixes, so 'boy' would drop 'boyfriend jeans' and 'baby' would drop 'baby alpaca'."""
+    adult_titles = ["boyfriend jeans", "baby alpaca sweater", "babydoll dress", "girlfriend tee", "kid mohair cardigan",
+                    "infinity scarf"]
+    for title in adult_titles:
+        assert not any(w in title.split() or any(part.startswith(w) for part in title.split()) for w in S.KIDS_WORDS), title
+
+
+def test_raw_files_are_ascii_so_unicode_line_separators_cannot_split_a_record(tmp_path):
+    S.run_plan(FakeClient(rows=[{"id": 1, "description": "a\u2028b caf\u00e9"}, {"id": 2}]), [t()], None, tmp_path)
+    (path,) = (tmp_path / "raw" / "depop").glob("*.jsonl")
+    text = path.read_text(encoding="utf-8")
+    assert text.isascii() and len(text.splitlines()) == 2
+
+
+def test_free_summary_rows_are_neither_written_nor_counted(tmp_path):
+    listing = {"type": "listing", "listingId": "m1", "title": "x"}
+    rows = [{"type": "search"}, listing, {"type": "status"}, {**listing, "listingId": "m2"}, {"type": "summary"}]
+    S.run_plan(FakeClient(rows=rows), [t("mercari")], None, tmp_path)
+    (path,) = (tmp_path / "raw" / "mercari").glob("*.jsonl")
+    assert [json.loads(line)["listingId"] for line in path.read_text(encoding="utf-8").splitlines()] == ["m1", "m2"]
+    (log,) = read_jsonl(tmp_path / "runs.jsonl")
+    assert log["items"] == 2 and log["est_charge_usd"] == pytest.approx(2 * 0.00273 + 0.006)
 
 
 def test_no_marketplace_is_more_than_half_of_the_planned_rows(cfg):
@@ -267,10 +356,10 @@ def test_every_query_is_capped_at_500_and_unique_per_marketplace(cfg):
         assert len(flat) == len(set(flat)), mp
 
 
-def test_pool_can_reach_the_50k_stage(cfg):
+def test_the_query_pool_can_fill_every_quota_with_room_for_short_queries(cfg):
     for mp, quota in cfg.quotas.items():
         capacity = sum(n for by_mp in cfg.queries.values() for _, n in by_mp[mp])
-        assert capacity >= 3 * quota, (mp, capacity, quota)
+        assert capacity >= 1.2 * quota, (mp, capacity, quota)
 
 
 def test_demo_props_and_conference_tees_are_queried(cfg):

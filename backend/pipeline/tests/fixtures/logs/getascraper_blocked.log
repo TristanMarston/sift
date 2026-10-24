@@ -1,0 +1,26 @@
+ACTOR: Pulling container image of build RAJDzbipnNijE6XrO from registry.
+ACTOR: Creating container.
+ACTOR: Starting container.
+ACTOR: Running under "LIMITED_PERMISSIONS".
+Running on architecture: x86_64
+Will run command: xvfb-run -a -s "-ac -screen 0 1920x1080x24+32 -nolisten tcp" node dist/main.js
+INFO  System info {"apifyVersion":"3.7.2","apifyClientVersion":"2.25.0","crawleeVersion":"3.18.1","osType":"Linux","nodeVersion":"v24.20.0"}
+INFO  Actor is listening on port 4321 (Standby mode enabled)
+INFO  Starting Mercari US scraping...
+INFO  Cost guard active: 2.0GB, $0.00220 net per listing, $0.05000 prospecting allowance, proxy billed to us.
+INFO  Adding constructed search URL for keyword: the north face jacket
+INFO  PlaywrightCrawler: Starting the crawler.
+INFO  Attaching search API network capture prior to page navigation: https://www.mercari.com/search/?keyword=the+north+face+jacket&sortBy=0&itemStatuses=1
+INFO  Processing URL: https://www.mercari.com/search/?keyword=the+north+face+jacket&sortBy=0&itemStatuses=1
+INFO  Fallback: Extracting first-page hydrated listings from Next.js payload...
+INFO  Scrolling page... Current count: 0/25
+INFO  Scrolling page... Current count: 0/25
+INFO  Scrolling page... Current count: 0/25
+INFO  Scrolling page... Current count: 0/25
+WARN  No new items intercepted after multiple scrolls. Ending crawler session.
+WARN  No listings extracted from https://www.mercari.com/search/?keyword=the+north+face+jacket&sortBy=0&itemStatuses=1.
+INFO  PlaywrightCrawler: All requests from the queue have been processed, the crawler will shut down.
+INFO  PlaywrightCrawler: Final request statistics: {"requestsFinished":1,"requestsFailed":0,"retryHistogram":[1],"requestAvgFailedDurationMillis":null,"requestAvgFinishedDurationMillis":27678,"requestsFinishedPerMinute":2,"requestsFailedPerMinute":0,"requestTotalDurationMillis":27678,"requestsTotal":1,"crawlerRuntimeMillis":29248}
+INFO  PlaywrightCrawler: Finished! Total 1 requests: 1 succeeded, 0 failed. {"terminal":true}
+INFO  Scraping completed. Total listings: 0. Run economics: [compute $0.00328, proxy $0.01060 over 1.4MB, billed $0.03208, margin $0.01821, budget left $0.06821]
+INFO  Bandwidth by host: u-web-assets.mercdn.net 1269KB, www.mercari.com 119KB, ingestion.dv.socure.io 1KB, o66889.ingest.sentry.io 0KB

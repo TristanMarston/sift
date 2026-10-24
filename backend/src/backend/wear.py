@@ -51,13 +51,14 @@ def break_even(total_cents: int, typ: dict | None) -> int | None:
 
 def wear_facts(category: str, baselines: dict, condition: str | None, condition_raw: str | None) -> list[dict]:
     b = baselines["categories"][category]
-    fact = lambda kind, label, value, snippet=None: dict(  # noqa: E731
-        kind=kind, label=label, value=value, status="inferred", source="baseline", source_url=None,
+    src, url = b.get("source", baselines["source"]), b.get("source_url", baselines.get("source_url"))
+    fact = lambda kind, label, value, snippet=None, url=None: dict(  # noqa: E731
+        kind=kind, label=label, value=value, status="inferred", source="baseline", source_url=url,
         snippet=snippet, as_of=str(baselines["as_of"]))
     life = f"about {round(CONDITION[condition] * 100)}% of its life left"
+    tag = " (assumption)" if "assumption" in src.lower() else ""  # only uncited baselines say so
     return [
-        fact("baseline", "Typical lifespan", f"{b['low']}–{b['high']} wears for {CATEGORY_LABEL[category]} (assumption)",
-             baselines["source"]),
+        fact("baseline", "Typical lifespan", f"{b['low']}–{b['high']} wears for {CATEGORY_LABEL[category]}{tag}", src, url),
         fact("condition", "Condition", f"{CONDITION_LABEL[condition]}: {life} (assumption)" if condition
              else f"Condition not stated: assume {life}", condition_raw),
     ]
