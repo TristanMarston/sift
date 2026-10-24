@@ -277,7 +277,7 @@ def _haiku_only(im: Image.Image, llm) -> list[dict]:
         found = [clean(g) for g in llm(_jpeg(im), None)]
     except Exception:  # noqa: BLE001
         return []
-    return [_region(g["label"], g["category"], [g["box"][k] for k in "xywh"], 0.5) for g in found]
+    return merge([_region(g["label"], g["category"], [g["box"][k] for k in "xywh"], 0.5) for g in found])
 
 
 # --- FashionSigLIP zero-shot category -----------------------------------------------------

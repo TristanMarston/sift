@@ -289,3 +289,10 @@ def test_a_pair_of_shoes_is_one_garment_even_when_haiku_boxes_each_shoe():
 def test_garments_sharing_a_third_of_the_smaller_box_are_one():
     a, b = g("white crop top", "tshirts", 0.36, 0.28, 0.18, 0.27, 0.85), g("white top", "tshirts", 0.42, 0.36, 0.2, 0.25, 0.75)
     assert D.merge([a, b]) == [a]
+
+
+def test_the_whole_photo_answer_is_merged_too(monkeypatch):
+    monkeypatch.setattr(D, "segformer", lambda im: [])
+    two = lambda crop, hint: [{"label": "pink sneakers", "category": "sneakers", "box": {"x": 0.1, "y": 0.5, "w": 0.3, "h": 0.3}},  # noqa: E731
+                              {"label": "pink sneakers second", "category": "sneakers", "box": {"x": 0.5, "y": 0.5, "w": 0.3, "h": 0.3}}]
+    assert [g["label"] for g in D.detect(IMG, llm=two)["garments"]] == ["pink sneakers"]
