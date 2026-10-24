@@ -59,3 +59,125 @@ def test_fit_shrinks_the_batch_until_its_worst_case_fits_the_money():
     assert rows < 400 and 0 < sum(l.cap_usd for l in lanes.values()) <= Decimal("0.60")
     assert B.fit(cfg(), [], 400, Decimal("100")) == (400, B.plan_batch(cfg(), [], 400))
     assert B.fit(cfg(), [], 400, Decimal("0.05")) == (0, {})
+
+
+# --- the loop ------------------------------------------------------------------------------------
+
+import _thread
+import json
+import threading
+import time
+
+import jsonl
+from run import checks as C
+from fakes import MAPPERS, FakeApify, full_rows
+
+SMALL = S.Config({"depop": 300, "ebay": 100},
+                 {"tshirts": {"depop": [("t1", 100), ("t2", 100)], "ebay": [("e1", 50)]},
+                  "sneakers": {"depop": [("s1", 100), ("s2", 100)], "ebay": [("f1", 50)]}})
+
+
+def go(client, d, **kw):
+    lines = []
+    kw = {"rows": 200, "who": "laptop", "mappers": MAPPERS, "log": lines.append, **kw}
+    return B.run_batches(client, SMALL, d, **kw), lines
+
+
+def batch_dirs(d):
+    return sorted(p for p in (d / "batches").iterdir()) if (d / "batches").exists() else []
+
+
+def test_one_batch_scrapes_every_lane_checks_it_shares_it_and_rebuilds_the_catalog(tmp_path):
+    client = FakeApify()
+    code, lines = go(client, tmp_path)
+    assert code == 0
+    assert sorted(client.calls) == [("depop", "s1"), ("depop", "t1"), ("ebay", "e1")]   # 150 + 50 rows
+    (b,) = batch_dirs(tmp_path)
+    record = json.loads((b / "batch.json").read_text())
+    assert record["stopped"] == {} and len(record["run_ids"]) == 3 and record["real_usd"] == pytest.approx(record["est_usd"])
+    assert (b / "CHECKS.md").exists() and (b / "run_report.md").exists()
+    assert [e["run_id"] for e in client.ledger()] == [e["run_id"] for e in jsonl.load(tmp_path / "runs.jsonl")]
+    assert len(jsonl.read(tmp_path / "listings.jsonl")) == 250
+
+
+def test_lanes_run_side_by_side_and_every_entry_lands_whole(tmp_path):
+    lock, now, peak = threading.Lock(), [0], [0]
+
+    def slow(mp, q, n):
+        with lock:
+            now[0] += 1
+            peak[0] = max(peak[0], now[0])
+        time.sleep(0.05)
+        with lock:
+            now[0] -= 1
+        return full_rows(mp, q, n)
+    go(FakeApify(rows=slow), tmp_path)
+    assert peak[0] == 2
+    assert len(jsonl.load(tmp_path / "runs.jsonl")) == 3
+
+
+def test_batches_all_keeps_going_until_nothing_is_left(tmp_path):
+    client = FakeApify()
+    code, lines = go(client, tmp_path, batches=None)
+    assert code == 0 and len(batch_dirs(tmp_path)) == 2 and len(client.calls) == 5      # depop's quota fills before s2
+    assert any("nothing left to scrape" in l for l in lines)
+
+
+def test_a_marketplace_that_fails_its_checks_sits_out_the_rest_of_the_command(tmp_path):
+    junk = lambda mp, q, n: [{**r, "junk": mp == "depop"} for r in full_rows(mp, q, n)]   # eBay's keep list would drop "junk"
+    client = FakeApify(rows=junk)
+    code, lines = go(client, tmp_path, batches=None)
+    assert code == 2
+    assert [q for mp, q in client.calls if mp == "depop"] == ["t1"]      # judged junk once, never retried in this command
+    assert [q for mp, q in client.calls if mp == "ebay"] == ["e1", "f1"]  # the other lane carried on
+    first = json.loads((batch_dirs(tmp_path)[0] / "batch.json").read_text())
+    assert list(first["stopped"]) == ["depop"] and any("depop" in l and "STOPPED" in l for l in lines)
+
+
+def test_seller_identity_in_a_batch_stops_everything(tmp_path, monkeypatch):
+    monkeypatch.setattr(C, "judge", lambda *a, **k: [C.Check("all", "privacy", "fail", "raw/depop/x.jsonl:1 .username")])
+    client = FakeApify()
+    assert go(client, tmp_path, batches=None)[0] == 2 and len(batch_dirs(tmp_path)) == 1
+
+
+def test_no_batch_starts_unless_its_worst_case_fits_the_account_balance_and_max_spend(tmp_path):
+    poor = FakeApify(max_usage=205.0, usage=203.0)        # $2 left: all of it is the safety margin
+    code, lines = go(poor, tmp_path / "a")
+    assert code == 3 and poor.calls == [] and any("money" in l for l in lines)
+    client = FakeApify()
+    code, _ = go(client, tmp_path / "b", batches=None, max_spend=Decimal("0.70"))
+    assert code == 3 and len(client.calls) == 3
+
+
+def test_a_busy_token_is_refused_unless_forced(tmp_path):
+    busy = FakeApify(active=1)
+    code, lines = go(busy, tmp_path)
+    assert code == B.EXIT_BUSY and busy.calls == [] and any("another runner" in l for l in lines)
+    assert go(busy, tmp_path, force=True)[0] == 0 and busy.calls
+
+
+def test_a_stop_file_halts_before_the_next_batch(tmp_path):
+    (tmp_path / "STOP").parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "STOP").touch()
+    client = FakeApify()
+    assert go(client, tmp_path)[0] == 4 and client.calls == []
+
+
+def test_ctrl_c_lets_the_lanes_finish_their_current_run_then_stops(tmp_path):
+    def interrupt(mp, q, n):
+        _thread.interrupt_main()
+        time.sleep(0.3)                                  # the main thread handles Ctrl-C while this run is "on Apify"
+        return full_rows(mp, q, n)
+    client = FakeApify(rows=interrupt)
+    code, lines = go(client, tmp_path, only={"depop"})
+    assert code == 130 and len(client.calls) == 1 and not (tmp_path / "STOP").exists()
+    assert len(jsonl.load(tmp_path / "runs.jsonl")) == 1 and len(batch_dirs(tmp_path)) == 1
+
+
+def test_recheck_judges_an_old_batch_again(tmp_path):
+    client = FakeApify()
+    go(client, tmp_path)
+    (b,) = batch_dirs(tmp_path)
+    (b / "CHECKS.md").unlink()
+    checks = B.recheck(client, tmp_path, b.name, mappers=MAPPERS)
+    assert C.failed(checks) == {} and (b / "CHECKS.md").exists()

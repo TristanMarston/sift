@@ -120,7 +120,12 @@ def _real_cost(client, run_id):
         return None
 
 
-def judge(client, data_dir, entries, stopped=None, mappers=MAPPERS) -> list[Check]:
+def real_costs(client, entries) -> dict:
+    """run id -> what Apify billed for it (None if it cannot be read)."""
+    return {e["run_id"]: _real_cost(client, e["run_id"]) for e in entries if e.get("run_id")}
+
+
+def judge(client, data_dir, entries, stopped=None, mappers=MAPPERS, real_usd=None) -> list[Check]:
     """Gather everything assess() needs for these runs from data_dir and Apify. "New" means not in any run that comes
     earlier in runs.jsonl."""
     data_dir = Path(data_dir)
@@ -141,7 +146,7 @@ def judge(client, data_dir, entries, stopped=None, mappers=MAPPERS) -> list[Chec
             leaks += [f"{path.relative_to(data_dir).as_posix()}:{i} {k}" for k in forbidden_keys(raw)]
     for l in listings:
         leaks += [f"listing {l.id} {k}" for k in forbidden_keys(l.model_dump(mode="json"))]
-    real = {e["run_id"]: _real_cost(client, e["run_id"]) for e in entries if e.get("run_id")}
+    real = real_costs(client, entries) if real_usd is None else real_usd
     return assess(entries, listings, invalid, stats, set(prior), real, stopped or {}, leaks)
 
 

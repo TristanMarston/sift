@@ -258,15 +258,16 @@ def _now() -> datetime:
 
 
 def run_plan(client, plan, quotas, data_dir, max_spend: Decimal | None = None, log=say, classify=None,
-             stop_all_on_block: bool = False, now=_now, write_report: bool = True) -> R.Summary:
+             stop_all_on_block: bool = False, now=_now, write_report: bool = True, past: list[dict] | None = None) -> R.Summary:
     """Run the plan. After every run the outcome is judged (health.py): a bad run raises an ALERT line at once (and a
     line in alerts.jsonl); a hard block or junk data stops that marketplace immediately, a second empty or failed run
     in a row stops it too. `classify(task, raw) -> (kind, reason, normalized)` judges single rows; without it every row
     counts as good. Create <data_dir>/STOP to halt before the next run. Writes run_report.md/.json (unless write_report is
-    False: a batch runs one lane per marketplace and writes one report for all of them) and returns the Summary."""
+    False: a batch runs one lane per marketplace and writes one report for all of them) and returns the Summary.
+    `past`: the earlier runs to resume from (default: runs.jsonl); a batch gives every lane the same snapshot."""
     data_dir = Path(data_dir)
     runs_path, alerts_path, stop_path = data_dir / "runs.jsonl", data_dir / "alerts.jsonl", data_dir / "STOP"
-    past = jsonl.load(runs_path)
+    past = jsonl.load(runs_path) if past is None else past
     done = finished_queries(past)
     summary = R.Summary(started=now(), max_spend=max_spend)
     spent = sum((Decimal(str(r["est_charge_usd"])) for r in past), Decimal(0))
