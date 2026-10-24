@@ -257,9 +257,9 @@ items, charge, timestamp.
 | description | `description` | `description` | `description` | `description` | `description` (HTML entities decoded) |
 | images | `pictureUrls` | `images` | `photos`, else `coverPhoto` | `photoUrls`, else `imageUrl` | `images` |
 | brand | `brand` | `brand` | `designer` | `brand` | `brand`, else specifics `Brand` |
-| size / color | `sizes[0]`, `colours` | `size`, `color` | `size`, `color` | `size`, `color` (never filled) | specifics `Size`, `Color` |
+| size / color | `sizes[0]`, `colours` | `size`, `color` | `size`, `color` | `size`, `color` (never filled) | specifics `Size` (shoes: `US Shoe Size`), `Color` |
 | condition | `condition` | none | `condition` | `condition` | specifics `Condition`, the label before the seller's prose |
-| category label | `category` `productType` `group` | breadcrumbs + `category` | `category` `categoryPath` | `categoryPath` (a string with `>`) + `category` | `categoryPath` (root ignored) |
+| category label | `category` `productType` `group` (kids items have only `Clothing` or `Shoes`) | breadcrumbs + `category` | `category` `categoryPath` (`short_sleeve_shirts` = T-shirts) | `categoryPath` (a string with `>`) + `category` | `categoryPath` (root ignored) + specifics `Type` as the leaf |
 | status | `isSold` | `listing_status`, `in_stock` | `sold` | `status`, `sold` | `listingStatus` |
 | seller type / rating | none | none | listing count (`sellerProfile.listings_for_sale_count`), `seller.ratingAverage` | `sellerListingCount`; `sellerRating` when `sellerRatingCount` > 0 | account type + feedback score; `sellerFeedbackPercentage` ÷ 20 |
 | region | `country` | `US` | `sellerProfile.country_code`, else `location` | `US` | `itemLocation` |
@@ -269,6 +269,7 @@ Normalization rules (`02_normalize.py`):
 - Drop records missing `url`, `title`, `price`, or at least one image.
 - Convert price to integer cents; keep currency; do not convert FX; drop non-USD.
 - Dedupe on `id` (keep the newest `scraped_at`).
+- Drop kids' items and eBay auctions (an auction's price is the current bid).
 - Map condition strings to the 4-value enum; keep the raw string.
 - Category: marketplace label wins over the query's category; fall back to the query's category.
 

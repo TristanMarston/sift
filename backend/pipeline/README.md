@@ -43,7 +43,7 @@ Everything runs from the `backend/` folder with `uv` (Python 3.12).
 ```bash
 cd backend
 uv sync                                    # install dependencies
-uv run pytest                              # ~540 tests, no network, no money
+uv run pytest                              # ~600 tests, no network, no money
 
 # put your Apify token in the repo root: /workspace/.env  ->  APIFY_TOKEN=...
 uv run python pipeline/01_scrape.py --dry-run      # see the plan and what it would cost. Calls nothing.
@@ -60,7 +60,7 @@ uv run python pipeline/04_report.py                # writes pipeline/REPORT.md
 ```
 
 `--test` makes every step work in `pipeline/data/test/` instead of `pipeline/data/`, so a test run never mixes
-with real data.
+with real data. Every step also takes `--data-dir PATH` for any other folder.
 
 ## The four steps
 
@@ -116,9 +116,13 @@ raises `Drop("reason")`. The step prints how many rows were kept and why the oth
 Duplicates (same marketplace and item id) are collapsed, keeping the newest copy.
 
 Shared rules (`normalize/common.py`): prices become integer cents; brands get one canonical spelling
-(`Levis`, `LEVI'S` → `Levi's`; junk like `unbranded` → null; Grailed's `Vintage` designer tag becomes a vintage flag, not part of the brand); condition text maps to `new_with_tags`, `like_new`,
+(`Levis`, `LEVI'S` → `Levi's`; a known brand followed by a model is that brand, `Nike Dunk Low` → `Nike`, because Poshmark
+sellers type these; junk like `unbranded` → null; Grailed's style tags such as `Flannel` and `Designer` are not brands, and
+its `Vintage` designer tag becomes a vintage flag); condition text maps to `new_with_tags`, `like_new`,
 `good`, `fair` (or null); the marketplace's category label maps to one of the 8 categories (all footwear counts as
-`sneakers`; the leaf of a path like `Men > Sweats & hoodies > Track jacket` wins; blazers and suits count as jackets);
+`sneakers`; the leaf of a path like `Men > Sweats & hoodies > Track jacket` wins; blazers and suits count as jackets;
+boot-cut jeans are jeans; Grailed's `short_sleeve_shirts` and `long_sleeve_shirts` are its T-shirt categories; eBay's
+`Type` specific is the leaf, because eBay files tees under a generic `Women's Clothing > Tops`);
 a missing label falls back to the query's category. Titles and descriptions lose invisible characters (zero-width
 spaces, soft hyphens) and non-breaking spaces, because a zero-width space inside `100%cotton` defeats the composition
 regex. Depop's own title is just the first few words of the description, cut mid-phrase, so the title is the first line
@@ -274,8 +278,10 @@ Measured in the test runs. This decides which facts are empty for which marketpl
 | Markdown (`original_price_cents`) | yes | no | from earlier prices | yes | no |
 | Retail price field (`retail_price_cents`) | no | yes (`Original Price`, seller-entered) | no | no | no |
 | Seller type / rating | no | no | yes | yes | yes |
-| Structured materials | no | no | no | no | yes (`Outer Shell Material`) |
+| Structured materials | no | no | no | no | yes (`Outer Shell Material`; sneakers `Upper Material`) |
 | Color | yes | yes | yes | **never** | yes |
+| Repeats inside one full-size run (billed) | 0 of 200 | 20 of 200 | not measured | not measured | 16 of 150 |
+| Left out on purpose (review scrape) | kids 3% | kids, crop tops 2% | none | kids, shorts 17% | auctions, kids 4% |
 
 Mercari's first actor (`getascraper/mercari-us-scraper`) returned card data only (no description, one photo) and was
 replaced; see `SPEC.md` §13a–b for what went wrong and how the new one was tested. Mercari's own total price also
@@ -286,8 +292,8 @@ includes a buyer-protection fee (about 3.5%) that `cost` does not model.
 No seller usernames, profile links, avatars or account ids are stored.
 
 - `scrape.py` removes them **before anything is written**. Flat keys such as `sellerUsername` are dropped at any depth.
-  Inside any seller block (`seller`, `sellerProfile`, `user`) only a short allowlist survives (ratings, counts,
-  location). eBay records keep only the top-level fields the mapper reads, because its raw page data contains the
+  Inside any seller block (`seller`, `sellerProfile`, `user`), at every depth, only a short allowlist survives (ratings,
+  counts, location). eBay records keep only the top-level fields the mapper reads, because its raw page data contains the
   seller's handle and buyers' feedback. Depop records lose `location` (the seller's city) and `slug` (it starts with
   the seller's handle).
 - `tests/test_privacy.py` scans the fixtures, the mapper output and any real files in `data/` for identity keys.
@@ -322,7 +328,13 @@ that is not mirrored in `listing.py` fails a test.
 - `seller.region` mixes formats: `US` for any US place, otherwise whatever the marketplace reports (a code like `CN`
   from Grailed, a name like `China` from eBay).
 - Poshmark gives no condition, so it is null. Depop gives no shipping and no seller details. Mercari gives no color.
-- Sellers sometimes put the wrong category on an item; a mislabeled item passes through.
+- Sellers sometimes put the wrong category on an item; a mislabeled item passes through. A tank top under a
+  `Shirts` or `Tops & blouses` parent (Poshmark men's, Mercari women's) is filed as a shirt; eBay's and Poshmark
+  women's tank tops and crop tops are dropped.
+- Grailed resellers cross-list one item as several listings (same title and price, different ids). Deduping by id
+  cannot catch this; it needs image-based dedupe later.
+- The duplicate counts in `run_report.md` ignore rows from earlier invocations of step 01 (step 02 still dedupes
+  everything).
 - `seller.type` thresholds are guesses (Grailed: ≤ 20 / ≤ 200 listings; eBay: business accounts with ≥ 5,000
   feedback are large resellers). An eBay seller with 0% positive feedback has no feedback in eBay's 12-month window,
   so `seller.rating` is null, as it is for a Mercari seller with no reviews.
@@ -332,7 +344,7 @@ that is not mirrored in `listing.py` fails a test.
   `synthetic_share`. This is 15% of the Mercari rows we tested, almost all coats, usually "shell composition, then a 100%
   polyester lining". Reading the "Shell:" and "Lining:" labels would recover most of them; taking the first group would
   be wrong whenever a seller lists the lining first, so we do not.
-- The Mercari actor is new and was tested up to 150 items per run (two results pages); the plan asks for up to 300.
+- The Mercari actor is new; it worked up to 300 items per run (three results pages) in the review scrape.
   `tortuga/mercari-scraper` is the fallback.
 - Not built yet: thumbnails, image embeddings, the Supabase upload, care-tag OCR, the LLM fallback for odd material
   text, sold-price comps, and the hand-curated brand facts table.
