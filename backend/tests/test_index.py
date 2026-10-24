@@ -144,3 +144,12 @@ def test_load_reads_colours_when_present(tmp_path):
     assert Index.load(tmp_path).colors is None
     np.save(tmp_path / "colors.npy", np.zeros((2, 3), np.float32))
     assert Index.load(tmp_path).colors.shape == (2, 3)
+
+
+def test_a_brand_read_off_the_photo_lifts_that_brands_listings():
+    """Haiku read "GAP" on the hoodie: GAP hoodies in the shortlist move up, the rest stay in similarity order."""
+    rows = [r(0, id="depop:other", brand="Champion"), r(1, id="depop:gap", brand="Gap")]
+    idx = Index(np.array([[1.0, 0.0, 0.0], [0.94, 0.34, 0.0]], np.float32), rows)
+    assert [row["id"] for row, _ in idx.search(unit(1, 0, 0))] == ["depop:other", "depop:gap"]
+    assert [row["id"] for row, _ in idx.search(unit(1, 0, 0), brand=" GAP ")] == ["depop:gap", "depop:other"]
+    assert [round(s, 2) for _, s in idx.search(unit(1, 0, 0), brand="GAP")] == [0.94, 1.0]   # similarity unchanged

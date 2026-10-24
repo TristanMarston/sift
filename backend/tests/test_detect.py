@@ -132,7 +132,7 @@ def test_slivers_next_to_a_real_garment_are_dropped():
 
 def test_haiku_answers_are_cleaned():
     g = D.clean({"label": " Jacket ", "category": "hats", "box": {"x": -0.1, "y": 0.5, "w": 2, "h": 0.2}})
-    assert g == {"label": "jacket", "category": None, "box": {"x": 0.0, "y": 0.5, "w": 1.0, "h": 0.2}}
+    assert g == {"label": "jacket", "category": None, "brand": None, "box": {"x": 0.0, "y": 0.5, "w": 1.0, "h": 0.2}}
 
 
 # --- response --------------------------------------------------------------------------
@@ -230,7 +230,7 @@ def test_a_product_shot_with_nothing_sure_becomes_one_whole_photo_garment(monkey
     monkeypatch.setattr(D, "name", lambda im, allowed: ("sneakers", 0.9))
     resp = D.detect(IMG, llm=None)
     validate(resp)
-    assert resp["garments"] == [{"id": "g0", "label": "sneakers", "category": "sneakers",
+    assert resp["garments"] == [{"id": "g0", "brand": None, "label": "sneakers", "category": "sneakers",
                                  "box": {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0}, "confidence": 0.9}]
     assert D.detect(IMG, llm=lambda c, h: [])["garments"][0]["category"] == "sneakers"  # Haiku found nothing
 
@@ -304,3 +304,36 @@ def test_the_whole_photo_answer_is_merged_too(monkeypatch):
     two = lambda crop, hint: [{"label": "pink sneakers", "category": "sneakers", "box": {"x": 0.1, "y": 0.5, "w": 0.3, "h": 0.3}},  # noqa: E731
                               {"label": "pink sneakers second", "category": "sneakers", "box": {"x": 0.5, "y": 0.5, "w": 0.3, "h": 0.3}}]
     assert [g["label"] for g in D.detect(IMG, llm=two)["garments"]] == ["pink sneakers"]
+
+
+# --- brand: a logo or label Haiku can read ------------------------------------------------------
+
+def test_haiku_brand_is_kept_and_cleaned():
+    g = D.clean({"label": "zip hoodie", "category": "hoodies_sweatshirts", "box": {"x": 0, "y": 0, "w": 1, "h": 1}, "brand": " GAP "})
+    assert g["brand"] == "GAP"
+    assert D.clean({"label": "tee", "category": None, "box": {"x": 0, "y": 0, "w": 1, "h": 1}})["brand"] is None
+
+
+def test_the_brand_rides_through_relabel_and_the_response(monkeypatch):
+    fake = lambda crop, hint: [{"label": "zip hoodie", "category": "hoodies_sweatshirts", "brand": "GAP",  # noqa: E731
+                               "box": {"x": 0, "y": 0, "w": 1, "h": 1}}]
+    [g] = D.relabel(IMG, [TOP], fake)
+    assert g["brand"] == "GAP"
+    resp = D.response(IMG, [g, PANTS_R])
+    validate(resp)
+    assert [x["brand"] for x in resp["garments"]] == ["GAP", None]
+
+
+def test_describe_asks_haiku_at_temperature_zero_so_the_same_photo_gets_the_same_answer(monkeypatch):
+    sent = {}
+
+    class Messages:
+        def create(self, **kw):
+            sent.update(kw)
+            text = json.dumps({"garments": []})
+            return type("Msg", (), {"stop_reason": "end_turn", "content": [type("B", (), {"type": "text", "text": text})]})
+
+    monkeypatch.setattr(D, "_client", lambda: type("C", (), {"messages": Messages()})())
+    D.describe(b"jpeg", "top")
+    assert sent["temperature"] == 0
+    assert "brand" in D.SCHEMA["properties"]["garments"]["items"]["properties"]

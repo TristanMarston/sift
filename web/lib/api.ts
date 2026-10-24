@@ -98,14 +98,14 @@ export async function toJpeg(photo: Blob): Promise<Blob | null> {
  * which). With no backend, the bundled sample for the garment's category (marked `sample`). With a backend, a
  * failure throws so the screen can offer Try again, never a sample in disguise.
  */
-export async function search(crop: Blob, category: string): Promise<SearchResponse> {
+export async function search(crop: Blob, category: string, brand: string | null = null): Promise<SearchResponse> {
     if (!hasBackend) {
         const res = await fetch(`/samples/${sampleCategory(category)}.json`);
         return (await res.json()) as SearchResponse;
     }
     const body = new FormData();
     body.append('image', crop, 'garment.jpg');
-    body.append('params', JSON.stringify(category ? { category } : {}));
+    body.append('params', JSON.stringify({ ...(category ? { category } : {}), ...(brand ? { brand } : {}) }));
     const res = await call('/search', { method: 'POST', body }, 20000);
     return (await res.json()) as SearchResponse;
 }

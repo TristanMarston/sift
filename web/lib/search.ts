@@ -66,11 +66,11 @@ export type Result = {
 };
 
 export type SearchResponse = {
-    query: { category?: string | null; filters?: Record<string, unknown> };
+    query: { category?: string | null; brand?: string | null; filters?: Record<string, unknown> };
     typical: { price_cents: number; expected_wears_mid: number; cpw_cents: number } | null;
     results: Result[];
     orders: Record<Sort, string[]>;
     slider: string[][];
-    headline: { cheapest_id: string | null; cheapest_rank_by_cpw: number | null };
+    headline: { cheapest_id: string | null; cheapest_rank_by_cpw: number | null; match?: 'exact' | 'close' | 'similar' | null; };
     sample?: { prop: string; note: string }; // only on the bundled sample files
 };

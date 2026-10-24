@@ -84,12 +84,13 @@ def rank(hits: list[tuple[dict, float]], query: dict, cfg: Config) -> dict:
     }
     by_id = {r["id"]: r for r in results}
     cheapest = orders["price"][0] if results else None
+    best = band(max(r["match"]["similarity"] for r in results)) if results else None   # how close the best one is
     return {
         "query": query,
         "typical": typ,
         "results": [by_id[i] for i in orders["cpw"]],
         "orders": orders,
         "slider": _slider(orders["cpw"], orders["match"]),
-        "headline": {"cheapest_id": cheapest,
+        "headline": {"cheapest_id": cheapest, "match": best,
                      "cheapest_rank_by_cpw": orders["cpw"].index(cheapest) + 1 if cheapest else None},
     }

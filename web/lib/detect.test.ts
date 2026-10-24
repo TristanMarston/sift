@@ -19,8 +19,8 @@ test('detected garments map to traceable boxes, most confident first, labels in 
         ],
     };
     assert.deepEqual(toGarments(res), [
-        { id: 'g0', category: 'jackets_outerwear', label: 'Jacket', attributes: {}, bbox: { x: 0.12, y: 0.08, w: 0.55, h: 0.7 } },
-        { id: 'g1', category: 'jeans_pants', label: 'Jeans', attributes: {}, bbox: { x: 0.2, y: 0.5, w: 0.5, h: 0.45 } },
+        { id: 'g0', category: 'jackets_outerwear', label: 'Jacket', brand: null, attributes: {}, bbox: { x: 0.12, y: 0.08, w: 0.55, h: 0.7 } },
+        { id: 'g1', category: 'jeans_pants', label: 'Jeans', brand: null, attributes: {}, bbox: { x: 0.2, y: 0.5, w: 0.5, h: 0.45 } },
     ]);
 });
 

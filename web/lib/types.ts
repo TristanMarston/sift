@@ -7,6 +7,7 @@ export type Garment = {
     id: string;
     category: string;
     label: string; // "Chore coat · navy"
+    brand?: string | null; // read off the garment by /detect; passed back to /search
     attributes: Record<string, string>;
     bbox: { x: number; y: number; w: number; h: number }; // fractions of the photo
     crop_url?: string;

@@ -158,3 +158,10 @@ def test_eco_percentile_places_each_result_among_the_others(hits):
     best = max(res, key=lambda r: r["eco"]["score"])
     assert best["eco"]["percentile"] == 100
     assert R.rank(hits[:1], QUERY, CFG)["results"][0]["eco"]["percentile"] == 100
+
+
+def test_headline_says_how_close_the_best_match_is(hits):
+    assert R.rank(hits, QUERY, CFG)["headline"]["match"] == "exact"          # best similarity 0.95
+    low = [(row, min(sim, 0.7)) for row, sim in hits]
+    assert R.rank(low, QUERY, CFG)["headline"]["match"] == "similar"
+    assert R.rank([], QUERY, CFG)["headline"]["match"] is None

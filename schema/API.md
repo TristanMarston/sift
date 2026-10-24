@@ -40,7 +40,7 @@ Finds the garments in a photo.
 {
   "image": {"width": 1024, "height": 768},
   "garments": [
-    {"id": "g0", "category": "jackets_outerwear", "label": "jacket",
+    {"id": "g0", "category": "jackets_outerwear", "label": "jacket", "brand": "Carhartt",
      "box": {"x": 0.12, "y": 0.08, "w": 0.55, "h": 0.70}, "confidence": 0.91}
   ]
 }
@@ -56,7 +56,8 @@ Finds look-alikes for one garment crop and returns the full receipt data for eac
 
 - Request: `multipart/form-data`
   - `image`: the cropped garment (the frontend crops on a canvas using `box`).
-  - `params`: a JSON string matching `SearchParams`:
+  - `params`: a JSON string matching `SearchParams` (`brand`: pass the garment's `brand` from `/detect` back; that
+    brand's listings are lifted in the match order, e.g. a GAP hoodie finds GAP hoodies first):
 
 ```json
 {
@@ -103,7 +104,7 @@ Any non-2xx response has the body `{"error": {"code": "...", "message": "..."}}`
     "eco":   ["poshmark:64f1a2", "ebay:77", "depop:91"]
   },
   "slider": [ /* 11 id lists: slider[0] = orders.cpw … slider[10] = orders.match */ ],
-  "headline": {"cheapest_id": "depop:91", "cheapest_rank_by_cpw": 2}
+  "headline": {"cheapest_id": "depop:91", "cheapest_rank_by_cpw": 2, "match": "close"}
 }
 ```
 
@@ -210,7 +211,8 @@ Any non-2xx response has the body `{"error": {"code": "...", "message": "..."}}`
 - `wear.facts` are the assumptions behind `expected_wears` (the category baseline and the condition factor).
   Show them under "Expected wears" so the number is never a black box.
 - `match.band`: `exact` when `similarity ≥ 0.9`, `close` from 0.8 (the same garment in another colour or cut),
-  otherwise `similar` (the kind of thing).
+  otherwise `similar` (the kind of thing). `headline.match` is the band of the best result: when it is `similar`,
+  say so ("Nothing close — showing similar t-shirts") instead of presenting look-alikes as matches.
 - `thumb_url` is a small (~320 px) variant of the first photo, fast on a phone. Use `image_urls` for the full gallery.
 - `quality.level == "unknown"` and `facts == []` → show **"Not enough evidence yet."**
   `score` is then `null`, and the item sorts last on that marker but stays in the list.

@@ -39,7 +39,7 @@ Base URL: `https://lu-anthony-73--sift-api.us-west.modal.run` · Contract: `sche
 | Endpoint | Behaviour worth knowing |
 | --- | --- |
 | `GET /health` | `{"status":"ok","index_size":51101}` |
-| `POST /detect` | multipart `image` (JPEG/PNG/WebP/**HEIC**). SegFormer boxes + Claude Haiku labels ("black leather jacket", "white ribbed crop top"), one garment per tab (overlaps merged, shoe pairs = 1). Product shots → one whole-photo garment with a category. `category` may be **null**. **~3 s warm, ~10 s cold** — the web app gives up at 8 s and searches the whole photo. |
+| `POST /detect` | multipart `image` (JPEG/PNG/WebP/**HEIC**). Each garment carries `brand` (null unless a logo/label is readable) — pass it to `/search`. SegFormer boxes + Claude Haiku labels ("black leather jacket", "white ribbed crop top"), one garment per tab (overlaps merged, shoe pairs = 1). Product shots → one whole-photo garment with a category. `category` may be **null**. **~3 s warm, ~10 s cold** — the web app gives up at 8 s and searches the whole photo. |
 | `POST /search` | multipart `image` + `params` JSON (`SearchParams`). Top 50, cross-posted duplicates collapsed to the **cheapest copy**; ordered by similarity **minus a colour penalty** once the index has `colors.npy` (`match.similarity` stays SigLIP's; `match.band` is `exact` ≥ 0.9, `close` ≥ 0.8, else `similar`). **No category → read from the photo**; `query.category` in the response says which was used. ~0.5 s. |
 | `POST /jpeg` | the uploaded photo back as an upright JPEG (long edge ≤ 1024 px), for browsers that cannot decode an iPhone HEIC. The web app calls it on its own when `createImageBitmap` fails (#48). |
 | Errors | always `{"error": {"code", "message"}}`: 400 `invalid_image` / `invalid_params`, 413 `image_too_large`, 500 `internal`. |
@@ -57,7 +57,8 @@ null → "Shipping unknown" (already handled). Break-even beyond the item's life
 | --- | --- | --- | --- |
 | Scrape pipeline (5 marketplaces, batches, checks, privacy) | ✅ | `backend/pipeline/`, `pipeline/run/` (Andy) | Ctrl-C bug fixed (#19); 51,101 listings, all checks passed |
 | Search index (FashionSigLIP, ONNX) | ✅ | `src/backend/embed.py`, `index.py` | median top match 0.89; product shots 0.89–0.99 |
-| Garment detection | ✅ | `src/backend/detect.py` | SegFormer + Haiku + FashionSigLIP naming; YOLOS swap via `backend="yolos"` |
+| Garment detection | ✅ | `src/backend/detect.py` | SegFormer + Haiku + FashionSigLIP naming; YOLOS swap via `backend="yolos"`. Haiku at temperature 0 (same photo, same answer) and reads the **brand** off a logo/label (`garments[].brand`, #64) |
+| Brand-aware search | ✅ | `src/backend/index.py`, `app.py` | `SearchParams.brand` (the web passes `/detect`'s brand back) lifts that brand's listings in the match order (+0.1); `headline.match` says how close the best result is, the web says "Nothing close — N similar t-shirts" when it's only `similar` (#64) |
 | HTTP API + hosting | ✅ | `src/backend/app.py`, `backend/modal_app.py` | deploy: `SIFT_HAIKU=1 SIFT_INDEX_NAME=full uv run modal deploy modal_app.py` |
 | Ranker: cost per wear, break-even, sorts, slider | ✅ | `src/backend/ranker.py`, `wear.py` | wear figures cited from EU PEFCR (mid = published default) |
 | Quality marker | ✅ | `src/backend/markers.py` | brand promises that reach secondhand buyers, durable product lines, fabric fit, construction words, vintage-that-lasted; **unknown 40%** at 51k (32% at 20k: the new batches have more sneakers and dresses) |

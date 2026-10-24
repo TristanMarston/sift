@@ -45,12 +45,13 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["id", "category", "label", "box", "confidence"],
+            "required": ["id", "category", "label", "brand", "box", "confidence"],
             "additionalProperties": false,
             "properties": {
               "id": {"type": "string"},
               "category": {"anyOf": [{"$ref": "#/$defs/Category"}, {"type": "null"}]},
               "label": {"type": "string"},
+              "brand": {"description": "A brand read off the garment (logo, wordmark, label), else null. Pass it back as SearchParams.brand.", "type": ["string", "null"]},
               "box": {"$ref": "#/$defs/Box"},
               "confidence": {"$ref": "#/$defs/Unit"}
             }
@@ -64,6 +65,7 @@
       "additionalProperties": false,
       "properties": {
         "category": {"anyOf": [{"$ref": "#/$defs/Category"}, {"type": "null"}]},
+        "brand": {"description": "From /detect: that brand's listings are lifted in the match order.", "type": ["string", "null"], "maxLength": 80},
         "filters": {"$ref": "#/$defs/Filters"}
       }
     },
@@ -108,9 +110,10 @@
         },
         "headline": {
           "type": "object",
-          "required": ["cheapest_id", "cheapest_rank_by_cpw"],
+          "required": ["cheapest_id", "cheapest_rank_by_cpw", "match"],
           "additionalProperties": false,
           "properties": {
+            "match": {"description": "How close the best result is: the match.band of the highest similarity; null with no results. \"similar\" means nothing close was found.", "anyOf": [{"type": "string", "enum": ["exact", "close", "similar"]}, {"type": "null"}]},
             "cheapest_id": {"type": ["string", "null"]},
             "cheapest_rank_by_cpw": {"type": ["integer", "null"], "minimum": 1}
           }
