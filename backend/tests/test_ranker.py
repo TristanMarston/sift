@@ -73,10 +73,12 @@ def test_price_and_match_orders(hits):
     assert o["match"] == ["depop:cheap", "depop:mid", "depop:nwt", "depop:plain", "depop:pricey"]
 
 
-def test_eco_order_puts_unknowns_last(hits):
+def test_eco_order_ranks_built_to_last_cotton_first_and_a_vintage_piece_above_a_worn_one(hits):
     hits[3] = (make_row("plain", condition="like_new", flags={"is_vintage": True, "is_deadstock": False,
                                                                 "is_upcycled": False}, **price(3000)), 0.80)
-    assert R.rank(hits, QUERY, CFG)["orders"]["eco"][0] == "depop:plain"
+    o = R.rank(hits, QUERY, CFG)["orders"]["eco"]
+    assert o[0] == "depop:mid"                                  # cotton duck, known line: lasts longest
+    assert o.index("depop:plain") < o.index("depop:cheap")     # vintage, like new, beats fair condition
 
 
 def test_slider_ends_are_the_value_and_match_orders(hits):
@@ -146,3 +148,13 @@ def test_three_match_bands(sim, band):
     """0.90 and 0.72 both read "similar" before; a 0.80-0.90 match looks like the same garment in another colour or
     cut, so it gets its own band."""
     assert R.band(sim) == band
+
+
+def test_eco_percentile_places_each_result_among_the_others(hits):
+    """"Greener than 72% of these matches": the share of the other results with a lower eco score."""
+    res = R.rank(hits, QUERY, CFG)["results"]
+    ps = sorted(r["eco"]["percentile"] for r in res)
+    assert ps[0] == 0 and ps[-1] == 100 and all(0 <= p <= 100 for p in ps)
+    best = max(res, key=lambda r: r["eco"]["score"])
+    assert best["eco"]["percentile"] == 100
+    assert R.rank(hits[:1], QUERY, CFG)["results"][0]["eco"]["percentile"] == 100

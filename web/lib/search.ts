@@ -53,7 +53,7 @@ export type Result = {
         composition_suspect: boolean;
     };
     quality: Marker;
-    eco: Marker;
+    eco: Marker & { percentile: number }; // greener than N% of these matches
     wear: {
         expected_wears: { low: number; high: number; mid: number };
         basis: 'category_baseline' | 'evidence_adjusted';

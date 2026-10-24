@@ -150,21 +150,40 @@ def quality(row: dict, brands: dict) -> tuple[dict, list[dict]]:
     return {"level": level, "score": score, "facts": facts}, scored
 
 
-def eco(row: dict, brands: dict) -> dict:
+# Eco score (0-1). Every item here is secondhand, so the new-garment impact is avoided for all of them; what separates
+# them is what happens next. Weights are a team judgement (API.md states them).
+ECO_WEIGHTS = {"fibers": 0.35, "durability": 0.30, "shipping": 0.15, "circularity": 0.20}
+ECO_HIGH, ECO_LOW = 0.70, 0.40      # 100% cotton alone is medium; cotton + vintage, or cotton + built to last, is high
+SHIP_US, SHIP_ABROAD, SHIP_UNKNOWN = 1.0, 0.4, 0.6
+
+
+def _natural_share(fibers) -> float | None:
+    """Share of natural fibers, 0-1; None when nothing is stated. Names without percentages count equally."""
+    if not fibers:
+        return None
+    known = [f for f in fibers if f["pct"] is not None]
+    if known:
+        return min(1.0, sum(f["pct"] for f in known if f["fiber"] in NATURAL) / (sum(f["pct"] for f in known) or 1))
+    return sum(f["fiber"] in NATURAL for f in fibers) / len(fibers)
+
+
+def eco(row: dict, brands: dict, wears: int | None = None, typical: int | None = None) -> dict:
+    """`wears` is the item's expected wears (mid) and `typical` the category's baseline, from the ranker: a garment
+    that lasts longer replaces more new clothing."""
     as_of = row["scraped_at"][:10]
     facts = [_fact("secondhand", "Secondhand", "Already in use: no new garment is made", status="verified", as_of=as_of)]
-    points = 0
+    circularity = 0.0
     for flag, kind, label, value in FLAGS:
         if row["flags"][flag]:
             e = _evidence(row, f"flags.{flag}") or {}
             facts.append(_fact(kind, label, value, as_of=e.get("as_of", as_of), snippet=e.get("snippet")))
-            points += 1
+            circularity += 1
     m = row["materials"]
     for attr, label in [("recycled", "Recycled"), ("organic", "Organic")]:
         hit = [f["fiber"] for f in m["fibers"] if f[attr]]
         if hit:
             facts.append(_fact(attr, label, f"{label} {', '.join(hit)}", as_of=as_of))
-            points += 1
+            circularity += 1
     b = brands.get(brand_key(row.get("brand"))) or {}
     certs = [(c, None, as_of) for c in m["certifications"]]
     certs += [(c["name"], c["url"], b.get("as_of", "")) for c in b.get("certifications", [])
@@ -172,30 +191,45 @@ def eco(row: dict, brands: dict) -> dict:
     for c, url, when in certs:
         facts.append(_fact("certification", "Certification", CERT_LABEL.get(c, c),
                            source="brand_table" if url else "listing_text", source_url=url, as_of=when))
-    points += min(2, len(certs))
+    circularity += 0.5 * min(2, len(certs))
     fibers = m["fibers"]
-    known = [f for f in fibers if f["pct"] is not None]
-    natural = (sum(f["pct"] for f in known if f["fiber"] in NATURAL) >= NATURAL_SHARE if known
-               else bool(fibers) and all(f["fiber"] in NATURAL for f in fibers))
-    if natural:  # the mirror of the synthetic-share penalty; the fact states the fibers, never "sustainable"
+    share = _natural_share(fibers)
+    if share is not None:  # the fact states the fibers, never "sustainable"
         e = _evidence(row, "materials.fibers") or {}
-        facts.append(_fact("natural_fibers", "Natural fibers", _composition(fibers), status=e.get("status", "claimed"),
-                           source=e.get("source", "listing_text"), as_of=e.get("as_of", as_of), snippet=e.get("snippet")))
-        points += 1
-    elif not fibers and (fab := title_fabric(row)) and fab[1] in NATURAL:   # "denim jeans": the seller named the fabric
+        kind, label = ("natural_fibers", "Natural fibers") if share * 100 >= NATURAL_SHARE else ("materials", "Materials")
+        if share * 100 >= NATURAL_SHARE or (m["synthetic_share"] or 0) <= SYNTHETIC_LIMIT:
+            facts.append(_fact(kind, label, _composition(fibers), status=e.get("status", "claimed"),
+                               source=e.get("source", "listing_text"), as_of=e.get("as_of", as_of), snippet=e.get("snippet")))
+    elif (fab := title_fabric(row)) and fab[1] in NATURAL:   # "denim jeans": the seller named the fabric
         facts.append(_fact("natural_fibers", "Natural fibers", fab[2], as_of=as_of, snippet=fab[0]))
-        points += 1
+        share = 1.0
+    else:
+        facts.append(_fact("fabric_unknown", "Fabric", "Not stated", status="unknown", as_of=as_of))
+        share = 0.5
     if (m["synthetic_share"] or 0) > SYNTHETIC_LIMIT:
         facts.append(_fact("synthetic_share", "Synthetic fibers", f"{m['synthetic_share']:g}% synthetic", as_of=as_of))
-        points -= 1
     animal = sorted({f["fiber"] for f in m["fibers"]} & ANIMAL)
     if animal:
         facts.append(_fact("animal_materials", "Animal materials", ", ".join(animal), as_of=as_of))
-    # Secondhand is the eco win itself (no new garment is made), so an item with nothing else known is medium, never
-    # unknown. Evidence moves it: high with 2 points (natural, recycled, organic, vintage, certified), low below 0.
-    level = "high" if points >= 2 else "low" if points < 0 else "medium"
-    score = min(1.0, max(0.0, (points + 2) / 4))
-    return {"level": level, "score": score, "facts": facts}
+    durability = 0.5
+    if wears and typical:
+        durability = min(1.0, max(0.0, wears / typical - 0.5))
+        facts.append(_fact("durability", "Lasts", f"Expected {wears} wears, typical {typical}"
+                           + (": fewer replacements" if wears > typical else ""), status="inferred", source="baseline",
+                           as_of=as_of))
+    region = (row.get("seller") or {}).get("region")
+    if region is None:
+        shipping = SHIP_UNKNOWN
+    elif region in {"US", "USA"}:
+        shipping = SHIP_US
+        facts.append(_fact("shipping", "Shipping", "Ships from the US", status="verified", as_of=as_of))
+    else:
+        shipping = SHIP_ABROAD
+        facts.append(_fact("shipping", "Shipping", f"Ships from {region}: long haul", status="verified", as_of=as_of))
+    score = (ECO_WEIGHTS["fibers"] * share + ECO_WEIGHTS["durability"] * durability + ECO_WEIGHTS["shipping"] * shipping
+             + ECO_WEIGHTS["circularity"] * min(1.0, circularity / 2))
+    level = "high" if score >= ECO_HIGH else "low" if score < ECO_LOW else "medium"
+    return {"level": level, "score": round(score, 3), "facts": facts}
 
 
 def confidence(scored: list[dict]) -> str:

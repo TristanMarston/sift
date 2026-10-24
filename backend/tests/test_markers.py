@@ -87,18 +87,42 @@ def test_leather_sneakers_and_organic_labels(row):
 
 def test_secondhand_alone_is_the_medium_baseline_never_unknown(row):
     """Buying secondhand is the eco win itself (no new garment is made), so every item has a level: medium with
-    nothing else known, high with evidence for it, low with evidence against (mostly synthetic)."""
+    nothing else known, high with evidence for it, low with evidence against (mostly synthetic, long-haul shipping)."""
     e = M.eco(row(), {})
-    assert e["level"] == "medium" and e["score"] == 0.5 and kinds(e) == ["secondhand"]
-    assert M.eco(row(materials=fibers(("cotton", 100), synthetic_share=0)), {})["score"] == 0.75
+    assert e["level"] == "medium" and 0.4 <= e["score"] < 0.5 and kinds(e) == ["secondhand", "fabric_unknown"]
+    cotton = M.eco(row(materials=fibers(("cotton", 100), synthetic_share=0)), {})
+    assert cotton["level"] == "medium" and cotton["score"] > e["score"]
 
 
 def test_a_fabric_named_in_the_title_is_a_natural_fiber_estimate_for_eco(row):
     e = M.eco(row(category="jeans_pants", title="Levi's black denim jeans"), {})
     f = next(f for f in e["facts"] if f["kind"] == "natural_fibers")
-    assert e["score"] == 0.75 and f["value"] == "Denim (cotton)" and f["status"] == "claimed"
+    assert f["value"] == "Denim (cotton)" and f["status"] == "claimed" and e["score"] > M.eco(row(), {})["score"]
     e = M.eco(row(category="hoodies_sweatshirts", title="Champion fleece hoodie"), {})
-    assert kinds(e) == ["secondhand"] and e["score"] == 0.5
+    assert kinds(e) == ["secondhand", "fabric_unknown"]
+
+
+def test_eco_is_a_continuous_score_so_a_result_list_can_be_ranked(row):
+    """Within one search every item is secondhand, so what separates them: natural-fiber share (end of life),
+    how long it will last (fewer replacements), where it ships from, and circularity (vintage, recycled, certified)."""
+    base = M.eco(row(), {})["score"]
+    blend = M.eco(row(materials=fibers(("cotton", 60), ("polyester", 40), synthetic_share=40)), {})["score"]
+    cotton = M.eco(row(materials=fibers(("cotton", 100), synthetic_share=0)), {})["score"]
+    assert M.eco(row(materials=fibers(("polyester", 100), synthetic_share=100)), {})["score"] < base < blend < cotton
+    assert M.eco(row(), {}, wears=120, typical=80)["score"] > base > M.eco(row(), {}, wears=50, typical=80)["score"]
+    us, abroad = M.eco(row(seller={"region": "US"}), {}), M.eco(row(seller={"region": "MY"}), {})
+    assert us["score"] > abroad["score"]
+    assert [f["value"] for f in us["facts"] if f["kind"] == "shipping"] == ["Ships from the US"]
+    assert [f["value"] for f in abroad["facts"] if f["kind"] == "shipping"] == ["Ships from MY: long haul"]
+    lasting = M.eco(row(), {}, wears=120, typical=80)
+    assert [f["value"] for f in lasting["facts"] if f["kind"] == "durability"] == ["Expected 120 wears, typical 80: fewer replacements"]
+
+
+def test_eco_levels_from_the_score(row):
+    assert M.eco(row(materials=fibers(("polyester", 100), synthetic_share=100), seller={"region": "US"}), {})["level"] == "low"
+    r = row(materials=fibers(("cotton", 100), synthetic_share=0), seller={"region": "US"},
+            flags={"is_vintage": True, "is_deadstock": False, "is_upcycled": False})
+    assert M.eco(r, {})["level"] == "high"
 
 
 def test_vintage_plus_recycled_is_high(row):
@@ -117,7 +141,7 @@ def test_certifications_count_at_most_twice_including_the_brands(row):
     r = row(brand="Patagonia", materials=fibers(("cotton", 100), organic=True, certs=["gots", "oeko_tex", "bluesign"]))
     e = M.eco(r, BRANDS)
     assert kinds(e).count("certification") == 4          # 3 on the listing + the brand's Fair Trade
-    assert e["level"] == "high" and e["score"] == 1.0    # organic + 2 (capped) = 3 -> clamped
+    assert e["level"] == "high" and e["score"] > 0.75
 
 
 def test_animal_materials_are_a_neutral_fact(row):
