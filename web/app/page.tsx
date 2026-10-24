@@ -1,11 +1,10 @@
-'use client';
+import type { Viewport } from 'next';
+import { Landing } from '@/components/landing/landing';
 
-import { useRouter } from 'next/navigation';
-import { IntroScreen } from '@/components/sift/intro-screen';
+// Safari's bars match the cobalt stage.
+export const viewport: Viewport = { themeColor: '#2b4bf2' };
 
-// The scanner flow isn't built yet; actions open the design lab for now.
+/** Home: the wear dial landing. Its lens opens the camera. The other prototypes live at /landing/flip and /landing/race. */
 export default function Home() {
-    const router = useRouter();
-    const lab = () => router.push('/design#scan');
-    return <IntroScreen className='mx-auto w-full max-w-md flex-1' onScan={lab} onUpload={lab} onDescribe={lab} onSecretHold={lab} />;
+    return <Landing variant='dial' home />;
 }

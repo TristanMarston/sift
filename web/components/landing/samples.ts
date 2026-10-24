@@ -46,7 +46,7 @@ export type Racer = { garment: string; title: string; note: string; cents: numbe
 export const race = {
     wears: 150,
     fragile: { garment: 'tee-plain', title: 'Thin tee', note: 'Pills after ~25 wears', cents: 1200, lasts: 25 } satisfies Racer,
-    sturdy: { garment: 'tee-heather', title: 'Heavyweight tee', note: '150+ wears, per owners', cents: 4000, lasts: 150 } satisfies Racer,
+    sturdy: { garment: 'tee-heather', title: 'Heavyweight tee', note: 'Lasts 150+ wears', cents: 4000, lasts: 150 } satisfies Racer,
 };
 
 export const dialItems: Listing[] = [
@@ -58,3 +58,9 @@ export const dialItems: Listing[] = [
 
 /** `DEPOP · GOOD`, or `EBAY · NEW` for new with tags (the full phrase doesn't fit a phone card). */
 export const metaLine = (l: Pick<Listing, 'market' | 'condition'>) => `${l.market} · ${l.condition === 'New with tags' ? 'New' : l.condition}`.toUpperCase();
+
+/** "Midweight tee, new on eBay" or "Trucker jacket, used on Poshmark": where the listing is, in plain words. */
+export const listingLine = (l: Pick<Listing, 'title' | 'market' | 'condition'>) => {
+    const state = l.condition === 'New with tags' ? 'new' : l.condition === 'Like new' ? 'like new' : 'used';
+    return `${l.title}, ${state} on ${l.market}`;
+};

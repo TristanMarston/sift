@@ -34,3 +34,6 @@ export const byPerWear = <T extends Priced>(items: T[]) =>
 
 /** Where the cheapest item lands (1-based) once sorted by cost per wear: "The cheapest drops to #4". */
 export const cheapestDropsTo = <T extends Priced>(items: T[]) => byPerWear(items).indexOf(byPrice(items)[0]) + 1;
+
+/** The wear counts the dial stops at: once, a few, many, then all of them. Each stop shows a clearly lower cost per wear. */
+export const wearSteps = (wears: number) => [...[1, 5, 20, 50].filter((s) => s < wears), wears];

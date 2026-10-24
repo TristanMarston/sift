@@ -53,14 +53,15 @@ export function CameraBar({ mode = 'outfit', hint, flash, onFlash, onClose, onSh
 }
 
 /** White ring with a disc that presses in. */
-export function Shutter({ onClick }: { onClick?: () => void }) {
+export function Shutter({ onClick, disabled }: { onClick?: () => void; disabled?: boolean }) {
     return (
         <motion.button
             type='button'
             aria-label='Take photo'
             onClick={onClick}
-            whileTap='pressed'
-            className='grid size-[76px] place-items-center rounded-full border-4 border-camera-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-camera'
+            disabled={disabled}
+            whileTap={disabled ? undefined : 'pressed'}
+            className='grid size-[76px] place-items-center rounded-full border-4 border-camera-foreground outline-none transition-opacity duration-200 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-camera disabled:opacity-40'
         >
             <motion.span className='size-[58px] rounded-full bg-camera-foreground' variants={{ pressed: { scale: 0.86 } }} transition={spring.snappy} />
         </motion.button>

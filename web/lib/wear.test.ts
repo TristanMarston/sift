@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { breakEven, byPerWear, byPrice, cheapestDropsTo, perWear, spentAt, timesBought } from './wear.ts';
+import { breakEven, byPerWear, byPrice, cheapestDropsTo, perWear, spentAt, timesBought, wearSteps } from './wear.ts';
 
 test('perWear divides price by wears, in whole cents', () => {
     assert.equal(perWear(4000, 100), 40);
@@ -66,4 +66,12 @@ test('ties break by id so the order never flickers', () => {
 
 test('cheapestDropsTo gives the cheapest item’s rank once sorted by cost per wear', () => {
     assert.equal(cheapestDropsTo(tees), 4);
+});
+
+test('wearSteps walks from one wear to all of them in readable jumps', () => {
+    assert.deepEqual(wearSteps(200), [1, 5, 20, 50, 200]);
+    assert.deepEqual(wearSteps(80), [1, 5, 20, 50, 80]);
+    assert.deepEqual(wearSteps(50), [1, 5, 20, 50]);
+    assert.deepEqual(wearSteps(12), [1, 5, 12]);
+    assert.deepEqual(wearSteps(1), [1]);
 });

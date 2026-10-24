@@ -1,13 +1,15 @@
 'use client';
 
+import { Camera } from 'lucide-react';
 import { animate, AnimatePresence, motion, useMotionValue, useReducedMotion, useTransform, type AnimationPlaybackControls, type MotionValue } from 'motion/react';
 import { useEffect, useId, useRef, useState } from 'react';
+import { EstTag } from '@/components/sift/status-badge';
 import { price } from '@/lib/format';
 import { cutout } from '@/lib/garments';
 import { ease, spring } from '@/lib/motion';
-import { perWear } from '@/lib/wear';
+import { perWear, wearSteps } from '@/lib/wear';
 import { GarmentFigure } from './garment-figure';
-import { dialItems, metaLine } from './samples';
+import { dialItems, listingLine } from './samples';
 
 const BLADES = 8;
 const TICKS = 72;
@@ -80,12 +82,19 @@ function Dial({ progress }: { progress: MotionValue<number> }) {
 
 type Phase = 'idle' | 'count' | 'done';
 
-/** 5 · The lens is the scan button. An iris opens on a garment; as the ring counts wears, its price per wear drops. Tap to scan. */
+/** Cost per wear always shows cents, so the number keeps its width as it falls: $38.00, $7.60, $0.19. */
+const perWearText = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+const wearsText = (n: number) => `${n} ${n === 1 ? 'wear' : 'wears'}`;
+
+/**
+ * 5 · The lens is the scan button. An iris opens on a garment, then the price per wear steps down as the
+ * wear count climbs (1, 5, 20, 50, all), with the division spelled out under the lens. Tap to scan.
+ */
 export function HeroDial({ onOpen }: { onOpen: (el: HTMLElement) => void }) {
     const reduce = useReducedMotion();
     const ref = useRef<HTMLButtonElement>(null);
     const open = useMotionValue(0.06);
-    const wear = useMotionValue(0);
+    const wear = useMotionValue(1);
     const [i, setI] = useState(0);
     const [shown, setShown] = useState(false);
     const [phase, setPhase] = useState<Phase>('idle');
@@ -93,9 +102,10 @@ export function HeroDial({ onOpen }: { onOpen: (el: HTMLElement) => void }) {
     const g = cutout(item.garment);
     const cur = useRef(dialItems[0]); // the loop's garment, read by the transforms below
 
+    // Everything reads from one wear count, so the ring, the number and the division always agree.
     const progress = useTransform(wear, (w) => w / cur.current.wears);
-    const pw = useTransform(wear, (w) => price(w < 1 ? cur.current.cents : perWear(cur.current.cents, Math.round(w))));
-    const count = useTransform(wear, (w) => `Wear ${Math.round(w)}`);
+    const pw = useTransform(wear, (w) => perWearText(perWear(cur.current.cents, Math.max(1, Math.round(w)))));
+    const worn = useTransform(wear, (w) => wearsText(Math.max(1, Math.round(w))));
 
     useEffect(() => {
         let alive = true;
@@ -110,27 +120,32 @@ export function HeroDial({ onOpen }: { onOpen: (el: HTMLElement) => void }) {
                     setI(n);
                     wear.jump(cur.current.wears);
                     setPhase('done');
-                    await wait(4500);
+                    await wait(5000);
                 }
                 return;
             }
             for (let n = 0; alive; n++) {
                 cur.current = dialItems[n % dialItems.length];
                 setI(n);
-                wear.jump(0);
+                wear.jump(1);
                 setPhase('idle');
                 run = animate(open, 0.95, { type: 'spring', bounce: 0.12, duration: 0.8 });
                 await run;
                 if (!alive) break;
-                setShown(true);
-                await wait(900);
+                setShown(true); // worn once: cost per wear is the full price
+                await wait(1400);
                 if (!alive) break;
                 setPhase('count');
-                run = animate(wear, cur.current.wears, { duration: 3.4, ease: 'linear' });
-                await run;
+                for (const step of wearSteps(cur.current.wears).slice(1)) {
+                    run = animate(wear, step, { duration: 0.7, ease: [0.4, 0, 0.2, 1] });
+                    await run;
+                    if (!alive) break;
+                    await wait(550);
+                    if (!alive) break;
+                }
                 if (!alive) break;
                 setPhase('done');
-                await wait(2000);
+                await wait(2400);
                 if (!alive) break;
                 setShown(false);
                 run = animate(open, 0.06, { type: 'spring', bounce: 0, duration: 0.55 });
@@ -145,9 +160,11 @@ export function HeroDial({ onOpen }: { onOpen: (el: HTMLElement) => void }) {
         };
     }, [reduce, open, wear]);
 
+    // Sized from the hero's own box, so the lens, its label and the readout always fit whatever the screen.
     return (
-        <div className='absolute inset-0 grid place-items-center'>
-            <div className='-translate-y-[5%]'>
+        <div className='absolute inset-0 flex flex-col items-center justify-center [container-type:size] [--lens:min(62cqw,calc((100cqh-170px)/1.2),380px)] lg:[--lens:min(70cqw,calc((100cqh-240px)/1.2),460px)]'>
+            {/* Room for the dial ring, which reaches 10% past the lens. */}
+            <div className='grid size-[calc(var(--lens)*1.2)] shrink-0 place-items-center'>
                 <motion.button
                     ref={ref}
                     type='button'
@@ -155,42 +172,54 @@ export function HeroDial({ onOpen }: { onOpen: (el: HTMLElement) => void }) {
                     onClick={() => ref.current && onOpen(ref.current)}
                     whileTap={{ scale: 0.96 }}
                     transition={spring.snappy}
-                    className='relative size-[min(70vw,38dvh,400px)] rounded-full outline-none focus-visible:ring-4 focus-visible:ring-stage-foreground/60 lg:size-[min(38vw,62dvh,520px)]'
+                    className='relative size-(--lens) rounded-full outline-none focus-visible:ring-4 focus-visible:ring-stage-foreground/60'
                 >
                     <Dial progress={progress} />
                     <motion.div className='absolute -inset-[5%] rounded-full bg-stage-foreground/25 blur-2xl' animate={reduce ? undefined : { opacity: [0.45, 0.85, 0.45] }} transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }} aria-hidden />
                     <div className='absolute inset-0 rounded-full border-[6px] border-stage-foreground shadow-[0_0_48px_rgba(255,255,255,0.35)]' />
                     <div className='absolute inset-[6px] overflow-hidden rounded-full' style={{ background: 'radial-gradient(circle at 36% 28%, #2a3050 0%, #0e1020 60%, #07080f 100%)' }} aria-hidden>
                         <AnimatePresence mode='popLayout'>
-                            <motion.div key={item.id} className='absolute inset-x-[21%] top-[17%] bottom-[29%]' initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+                            <motion.div key={item.id} className='absolute inset-[18%]' initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
                                 <GarmentFigure g={g} traced={shown} line='#ffffff' />
                             </motion.div>
                         </AnimatePresence>
                         <Iris open={open} />
-                        <AnimatePresence>
-                            {shown && (
-                                <motion.div key={item.id} className='absolute inset-0' initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.15 } }} transition={{ duration: 0.35, ease: ease.out }}>
-                                    <span className='absolute inset-x-0 top-[9%] text-center type-label text-white/85 uppercase'>{metaLine(item)}</span>
-                                    <span className='absolute bottom-[15%] left-1/2 flex -translate-x-1/2 items-baseline gap-1 rounded-pill bg-stage-foreground px-3.5 py-1 whitespace-nowrap text-stage shadow-float'>
-                                        <motion.span className='font-serif text-[22px] leading-7 tabular lg:text-[28px] lg:leading-9'>{pw}</motion.span>
-                                        {phase !== 'idle' && <span className='type-footnote font-semibold'>a wear</span>}
-                                    </span>
-                                    <span className='absolute inset-x-0 bottom-[7%] text-center type-label text-white/85 uppercase'>
-                                        {phase === 'done' ? `${item.wears} wears · est.` : phase === 'count' ? <motion.span className='tabular'>{count}</motion.span> : 'Price'}
-                                    </span>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
                         <svg viewBox='-50 -50 100 100' className='pointer-events-none absolute inset-0 size-full' aria-hidden>
                             <path d='M-36 -18A40 40 0 0 1-14-37' fill='none' stroke='rgba(255,255,255,0.35)' strokeWidth='2.2' strokeLinecap='round' />
                         </svg>
                     </div>
-                    {/* Sits just outside the dial, at any lens size. */}
-                    <motion.span className='absolute top-[115%] left-1/2 -translate-x-1/2 type-callout whitespace-nowrap text-stage-foreground' animate={reduce ? undefined : { opacity: [0.6, 1, 0.6] }} transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}>
-                        Scan an outfit
-                    </motion.span>
                 </motion.button>
             </div>
+
+            {/* The lens's label sits right under the ring so it reads as part of it. Same action as the lens. */}
+            <motion.button
+                type='button'
+                tabIndex={-1}
+                aria-hidden
+                onClick={() => ref.current && onOpen(ref.current)}
+                whileTap={{ scale: 0.96 }}
+                transition={spring.snappy}
+                className='-mt-1 flex shrink-0 items-center gap-1.5 rounded-pill bg-stage-foreground px-4 py-2 type-callout font-semibold text-stage shadow-float'
+            >
+                <Camera className='size-4' strokeWidth={2} />
+                Scan an outfit
+            </motion.button>
+
+            <motion.div className='mt-5 flex flex-col items-center gap-1 text-center lg:mt-8' animate={{ opacity: shown ? 1 : 0, y: shown ? 0 : 6 }} transition={{ duration: 0.35, ease: ease.out }} aria-hidden>
+                <AnimatePresence mode='wait' initial={false}>
+                    <motion.span key={item.id} className='type-footnote text-stage-foreground/85 lg:type-callout' initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+                        {listingLine(item)}
+                    </motion.span>
+                </AnimatePresence>
+                <span className='flex items-baseline gap-1.5'>
+                    <motion.span className='font-serif text-[44px] leading-[44px] tracking-tight tabular lg:type-numeral'>{pw}</motion.span>
+                    <span className='type-callout text-stage-foreground/85'>a wear</span>
+                </span>
+                <span className='flex h-5 items-center gap-1.5 type-callout tabular text-stage-foreground/85'>
+                    {price(item.cents)} ÷ <motion.span className='font-semibold text-stage-foreground'>{worn}</motion.span>
+                    {phase === 'done' && <EstTag className='text-stage-foreground/85' />}
+                </span>
+            </motion.div>
         </div>
     );
 }

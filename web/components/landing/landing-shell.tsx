@@ -2,20 +2,23 @@
 
 import { Camera } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { CameraHandoff, type HandoffFrom } from './camera-handoff';
 import { VariantSwitcher } from './variant-switcher';
 import type { Variant } from './variants';
 
-export type OpenCamera = (el: HTMLElement | null, shape?: 'rect' | 'circle') => void;
+export type OpenCamera = (el: HTMLElement | null, shape?: 'rect' | 'circle', photo?: File | null) => void;
 
 // Source for the footnote (DESCRIPTION.md §18).
 const WRAP_URL = 'https://sustainablebrands.com/read/behavior-change/trending-while-wrap-scottish-designers-tout-merits-of-durable-fashion-mango-has-a-different-idea';
 const MARKETS = ['Depop', 'Poshmark', 'Grailed', 'Mercari', 'eBay'];
+const SCAN = '/scan';
+const atScan = () => window.location.pathname === SCAN;
 
 type Props = {
     variant: Variant;
+    home?: boolean; // the real home page: no prototype switcher
     scanButton?: boolean; // false when the centerpiece itself is the scan button
     hero: (open: OpenCamera) => React.ReactNode;
 };
@@ -24,17 +27,31 @@ type Props = {
  * Landing layout on the full cobalt stage (both themes). Phone: name on top, the centerpiece in the middle,
  * headline and actions below. Desktop: text on the left, centerpiece on the right.
  */
-export function LandingShell({ variant, scanButton = true, hero }: Props) {
+export function LandingShell({ variant, home = false, scanButton = true, hero }: Props) {
     const router = useRouter();
     const heroRef = useRef<HTMLDivElement>(null);
     const hold = useRef<ReturnType<typeof setTimeout>>(undefined);
+    const uploadRef = useRef<HTMLInputElement>(null);
     const [from, setFrom] = useState<HandoffFrom | null>(null);
+    const [file, setFile] = useState<File | null>(null);
 
-    const open: OpenCamera = (el, shape = 'rect') => {
+    // The camera lives at /scan over this page: Back (button or swipe) shrinks it back into the lens.
+    useEffect(() => {
+        const onPop = () => !atScan() && setFrom(null);
+        window.addEventListener('popstate', onPop);
+        return () => window.removeEventListener('popstate', onPop);
+    }, []);
+
+    const open: OpenCamera = (el, shape = 'rect', photo: File | null = null) => {
         if (!el) return;
         const r = el.getBoundingClientRect();
+        setFile(photo);
         setFrom({ x: r.left, y: r.top, w: r.width, h: r.height, shape });
+        if (!atScan()) window.history.pushState(null, '', SCAN);
     };
+    const close = () => (atScan() ? window.history.back() : setFrom(null));
+    // "Upload a photo" opens the photo picker right away, then the camera screen with that photo.
+    const uploaded = (photo?: File) => photo && open(heroRef.current, 'rect', photo);
     // Holding the name for 1s loads cached demo results. The results screen isn't built yet, so it opens the lab.
     const startHold = () => (hold.current = setTimeout(() => router.push('/design#scan'), 1000));
     const endHold = () => clearTimeout(hold.current);
@@ -45,7 +62,7 @@ export function LandingShell({ variant, scanButton = true, hero }: Props) {
                 <span className='type-wordmark select-none' onPointerDown={startHold} onPointerUp={endHold} onPointerLeave={endHold} onContextMenu={(e) => e.preventDefault()}>
                     Sift
                 </span>
-                <VariantSwitcher current={variant} />
+                {!home && <VariantSwitcher current={variant} />}
             </header>
 
             <main className='mx-auto flex w-full max-w-6xl flex-1 flex-col lg:grid lg:grid-cols-[1fr_1.1fr] lg:items-center lg:gap-16 lg:px-8 lg:pb-12'>
@@ -62,7 +79,17 @@ export function LandingShell({ variant, scanButton = true, hero }: Props) {
                             Scan an outfit
                         </Button>
                     )}
-                    <Button variant='stage-link' size='sm' onClick={() => router.push('/design#scan')} className={scanButton ? 'self-center px-1 lg:self-start' : 'self-start px-1'}>
+                    <input
+                        ref={uploadRef}
+                        type='file'
+                        accept='image/*'
+                        className='hidden'
+                        onChange={(e) => {
+                            uploaded(e.target.files?.[0]);
+                            e.target.value = '';
+                        }}
+                    />
+                    <Button variant='stage-link' size='sm' onClick={() => uploadRef.current?.click()} className={scanButton ? 'self-center px-1 lg:self-start' : 'self-start px-1'}>
                         Upload a photo
                     </Button>
                     <footer className='flex flex-col gap-1.5 border-t border-stage-foreground/20 pt-3 lg:max-w-md'>
@@ -77,7 +104,7 @@ export function LandingShell({ variant, scanButton = true, hero }: Props) {
                 </div>
             </main>
 
-            <CameraHandoff from={from} onClose={() => setFrom(null)} />
+            <CameraHandoff from={from} file={file} onClose={close} />
         </div>
     );
 }

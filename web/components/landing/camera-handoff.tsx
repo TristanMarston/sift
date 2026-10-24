@@ -1,8 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion } from 'motion/react';
-import { useRouter } from 'next/navigation';
-import { CameraBar } from '@/components/sift/camera-controls';
+import { CameraScreen } from '@/components/camera/camera-screen';
 
 export type HandoffFrom = { x: number; y: number; w: number; h: number; shape: 'rect' | 'circle'; radius?: number };
 
@@ -18,9 +17,10 @@ function clips(f: HandoffFrom) {
     return { from: `inset(${f.y}px ${vw - f.x - f.w}px ${vh - f.y - f.h}px ${f.x}px round ${r}px)`, to: 'inset(0px 0px 0px 0px round 0px)' };
 }
 
+type Props = { from: HandoffFrom | null; file?: File | null; onClose: () => void };
+
 /** The centerpiece grows into the camera. Closing shrinks it back into the same place. */
-export function CameraHandoff({ from, onClose }: { from: HandoffFrom | null; onClose: () => void }) {
-    const router = useRouter();
+export function CameraHandoff({ from, file, onClose }: Props) {
     const c = from ? clips(from) : null;
     return (
         <AnimatePresence>
@@ -33,14 +33,13 @@ export function CameraHandoff({ from, onClose }: { from: HandoffFrom | null; onC
                     exit={{ clipPath: c.from }}
                     transition={{ type: 'spring', bounce: 0, duration: 0.55 }}
                 >
-                    <motion.div className='absolute inset-0' initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { delay: 0.3, duration: 0.3 } }} exit={{ opacity: 0, transition: { duration: 0.12 } }}>
-                        {/* Viewfinder placeholder until the real camera flow exists. */}
-                        <div className='absolute inset-x-0 top-14 mx-auto aspect-[3/4] max-w-md'>
-                            <div className='absolute top-1/2 left-1/2 size-24 -translate-1/2 rounded-3xl border-2 border-camera-foreground/40' />
-                        </div>
-                        <div className='absolute inset-0 mx-auto max-w-md'>
-                            <CameraBar onClose={onClose} onShutter={() => router.push('/design#scan')} onUpload={() => router.push('/design#scan')} />
-                        </div>
+                    <motion.div
+                        className='absolute inset-0'
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1, transition: { delay: 0.25, duration: 0.3 } }}
+                        exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                    >
+                        <CameraScreen onClose={onClose} initialFile={file} />
                     </motion.div>
                 </motion.div>
             )}
