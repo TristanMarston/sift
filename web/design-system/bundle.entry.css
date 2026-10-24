@@ -1,0 +1,9 @@
+/* Stylesheet for the design-system page. Token values come from the page's own tokens.css. */
+@import "tailwindcss" source(none);
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "../app/theme.css";
+
+@source "../components";
+@source "../lib";
+@source "./entry.tsx";
