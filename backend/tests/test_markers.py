@@ -170,3 +170,10 @@ def test_faux_and_pu_leather_score_low(row):
 
 def test_construction_words_are_matched_as_words(row):
     assert "construction" not in kinds(M.quality(row(title="Waxed-look nylon bomber, not heavyweightish"), {})[0])
+
+
+def test_a_certification_the_listing_and_the_brand_both_state_counts_once(row):
+    r = row(brand="Patagonia", materials=fibers(("cotton", 100), certs=["fair_trade"]))
+    e = M.eco(r, BRANDS)
+    assert [f["value"] for f in e["facts"] if f["kind"] == "certification"] == ["Fair Trade"]
+    assert e["score"] == M.eco(row(brand="Patagonia", materials=fibers(("cotton", 100))), BRANDS)["score"]
