@@ -1,0 +1,171 @@
+"""Per-marketplace mappers, tested on sanitized real samples in tests/fixtures/."""
+import copy
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+
+import pytest
+
+from listing import Normalized
+from normalize import depop, ebay, grailed, poshmark
+from normalize.common import Drop
+
+FIX = Path(__file__).parent / "fixtures"
+NOW = datetime(2026, 10, 24, tzinfo=timezone.utc)
+MAPPERS = {"depop": depop.map_item, "poshmark": poshmark.map_item, "grailed": grailed.map_item, "ebay": ebay.map_item}
+
+
+def fx(mp):
+    return json.loads((FIX / f"{mp}.json").read_text())
+
+
+def mapped(mp, i=0, query_category="tshirts", **override):
+    raw = copy.deepcopy(fx(mp)[i])
+    raw.update(override)
+    return MAPPERS[mp](raw, query_category, NOW)
+
+
+@pytest.mark.parametrize("mp", MAPPERS)
+def test_every_real_sample_maps_to_a_valid_row_and_the_label_beats_the_query_category(mp):
+    for raw in fx(mp):
+        n = MAPPERS[mp](copy.deepcopy(raw), "tshirts", NOW)
+        assert isinstance(n, Normalized) and n.id.startswith(mp + ":") and n.id.endswith(n.external_id)
+        assert n.category == "jackets_outerwear" and n.image_urls and n.seller.region and n.scraped_at == NOW
+        assert n.status == "active" and n.cost.currency == "USD" and n.title and n.description
+
+
+@pytest.mark.parametrize("mp", MAPPERS)
+def test_a_missing_label_falls_back_to_the_query_category(mp):
+    labels = {"depop": dict(category=None, productType=None, group=None), "poshmark": dict(category=None, breadcrumbs=[]),
+              "grailed": dict(category=None, categoryPath=None), "ebay": dict(categoryPath=None)}[mp]
+    assert mapped(mp, query_category="sneakers", **labels).category == "sneakers"
+
+
+@pytest.mark.parametrize("mp, label", [
+    ("depop", dict(category="Accessories", productType="hats", group="hats")),
+    ("poshmark", dict(category="Hats", breadcrumbs=["Women", "Accessories", "Hats"])),
+    ("grailed", dict(category="accessories", categoryPath="accessories.hats")),
+    ("ebay", dict(categoryPath="Clothing, Shoes & Accessories > Men > Men's Accessories > Hats")),
+])
+def test_a_hat_is_dropped_not_filed_under_the_query_category(mp, label):
+    with pytest.raises(Drop, match="unmapped_category"):
+        mapped(mp, query_category="jackets_outerwear", **label)
+
+
+@pytest.mark.parametrize("mp, override, reason", [
+    ("depop", dict(price={"amount": None, "currency": "USD"}), "no_price"),
+    ("depop", dict(price={"amount": 20, "currency": "GBP"}), "non_usd"),
+    ("depop", dict(pictureUrls=[]), "no_image"),
+    ("depop", dict(url=None), "no_url"),
+    ("poshmark", dict(price=None), "no_price"),
+    ("poshmark", dict(currency="CAD"), "non_usd"),
+    ("poshmark", dict(images=[], main_image=None), "no_image"),
+    ("poshmark", dict(breadcrumbs=["Kids", "Boys", "Jackets & Coats"]), "kids"),
+    ("grailed", dict(price=None), "no_price"),
+    ("grailed", dict(photos=[], coverPhoto=None), "no_image"),
+    ("ebay", dict(priceValue=None), "no_price"),
+    ("ebay", dict(currency="GBP"), "non_usd"),
+    ("ebay", dict(images=[]), "no_image"),
+    ("ebay", dict(categoryPath="Clothing, Shoes & Accessories > Kids > Boys > Coats, Jackets & Vests"), "kids"),
+])
+def test_unusable_records_are_dropped_with_a_reason(mp, override, reason):
+    with pytest.raises(Drop, match=reason):
+        mapped(mp, **override)
+
+
+# --- Depop ----------------------------------------------------------------------------------
+
+def test_depop_fields():
+    n = mapped("depop", 0)
+    assert (n.id, n.external_id, n.brand, n.subcategory, n.size, n.color) == \
+           ("depop:965376720", "965376720", "The North Face", "jackets", "L", "white")
+    assert (n.condition, n.condition_raw) == ("like_new", "Used - like new")
+    assert n.url == "https://www.depop.com/products/seller-the-north-face-white-fuzzy-f24d/"
+    assert (n.cost.price_cents, n.cost.original_price_cents, n.cost.shipping_cents, n.cost.total_cents) == (2850, 3000, None, 2850)
+    assert (n.seller.region, n.seller.type, n.seller.rating) == ("US", None, None) and n.specifics == {}
+
+
+def test_depop_first_size_no_colour_and_no_markdown():
+    n = mapped("depop", 2)
+    assert n.size == "XL" and n.condition == "like_new" and n.cost.original_price_cents is None
+    assert mapped("depop", 1).color is None
+
+
+def test_depop_sold_and_non_us_seller_with_a_usd_price_is_kept_with_its_region():
+    n = mapped("depop", 0, isSold=True, country="GB")
+    assert n.status == "sold" and n.seller.region == "GB"
+
+
+# --- Poshmark -------------------------------------------------------------------------------
+
+def test_poshmark_fields():
+    n = mapped("poshmark", 0)
+    assert (n.id, n.brand, n.size, n.color, n.subcategory) == ("poshmark:6acbf84b28951ffc17205cc0", "The North Face", "M", "Blue", "Jackets & Coats")
+    assert (n.cost.price_cents, n.cost.original_price_cents, n.cost.total_cents) == (9000, 22500, 9000)
+    assert (n.condition, n.condition_raw, n.seller.region) == (None, None, "US")
+    assert n.title == fx("poshmark")[0]["name"] and len(n.image_urls) == 3
+
+
+def test_poshmark_status():
+    assert mapped("poshmark", 0, listing_status="sold_out").status == "sold"
+    assert mapped("poshmark", 0, in_stock=False).status == "sold"
+
+
+# --- Grailed --------------------------------------------------------------------------------
+
+def test_grailed_fields_and_us_shipping():
+    n = mapped("grailed", 0)
+    assert (n.id, n.brand, n.size, n.condition, n.subcategory) == ("grailed:109434912", "The North Face", "l", "new_with_tags", "vests")
+    assert (n.cost.price_cents, n.cost.original_price_cents, n.cost.shipping_cents, n.cost.total_cents) == (8500, 13000, 1499, 9999)
+    assert (n.seller.region, n.seller.type, n.seller.listing_count, n.seller.rating) == ("US", "individual", 2, None)
+
+
+def test_grailed_seller_country_not_listing_region_and_big_sellers():
+    n = mapped("grailed", 1)     # item listed in Europe by a US seller with 70k listings
+    assert (n.seller.region, n.seller.type, n.condition) == ("US", "large_reseller", "good")
+    assert n.seller.rating == pytest.approx(4.81, abs=0.01)
+
+
+def test_grailed_free_shipping_no_markdown_and_foreign_seller_kept():
+    n = mapped("grailed", 3)
+    assert (n.cost.free_shipping, n.cost.original_price_cents, n.cost.total_cents) == (True, None, 71400)
+    assert (n.seller.region, n.condition) == ("CN", "like_new")
+
+
+def test_grailed_without_us_shipping_has_unknown_shipping():
+    n = mapped("grailed", 0, shipping={"us": {"amount": 20, "enabled": False}})
+    assert n.cost.shipping_cents is None and n.cost.total_cents == 8500
+
+
+# --- eBay -----------------------------------------------------------------------------------
+
+def test_ebay_fields():
+    n = mapped("ebay", 0)
+    assert (n.id, n.brand, n.size, n.color, n.subcategory) == ("ebay:860021552093", "The North Face", "L", "TNF Black / TNF White Logo", "Jacket")
+    assert n.url == "https://www.ebay.com/itm/860021552093"
+    assert (n.condition, n.condition_raw, n.status, n.seller.region) == ("like_new", "Pre-owned - Excellent", "active", "US")
+    assert (n.cost.price_cents, n.cost.shipping_cents, n.cost.free_shipping, n.cost.total_cents) == (15500, 0, True, 15500)
+    assert n.specifics["Outer Shell Material"] == "Nylon" and n.specifics["Product Line"] == "The North Face Nuptse"
+
+
+def test_ebay_paid_shipping_adds_up_to_the_total_ebay_shows():
+    n = mapped("ebay", 1)
+    assert (n.cost.price_cents, n.cost.shipping_cents, n.cost.free_shipping, n.cost.total_cents) == (2599, 666, False, 3265)
+
+
+def test_ebay_seller_type_and_rating_scale():
+    private = mapped("ebay", 2).seller
+    big = mapped("ebay", 3).seller
+    assert (private.type, private.rating) == ("individual", 5.0)
+    assert (big.type, big.rating) == ("large_reseller", pytest.approx(4.99, abs=0.02))
+    assert mapped("ebay", 3, sellerFeedbackScore=40).seller.type == "small_shop"
+
+
+def test_ebay_condition_uses_only_the_label_before_the_seller_prose_and_html_entities_are_decoded():
+    assert mapped("ebay", 3).condition == "good"
+    assert "&#039;" not in mapped("ebay", 1).description and "men's" in mapped("ebay", 1).description
+
+
+def test_ebay_foreign_item_location_is_kept_with_its_country_and_ended_listings_are_sold():
+    n = mapped("ebay", 0, itemLocation="Located in China", listingStatus="ENDED")
+    assert n.seller.region == "China" and n.status == "sold"
