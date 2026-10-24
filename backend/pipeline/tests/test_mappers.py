@@ -207,6 +207,11 @@ def test_ebay_fields():
     assert n.specifics["Outer Shell Material"] == "Nylon" and n.specifics["Product Line"] == "The North Face Nuptse"
 
 
+def test_ebay_shoes_have_their_size_under_us_shoe_size():
+    spec = {k: v for k, v in fx("ebay")[0]["itemSpecifics"].items() if k != "Size"}
+    assert mapped("ebay", 0, itemSpecifics={**spec, "US Shoe Size": "10.5", "UK Shoe Size": "9.5"}).size == "10.5"
+
+
 def test_ebay_paid_shipping_adds_up_to_the_total_ebay_shows():
     n = mapped("ebay", 1)
     assert (n.cost.price_cents, n.cost.shipping_cents, n.cost.free_shipping, n.cost.total_cents) == (2599, 666, False, 3265)

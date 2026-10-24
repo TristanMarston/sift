@@ -36,7 +36,7 @@ def map_item(raw: dict, category: str, scraped_at) -> Normalized:
         status="active" if raw.get("listingStatus") == "ACTIVE" else "sold", scraped_at=scraped_at,
         brand=normalize_brand(raw.get("brand") or spec.get("Brand")),
         category=resolve_category(" > ".join(filter(None, [path, spec.get("Type")])), category),
-        subcategory=spec.get("Type"), size=spec.get("Size"), color=spec.get("Color"),
+        subcategory=spec.get("Type"), size=spec.get("Size") or spec.get("US Shoe Size"), color=spec.get("Color"),
         condition=map_condition(condition), condition_raw=condition,
         image_urls=require(clean_images(raw.get("images")), "no_image"),
         cost=make_cost(raw.get("priceValue"), raw.get("currency"), shipping=raw.get("shippingCost"),
