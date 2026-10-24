@@ -1,5 +1,6 @@
 // Turning the live camera or an uploaded file into the photo we search. Browser-only.
 import { coverCrop, fitLongEdge } from '@/lib/photo';
+import { cropRect } from '@/lib/results';
 
 export type Shot = { url: string; blob: Blob; aspect: number }; // aspect = width / height
 
@@ -32,4 +33,16 @@ export async function photoFromFile(file: File): Promise<Shot> {
     canvas.getContext('2d')!.drawImage(bitmap, 0, 0, w, h);
     bitmap.close();
     return toShot(canvas);
+}
+
+/** One garment cut from the photo with a little padding: what /search looks at. */
+export async function cropShot(shot: Shot, box: { x: number; y: number; w: number; h: number }): Promise<Blob> {
+    const bitmap = await createImageBitmap(shot.blob);
+    const { sx, sy, sw, sh } = cropRect(box, bitmap.width, bitmap.height);
+    const canvas = document.createElement('canvas');
+    canvas.width = sw;
+    canvas.height = sh;
+    canvas.getContext('2d')!.drawImage(bitmap, sx, sy, sw, sh, 0, 0, sw, sh);
+    bitmap.close();
+    return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not crop the photo'))), 'image/jpeg', 0.9));
 }

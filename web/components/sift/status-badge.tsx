@@ -1,11 +1,11 @@
 import { cn } from '@/lib/utils';
 import type { BadgeStatus } from '@/lib/types';
 
-const LABEL: Record<BadgeStatus, string> = { verified: 'Verified', claimed: 'Claimed', unknown: 'Unknown' };
+const LABEL: Record<BadgeStatus, string> = { verified: 'Verified', claimed: 'Claimed', inferred: 'Likely', unknown: 'Unknown' };
 
-/** Shape carries the meaning, color backs it up: solid, half, hollow. */
+/** Shape carries the meaning, color backs it up: solid (verified), half (as declared), dashed ring (likely), hollow (unknown). */
 export function StatusDot({ status, className }: { status: BadgeStatus; className?: string }) {
-    const color = { verified: 'text-verified', claimed: 'text-claimed', unknown: 'text-unknown' }[status];
+    const color = { verified: 'text-verified', claimed: 'text-claimed', inferred: 'text-claimed', unknown: 'text-unknown' }[status];
     return (
         <svg viewBox='0 0 10 10' aria-hidden className={cn('size-2.5 shrink-0', color, className)}>
             {status === 'verified' && <circle cx='5' cy='5' r='4.5' fill='currentColor' />}
@@ -15,6 +15,7 @@ export function StatusDot({ status, className }: { status: BadgeStatus; classNam
                     <path d='M5 1a4 4 0 0 0 0 8z' fill='currentColor' />
                 </>
             )}
+            {status === 'inferred' && <circle cx='5' cy='5' r='4' fill='none' stroke='currentColor' strokeWidth='1.5' strokeDasharray='2.1 1.5' />}
             {status === 'unknown' && <circle cx='5' cy='5' r='4' fill='none' stroke='currentColor' strokeWidth='1.5' />}
         </svg>
     );

@@ -4,12 +4,15 @@ import { CameraOff, Images, RotateCcw, SwitchCamera, X, Zap, ZapOff } from 'luci
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Shutter } from '@/components/sift/camera-controls';
+import { GarmentCutout } from '@/components/sift/garment-tabs';
 import { Notice } from '@/components/sift/notice';
+import { SearchCounter } from '@/components/sift/search-counter';
 import { ScanTrace, type ScanPhase } from '@/components/sift/scan-trace';
 import { Button } from '@/components/ui/button';
 import { detect } from '@/lib/api';
 import { toGarments } from '@/lib/detect';
-import { ease } from '@/lib/motion';
+import { ease, spring } from '@/lib/motion';
+import { MARKET } from '@/lib/results';
 import type { Garment } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { captureFrame, photoFromFile, type Shot } from './capture';
@@ -17,10 +20,18 @@ import { useCamera } from './use-camera';
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const SCAN_AT_LEAST = 1400; // the scan line gets one full pass even when detection is instant
+const MARKETS = Object.values(MARKET);
+
+export type SearchState = { total: number; elapsedMs?: number; lifted: boolean; selectedId: string };
 
 type Props = {
     onClose: () => void;
     initialFile?: File | null; // opened from "Upload a photo": skip the live camera until Retake
+    onTraced?: (shot: Shot, garments: Garment[]) => void; // tracing landed: start the search
+    onRetake?: () => void;
+    search?: SearchState | null; // while set, the search counter replaces the shutter row
+    onShowResults?: () => void; // after Back from results: the finished counter reopens them
+    handedOff?: boolean; // results are showing: the lifted garment now lives in their header, and the camera rests
 };
 
 /**
@@ -28,11 +39,11 @@ type Props = {
  * then the hint, upload, shutter and camera flip. The shutter flashes and freezes the frame, the scan line
  * runs while garments are found, then each garment is traced. Retake is always one tap away.
  */
-export function CameraScreen({ onClose, initialFile }: Props) {
+export function CameraScreen({ onClose, initialFile, onTraced, onRetake, search, onShowResults, handedOff = false }: Props) {
     const reduce = useReducedMotion();
     const fileRef = useRef<HTMLInputElement>(null);
     const [wantCamera, setWantCamera] = useState(!initialFile);
-    const { videoRef, status, mirrored, canFlip, torch, flip, toggleTorch, retry } = useCamera(wantCamera);
+    const { videoRef, status, mirrored, canFlip, torch, flip, toggleTorch, retry } = useCamera(wantCamera && !handedOff); // camera light off while results show
     const [shot, setShot] = useState<Shot | null>(null);
     const [phase, setPhase] = useState<ScanPhase>('scanning');
     const [garments, setGarments] = useState<Garment[]>([]);
@@ -77,10 +88,12 @@ export function CameraScreen({ onClose, initialFile }: Props) {
         setShot(null);
         setGarments([]);
         setWantCamera(true);
+        onRetake?.();
     };
 
     const live = !shot && status === 'live';
-    const hint = shot ? (phase === 'done' ? doneLine(garments) : '') : live ? 'Fit the whole outfit' : '';
+    const hint = live ? 'Fit the whole outfit' : '';
+    const lifted = search?.lifted ? garments.find((g) => g.id === search.selectedId) : undefined;
 
     return (
         <div className='relative flex size-full flex-col bg-camera text-camera-foreground select-none'>
@@ -123,8 +136,31 @@ export function CameraScreen({ onClose, initialFile }: Props) {
                 </div>
                 {shot && (
                     <div className='absolute inset-0 grid place-items-center sm:px-4'>
-                        <div style={{ width: `min(100cqw, calc(100cqh * ${shot.aspect}), 448px)` }}>
-                            <ScanTrace garments={garments} phase={phase} photo={shot.url} aspect={shot.aspect} onTraced={() => setPhase('done')} className='w-full sm:rounded-[14px]' />
+                        <div className='relative' style={{ width: `min(100cqw, calc(100cqh * ${shot.aspect}), 448px)` }}>
+                            <ScanTrace
+                                garments={garments}
+                                phase={phase}
+                                photo={shot.url}
+                                aspect={shot.aspect}
+                                onTraced={() => {
+                                    setPhase('done');
+                                    onTraced?.(shot, garments);
+                                }}
+                                className='w-full sm:rounded-[14px]'
+                            />
+                            {/* The garment lifts out of the photo, then flies into the results header (same layoutId). */}
+                            {lifted && !handedOff && (
+                                <motion.div
+                                    layoutId={`garment-${lifted.id}`}
+                                    className='absolute drop-shadow-[0_18px_28px_rgba(0,0,0,0.5)]'
+                                    style={{ left: `${lifted.bbox.x * 100}%`, top: `${lifted.bbox.y * 100}%`, width: `${lifted.bbox.w * 100}%`, height: `${lifted.bbox.h * 100}%` }}
+                                    initial={{ scale: 1 }}
+                                    animate={{ scale: 1.04 }}
+                                    transition={spring.ui}
+                                >
+                                    <GarmentCutout garment={lifted} src={shot.url} aspect={shot.aspect} />
+                                </motion.div>
+                            )}
                         </div>
                     </div>
                 )}
@@ -136,12 +172,22 @@ export function CameraScreen({ onClose, initialFile }: Props) {
                 </AnimatePresence>
             </div>
 
-            {/* Bottom band */}
-            <div className='flex shrink-0 flex-col items-center gap-4 px-4 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]'>
+            {/* Bottom band: the shutter row, or the live search counter once garments are traced. */}
+            <div className='relative flex shrink-0 flex-col items-center gap-4 px-4 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]'>
+                <AnimatePresence>
+                    {search && (
+                        <motion.div key='counter' className='absolute inset-x-4 bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-10 mx-auto max-w-md' initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 40 }} transition={spring.sheet}>
+                            {/* Always the same element, so the count never restarts. After Back from results it reopens them. */}
+                            <button type='button' onClick={onShowResults} disabled={!onShowResults || search.lifted} aria-label={onShowResults ? 'Show results' : undefined} className='block w-full rounded-card text-left outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default'>
+                                <SearchCounter total={search.total} marketplaces={MARKETS} elapsedMs={search.elapsedMs} />
+                            </button>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
                 <p className='h-5 type-callout text-camera-muted' aria-live='polite'>
                     {hint}
                 </p>
-                <div className='grid w-full max-w-md grid-cols-[1fr_auto_1fr] items-center'>
+                <div className={cn('grid w-full max-w-md grid-cols-[1fr_auto_1fr] items-center transition-opacity duration-200', search && 'pointer-events-none opacity-0')}>
                     <Button variant='camera' size='icon' aria-label='Upload a photo' onClick={() => fileRef.current?.click()} className='justify-self-start'>
                         <Images strokeWidth={1.75} />
                     </Button>
@@ -168,12 +214,6 @@ export function CameraScreen({ onClose, initialFile }: Props) {
             />
         </div>
     );
-}
-
-/** What the bottom hint says once tracing lands. Search and results are the next screens to build. */
-function doneLine(garments: Garment[]) {
-    if (garments.length === 1 && garments[0].category === '') return 'Searching the whole photo. Results come next.';
-    return `Found ${garments.length} ${garments.length === 1 ? 'garment' : 'garments'}. Results come next.`;
 }
 
 type StateProps = { status: ReturnType<typeof useCamera>['status']; waiting: boolean; onUpload: () => void; onRetry: () => void };
