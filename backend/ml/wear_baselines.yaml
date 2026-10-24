@@ -1,0 +1,14 @@
+# Expected wears per category before any evidence: the baseline of every cost-per-wear number.
+# DRAFT team assumptions (Oct 23, 2026), shown on every receipt as an assumption.
+# TODO(Anthony): replace each `source` with a cited benchmark (WRAP clothing longevity, Ellen MacArthur Foundation).
+as_of: 2026-10-23
+source: Sift team assumption (draft), to be replaced with a cited benchmark
+categories:
+  tshirts:             {low: 30,  high: 60}
+  hoodies_sweatshirts: {low: 50,  high: 100}
+  shirts:              {low: 40,  high: 80}
+  sweaters_knitwear:   {low: 50,  high: 100}
+  jeans_pants:         {low: 60,  high: 120}
+  jackets_outerwear:   {low: 80,  high: 160}
+  sneakers:            {low: 100, high: 250}
+  dresses_skirts:      {low: 20,  high: 50}

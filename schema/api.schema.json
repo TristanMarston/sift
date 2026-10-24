@@ -79,12 +79,42 @@
       }
     },
 
+    "IdList": {"type": "array", "items": {"type": "string"}, "maxItems": 50},
+
     "SearchResponse": {
       "type": "object",
-      "required": ["query", "typical", "results"],
+      "required": ["query", "typical", "results", "orders", "slider", "headline"],
       "additionalProperties": false,
       "properties": {
         "query": {"$ref": "#/$defs/SearchParams"},
+        "orders": {
+          "description": "Result ids in display order for each sort. results[] itself is in cpw order.",
+          "type": "object",
+          "required": ["cpw", "price", "match", "eco"],
+          "additionalProperties": false,
+          "properties": {
+            "cpw": {"$ref": "#/$defs/IdList"},
+            "price": {"$ref": "#/$defs/IdList"},
+            "match": {"$ref": "#/$defs/IdList"},
+            "eco": {"$ref": "#/$defs/IdList"}
+          }
+        },
+        "slider": {
+          "description": "11 orders for the match <-> value slider: slider[i] is the order at weight i/10 (0 = best value, 1 = closest match).",
+          "type": "array",
+          "minItems": 11,
+          "maxItems": 11,
+          "items": {"$ref": "#/$defs/IdList"}
+        },
+        "headline": {
+          "type": "object",
+          "required": ["cheapest_id", "cheapest_rank_by_cpw"],
+          "additionalProperties": false,
+          "properties": {
+            "cheapest_id": {"type": ["string", "null"]},
+            "cheapest_rank_by_cpw": {"type": ["integer", "null"], "minimum": 1}
+          }
+        },
         "typical": {
           "oneOf": [
             {"type": "null"},
@@ -164,9 +194,12 @@
         },
         "match": {
           "type": "object",
-          "required": ["similarity"],
+          "required": ["similarity", "band"],
           "additionalProperties": false,
-          "properties": {"similarity": {"$ref": "#/$defs/Unit"}}
+          "properties": {
+            "similarity": {"$ref": "#/$defs/Unit"},
+            "band": {"enum": ["exact", "similar"]}
+          }
         },
         "cost": {
           "type": "object",
@@ -214,7 +247,7 @@
         "eco": {"$ref": "#/$defs/Marker"},
         "wear": {
           "type": "object",
-          "required": ["expected_wears", "basis", "cpw_cents", "break_even_wears"],
+          "required": ["expected_wears", "basis", "cpw_cents", "break_even_wears", "facts"],
           "additionalProperties": false,
           "properties": {
             "expected_wears": {
@@ -239,7 +272,8 @@
                 "at_mid": {"$ref": "#/$defs/Cents"}
               }
             },
-            "break_even_wears": {"type": ["integer", "null"], "minimum": 1}
+            "break_even_wears": {"type": ["integer", "null"], "minimum": 1},
+            "facts": {"type": "array", "items": {"$ref": "#/$defs/Fact"}}
           }
         },
         "confidence": {"$ref": "#/$defs/Level"},
