@@ -1,10 +1,7 @@
 'use client';
 
-import { ChevronDown, ExternalLink } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
-import { useState } from 'react';
+import { ExternalLink } from 'lucide-react';
 import { StatusDot } from '@/components/sift/status-badge';
-import { ease } from '@/lib/motion';
 import { dots, levelText } from '@/lib/results';
 import type { Fact, FactStatus, Level, Result } from '@/lib/search';
 import { cn } from '@/lib/utils';
@@ -56,47 +53,34 @@ const SOURCE: Record<string, string> = {
 };
 
 /** "cotton" reads as "Cotton"; "eBay" stays as it is. */
-const sentence = (v: string) => (/^[a-z](?![A-Z])/.test(v) ? v[0].toUpperCase() + v.slice(1) : v);
+export const sentence = (v: string) => (/^[a-z](?![A-Z])/.test(v) ? v[0].toUpperCase() + v.slice(1) : v);
 
 const date = (iso: string) => {
     const d = new Date(`${iso}T12:00:00`);
     return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
-/**
- * One receipt line: a small label and how sure we are on top, the value below in full size. Tap it for where it
- * came from: source, the words it was read from, and the date.
- */
-export function FactLine({ fact }: { fact: Fact }) {
-    const [open, setOpen] = useState(false);
+/** One fact, in full: what it is, how sure we are, and where it came from (the words, the source, the date). */
+export function FactRow({ fact }: { fact: Fact }) {
     return (
-        <li>
-            <button type='button' aria-expanded={open} onClick={() => setOpen((o) => !o)} className='w-full rounded-md py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring'>
-                <span className='flex items-center gap-1.5 type-footnote text-muted-foreground'>
-                    <StatusDot status={fact.status} />
-                    <span className='min-w-0 flex-1 truncate'>{fact.label}</span>
-                    <span className='shrink-0'>{STATUS_WORD[fact.status]}</span>
-                    <ChevronDown className={cn('size-4 shrink-0 transition-transform duration-200', open && 'rotate-180')} strokeWidth={1.75} aria-hidden />
-                </span>
-                <span className='mt-0.5 block pl-4 type-callout font-medium text-pretty text-receipt-ink'>{sentence(fact.value)}</span>
-            </button>
-            <AnimatePresence initial={false}>
-                {open && (
-                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25, ease: ease.out }} className='overflow-hidden'>
-                        <div className='mb-2 ml-1 flex flex-col gap-1 border-l-2 border-receipt-ink/15 pl-3 type-footnote text-muted-foreground'>
-                            {fact.snippet && <p className='text-pretty italic'>“{fact.snippet}”</p>}
-                            <p>
-                                {SOURCE[fact.source] ?? fact.source}, {date(fact.as_of)}
-                            </p>
-                            {fact.source_url && (
-                                <a href={fact.source_url} target='_blank' rel='noreferrer' className='inline-flex items-center gap-1 self-start text-primary underline-offset-2 hover:underline'>
-                                    Open source <ExternalLink className='size-3.5' strokeWidth={1.75} aria-hidden />
-                                </a>
-                            )}
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+        <li className='border-t border-border py-3 first:border-t-0 first:pt-1'>
+            <p className='flex items-center gap-1.5 type-footnote text-muted-foreground'>
+                <StatusDot status={fact.status} />
+                <span className='min-w-0 flex-1'>{fact.label}</span>
+                <span className='shrink-0'>{STATUS_WORD[fact.status]}</span>
+            </p>
+            <p className='mt-0.5 pl-4 type-callout font-medium text-pretty'>{sentence(fact.value)}</p>
+            <div className='mt-1 flex flex-col gap-0.5 pl-4 type-footnote text-pretty text-muted-foreground'>
+                {fact.snippet && <p className='italic'>“{fact.snippet}”</p>}
+                <p>
+                    {SOURCE[fact.source] ?? fact.source}, {date(fact.as_of)}
+                    {fact.source_url && (
+                        <a href={fact.source_url} target='_blank' rel='noreferrer' className='ml-2 inline-flex items-center gap-1 text-primary underline-offset-2 hover:underline'>
+                            Open source <ExternalLink className='size-3.5' strokeWidth={1.75} aria-hidden />
+                        </a>
+                    )}
+                </p>
+            </div>
         </li>
     );
 }

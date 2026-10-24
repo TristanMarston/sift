@@ -14,7 +14,7 @@ export function ResultsGone() {
                 <Notice
                     icon={Camera}
                     title='Scan again to see results'
-                    body="Results last only while the page is open, so your photo isn't kept anywhere."
+                    body="There's no saved scan in this browser yet."
                     actions={<Button render={<Link href='/scan' />} nativeButton={false}>Scan an outfit</Button>}
                 />
             </main>

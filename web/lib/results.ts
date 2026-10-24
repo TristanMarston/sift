@@ -52,6 +52,12 @@ const dollars = (cents: number) => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0
 export const perWearText = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 export const priceText = dollars;
 
+/** What "a typical look-alike" means: the middle price of the matches, over their middle number of wears. */
+export function typicalText(t: NonNullable<SearchResponse['typical']>, count?: number) {
+    const these = count ? `these ${count} look-alikes` : 'these look-alikes';
+    return `Half of ${these} cost less than ${dollars(t.price_cents)} and half cost more. Spread over a typical ${t.expected_wears_mid} wears, that comes to ${perWearText(t.cpw_cents)} a wear.`;
+}
+
 const LEVEL: Record<Level, string> = { high: 'High', medium: 'Medium', low: 'Low', unknown: 'Unknown' };
 export const levelText = (l: Level) => LEVEL[l];
 

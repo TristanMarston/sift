@@ -16,7 +16,11 @@ export type Fact = {
     source_url: string | null;
     snippet: string | null;
     as_of: string;
+    part?: EcoPartKey | null; // eco facts only: which part of the eco score it feeds (asked of the API, NOTES-FOR-BACKEND)
 };
+
+export type EcoPartKey = 'fibers' | 'durability' | 'shipping' | 'circularity';
+export type EcoPart = { key: EcoPartKey; label: string; weight: number; score: number }; // weight and score 0–1
 
 export type Marker = { level: Level; score: number | null; facts: Fact[] }; // score is for sorting only, never shown
 
@@ -53,13 +57,14 @@ export type Result = {
         composition_suspect: boolean;
     };
     quality: Marker;
-    eco: Marker & { percentile: number }; // greener than N% of these matches
+    eco: Marker & { percentile?: number; parts?: EcoPart[] }; // percentile: greener than N% of these matches. Both can be missing
     wear: {
         expected_wears: { low: number; high: number; mid: number };
         basis: 'category_baseline' | 'evidence_adjusted';
         cpw_cents: { at_30: number; at_60: number; at_100: number; at_mid: number };
         break_even_wears: number | null; // set only when it costs more than the typical match
         facts: Fact[]; // the assumptions behind expected wears
+        steps?: { label: string; value: string }[]; // how expected wears were worked out, step by step (asked of the API)
     };
     confidence: Level;
     seller: { type: 'individual' | 'small_shop' | 'large_reseller' | null; rating: number | null; region: string | null };

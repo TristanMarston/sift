@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
-import { ResultsGone } from './results-gone';
+import { ResultsPage } from './results-page';
 
 export const metadata: Metadata = { title: 'Sift: results' };
 
-/** Results live only while the page is open (photos never leave the visit), so a refresh here offers a new scan. */
+/** A refresh here restores the latest scan saved in this browser; with none saved, it offers a new scan. */
 export default function Results() {
-    return <ResultsGone />;
+    return <ResultsPage />;
 }

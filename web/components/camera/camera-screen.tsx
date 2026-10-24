@@ -29,10 +29,12 @@ export type SearchState = { total: number; elapsedMs?: number; lifted: boolean; 
 type Props = {
     onClose: () => void;
     initialFile?: File | null; // opened from "Upload a photo": skip the live camera until Retake
+    restored?: { shot: Shot; garments: Garment[] } | null; // a refresh: the saved photo, already traced
     onTraced?: (shot: Shot, garments: Garment[]) => void; // tracing landed: start the search
     onRetake?: () => void;
     search?: SearchState | null; // while set, the search counter replaces the shutter row
-    onShowResults?: () => void; // after Back from results: the finished counter reopens them
+    onShowResults?: () => void; // after Back from results: a button reopens them
+    showResultsLabel?: string; // "See 50 look-alikes"
     handedOff?: boolean; // results are showing: the lifted garment now lives in their header, and the camera rests
     drawing?: boolean; // "Draw a box": drag around the garment detection missed
     onBoxDrawn?: (box: Box) => void;
@@ -44,14 +46,14 @@ type Props = {
  * then the hint, upload, shutter and camera flip. The shutter flashes and freezes the frame, the scan line
  * runs while garments are found, then each garment is traced. Retake is always one tap away.
  */
-export function CameraScreen({ onClose, initialFile, onTraced, onRetake, search, onShowResults, handedOff = false, drawing = false, onBoxDrawn, onCancelDraw }: Props) {
+export function CameraScreen({ onClose, initialFile, restored, onTraced, onRetake, search, onShowResults, showResultsLabel = 'See results', handedOff = false, drawing = false, onBoxDrawn, onCancelDraw }: Props) {
     const reduce = useReducedMotion();
     const fileRef = useRef<HTMLInputElement>(null);
-    const [wantCamera, setWantCamera] = useState(!initialFile);
+    const [wantCamera, setWantCamera] = useState(!initialFile && !restored);
     const { videoRef, status, mirrored, canFlip, torch, flip, toggleTorch, retry } = useCamera(wantCamera && !handedOff); // camera light off while results show
-    const [shot, setShot] = useState<Shot | null>(null);
-    const [phase, setPhase] = useState<ScanPhase>('scanning');
-    const [garments, setGarments] = useState<Garment[]>([]);
+    const [shot, setShot] = useState<Shot | null>(restored?.shot ?? null);
+    const [phase, setPhase] = useState<ScanPhase>(restored ? 'done' : 'scanning');
+    const [garments, setGarments] = useState<Garment[]>(restored?.garments ?? []);
     const [flashKey, setFlashKey] = useState(0);
     const [slow, setSlow] = useState(false);
     const run = useRef(0); // ignores a scan that finishes after Retake
@@ -78,8 +80,8 @@ export function CameraScreen({ onClose, initialFile, onTraced, onRetake, search,
         photoFromFile(initialFile).then(scan, () => setWantCamera(true));
     }, [initialFile, scan]);
 
-    // Free the photo's memory when it's replaced or the screen closes.
-    useEffect(() => () => void (shot && URL.revokeObjectURL(shot.url)), [shot]);
+    // Free the photo's memory when it's replaced or the screen closes. A restored photo belongs to the scan flow.
+    useEffect(() => () => void (shot && shot !== restored?.shot && URL.revokeObjectURL(shot.url)), [shot, restored]);
 
     const takePhoto = async () => {
         const video = videoRef.current;
@@ -196,10 +198,14 @@ export function CameraScreen({ onClose, initialFile, onTraced, onRetake, search,
                     )}
                     {search && !drawing && (
                         <motion.div key='counter' className='absolute inset-x-4 bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-10 mx-auto max-w-md' initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 40 }} transition={spring.sheet}>
-                            {/* Always the same element, so the count never restarts. After Back from results it reopens them. */}
-                            <button type='button' onClick={onShowResults} disabled={!onShowResults || search.lifted} aria-label={onShowResults ? 'Show results' : undefined} className='block w-full rounded-card text-left outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default'>
+                            {/* The count runs once. After Back from results (or a refresh), a plain button goes back to them. */}
+                            {onShowResults && !handedOff ? (
+                                <Button variant='stage' size='lg' className='w-full' onClick={onShowResults}>
+                                    {showResultsLabel}
+                                </Button>
+                            ) : (
                                 <SearchCounter total={search.total} marketplaces={MARKETS} elapsedMs={search.elapsedMs} label={search.label} />
-                            </button>
+                            )}
                         </motion.div>
                     )}
                 </AnimatePresence>
