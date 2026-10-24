@@ -1,0 +1,35 @@
+<!-- @dsCard group="Listings" height=720 -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>MatchCard</title>
+<style>
+body { margin: 0; padding: 20px; background: var(--background); color: var(--foreground); font-family: var(--font-sans); }
+.row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.col { display: flex; flex-direction: column; gap: 16px; }
+.cam { background: var(--camera); border-radius: 24px; overflow: hidden; position: relative; }
+.note { font: 13px/18px var(--font-mono); color: var(--muted-foreground); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+var S = window.Sift, h = React.createElement, D = S.samples, use = React.useState, effect = React.useEffect;
+function replay(label, onClick) { return h(S.Button, { variant: 'secondary', size: 'sm', onClick: onClick }, label || 'Replay'); }
+function App() {
+  var liked = use({});
+  function like(id) { var n = Object.assign({}, liked[0]); n[id] = !n[id]; liked[1](n); }
+  var tee = Object.assign({}, D.teePick);
+  return h('div', { className: 'row', style: { alignItems: 'flex-start', gap: 16 } },
+    h('div', { style: { width: 320 } }, h(S.MatchCard, { match: D.coatMatches[0], liked: !!liked[0].l1, onLike: function () { like('l1'); } })),
+    h('div', { style: { display: 'grid', gridTemplateColumns: '160px 160px', gap: 12 } },
+      h(S.MatchCard, { match: D.coatMatches[4], size: 'compact', moved: 2, onLike: function () { like('l5'); }, liked: !!liked[0].l5 }),
+      h(S.MatchCard, { match: D.coatMatchesAfterUpdate[4], size: 'compact', isNew: true, onLike: function () {} }),
+      h(S.MatchCard, { match: tee, size: 'compact', onLike: function () {} }),
+      h(S.MatchCardSkeleton, { size: 'compact' })));
+}
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+</script>
+</body>
+</html>
