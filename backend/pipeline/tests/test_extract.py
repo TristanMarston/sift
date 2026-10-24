@@ -93,6 +93,31 @@ def test_bare_words_and_traps(text, expected):
     assert fibers(text) == expected
 
 
+@pytest.mark.parametrize("text, expected", [
+    # Grailed resellers paste eBay's item specifics into the description (seen on 14% of live Grailed rows)
+    ("Outer Shell Material: Cotton Closure: Zip Lining Material: Nylon Vintage: Yes", [("cotton", None, None, None)]),
+    ("Outer Shell Material: Cotton Insulation Material: Polyester Size Type: Regular", [("cotton", None, None, None)]),
+    ("Shell: 100% wool. Lining: 100% polyester", [("wool", 100, None, None)]),
+    ("Lining: 60% acetate, 40% viscose. Shell: 100% wool", [("wool", 100, None, None)]),
+    ("Made of cotton canvas and lined with polyester", [("cotton", None, None, None)]),
+    ("cotton outer shell material and polyester lining", [("cotton", None, None, None)]),
+    ("Shell 100% nylon, 100% polyester lining", [("nylon", 100, None, None)]),
+    ("Material: 100% Cotton Duck Shell Lining: Acrylic/Polyester Blanket", [("cotton", 100, None, None)]),
+])
+def test_lining_and_insulation_are_not_what_the_garment_is_made_of(text, expected):
+    """eBay's own Lining and Insulation fields are skipped (they add up past 100%); the same words in text too."""
+    assert fibers(text) == expected
+
+
+def test_hashtags_are_not_material_claims():
+    """Reseller tools tag every pasted field, the lining too (18 live Grailed rows, no Depop row needed them)."""
+    assert fibers("Carhartt chore coat in cotton canvas. #men #cotton #polyester #workwear") == [("cotton", None, None, None)]
+
+
+def test_a_ply_count_between_the_percent_and_the_fiber():
+    assert fibers("100% 2-Ply Cashmere Shawl Collar") == [("cashmere", 100, None, None)]
+
+
 def test_percent_wins_over_bare_word_for_the_same_fiber():
     assert fibers("100% cotton, soft cotton feel") == [("cotton", 100, None, None)]
     assert fibers("Brown genuine leather bomber. Shell: 100% Genuine Leather") == [("leather", 100, None, None)]

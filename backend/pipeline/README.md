@@ -155,8 +155,11 @@ Countries get one name each (`U.S.A.`, `United States`, `America` → `USA`; `Ko
 
 Composition details: synonyms are unified (`poly` → `polyester`, `spandex` → `elastane`, `merino` and `lambswool` → `wool`);
 words between the number and the fiber are allowed (`100% pure new wool`, `100% Italian boiled wool`, `100% baby alpaca`);
-percentages that add up to 90–110 are scaled to 100; any other sum is kept but marked `composition_suspect`
-(multi-part tags like shell + lining land here). `synthetic_share` is the share of polyester, nylon, acrylic and
+lining and insulation are not the garment's material, so text labeled as one is skipped (`Lining: 100% polyester`,
+`Lining Material: Nylon` pasted from eBay, `lined with polyester`, `polyester lining`), as eBay's own Lining and
+Insulation fields are; hashtags are tags, not claims, and are skipped too (resellers tag the lining). Percentages
+that add up to 90–110 are scaled to 100; any other sum is kept but marked `composition_suspect` (body + trim, or a
+shell and lining without labels). `synthetic_share` is the share of polyester, nylon, acrylic and
 elastane (plus modacrylic and polyurethane), and is only computed when every fiber has a percentage and the sum is sound. Fabrics that are not fibers
 (fleece, ripstop, Gore-Tex) are not reported as materials.
 
@@ -369,10 +372,9 @@ that is not mirrored in `listing.py` fails a test.
   so `seller.rating` is null, as it is for a Mercari seller with no reviews.
 - Material coverage depends on the queries. One generic jacket query gave 41% with a stated material and 6% with
   percentages; material-rich queries lifted Mercari to 70% and 50%. Check `REPORT.md` after the run.
-- Tags with several parts (shell, lining) add up past 100%, so they are kept but marked `composition_suspect` and get no
-  `synthetic_share`. This is 15% of the Mercari rows we tested, almost all coats, usually "shell composition, then a 100%
-  polyester lining". Reading the "Shell:" and "Lining:" labels would recover most of them; taking the first group would
-  be wrong whenever a seller lists the lining first, so we do not.
+- Tags with several parts add up past 100%, so they are kept but marked `composition_suspect` and get no
+  `synthetic_share`. A labeled lining is skipped (see 03), so what is left is mostly body + trim or an unlabeled lining:
+  1.3% of the rows in the second review's live sample.
 - The Mercari actor is new; it worked up to 300 items per run (three results pages) in the review scrape.
   `tortuga/mercari-scraper` is the fallback.
 - Not built yet: hosted thumbnails, the Supabase upload, care-tag OCR, the LLM fallback for odd material

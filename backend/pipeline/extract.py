@@ -26,7 +26,13 @@ _CANON = {"poly": "polyester", "polyamide": "nylon", "spandex": "elastane", "lyc
           "suede": "leather"}
 # Words sellers put between the percentage and the fiber: "100% pure new wool", "100% Italian boiled wool".
 _ADJ = r"(?:(?:pure|virgin|new|fine|extra[\s-]?fine|super[\s-]?fine|italian|scottish|worsted|boiled|premium|genuine|" \
-       r"shetland|baby)[\s/]+)*"
+       r"shetland|baby|\d[\s-]?ply)[\s/]+)*"
+# Lining and insulation are not what the garment is made of (MATERIAL_KEYS skips eBay's fields for them for the same
+# reason). Resellers paste those fields into descriptions ("Lining Material: Nylon"), and tags say "Lining: 100% poly".
+_PCTS = r"\d{1,3}(?:\.\d+)?\s*%\s*[a-z]+(?:\s*[,/&]?\s*(?:and\s+)?\d{1,3}(?:\.\d+)?\s*%\s*[a-z]+)*"
+_WORDS = r"[a-z]+(?:\s*/\s*[a-z]+)*"   # "Acrylic/Polyester"
+_INNER = re.compile(rf"\b(?:lining|insulation)(?:\s+material)?\s*[:\-]\s*(?:{_PCTS}|{_WORDS})|\blined\s+with\s+(?:{_PCTS}|{_WORDS})"
+                    rf"|(?:\d{{1,3}}(?:\.\d+)?\s*%\s*)?\b[a-z]+\s+lining\b(?!\s*(?:material|[:\-]))", re.I)
 _PCT = re.compile(rf"(?<![\d.])(\d{{1,3}}(?:\.\d+)?)\s*%\s*{_ADJ}(organic\s+|recycled\s+)?({_FIBER})\b", re.I)
 _BARE_RE = re.compile(rf"\b(organic\s+|recycled\s+)?({_BARE})\b", re.I)
 # A dedicated material field is unambiguous, so there "leather", "down" and "poly" are fibers too, and suede is leather.
@@ -103,6 +109,7 @@ def parse_fibers(text: str, field: bool = False) -> tuple[list[Fiber], str]:
             out.append(fiber)
             snips.append(snippet)
 
+    text = _INNER.sub(" ", re.sub(r"#\w+", " ", text))   # hashtags are tags, not claims: resellers tag the lining too
     for m in _FAUX_LEATHER.finditer(text):
         add("synthetic_leather", None, "", m[0])
     text = _FAUX_LEATHER.sub(" ", text)
