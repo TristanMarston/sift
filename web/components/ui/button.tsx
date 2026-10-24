@@ -16,8 +16,8 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
         camera: "bg-camera-control text-camera-foreground backdrop-blur-md hover:bg-white/20",
         stage: "bg-stage-foreground text-stage hover:bg-stage-foreground/90",
-        "stage-ghost": "text-stage-foreground hover:bg-white/10",
-        "stage-link": "text-stage-foreground underline underline-offset-4 decoration-white/40 hover:decoration-white",
+        "stage-ghost": "text-stage-foreground hover:bg-stage-foreground/10",
+        "stage-link": "text-stage-foreground underline underline-offset-4 decoration-current/40 hover:decoration-current",
       },
       size: {
         default: "h-11 gap-2 px-5 has-data-[icon=inline-end]:pr-4 has-data-[icon=inline-start]:pl-4",

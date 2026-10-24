@@ -39,6 +39,10 @@
   --color-receipt-ink: var(--receipt-ink);
   --color-stage: var(--stage);
   --color-stage-foreground: var(--stage-foreground);
+  --color-stage-accent: var(--stage-accent);
+  --color-logo: var(--logo);
+  --color-logo-leaf: var(--logo-leaf);
+  --color-sage: var(--sage);
   --color-camera: var(--camera);
   --color-camera-foreground: var(--camera-foreground);
   --color-camera-muted: var(--camera-muted);

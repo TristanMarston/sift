@@ -11,7 +11,7 @@ Write plain, warm and short. The product speaks; the user's things are "your" th
 - **No "It's not X, it's Y" lines** and no slogans built on contrast. Say what it does.
 - **No exclamation marks**, no "please", "simply" or "just".
 - **Sell the idea, then the product.** Lead with cost per wear ("Buy it once."), not with Sift. The product shows up in the actions.
-- **Never claim virtue.** Banned: "eco-friendly", "sustainable", "green", "guilt-free", "planet-positive". Longer wear is why cost per wear matters, so the environmental side is welcome, but only as a specific, sourced fact ("Wearing clothes 9 months longer cuts their carbon, water and waste footprint by about 20–30%. WRAP") or a count ("Tees bought · 6 vs 1"). Never the headline, never leaves or green.
+- **Never claim virtue.** Banned: "eco-friendly", "sustainable", "green", "guilt-free", "planet-positive". Longer wear is why cost per wear matters, so the environmental side is welcome, but only as a specific, sourced fact ("Wearing clothes 9 months longer cuts their carbon, water and waste footprint by about 20–30%. WRAP") or a count ("Tees bought · 6 vs 1"). Never the headline, and never shown with leaf icons or a green "eco" signal.
 - **Cost per wear is always an estimate.** Show it with an `EstTag` and the wear count it assumes ("÷ 150 wears", "150 wears · est."). Expected wears are ranges; when there's room, show the range.
 - **Label durability by evidence, never by price.** Price alone doesn't predict how long clothes last. Say "Pills after ~25 wears", not "Cheap tee".
 - **Every claim shows where it came from**, with a `StatusBadge`: **Verified** (read from the tag or a certification), **Claimed** (the seller's text), **Unknown**. Unknown is shown, never hidden.
@@ -36,11 +36,14 @@ The full copy library is in the Wording section.
 ## Color
 
 - **Light is the default.** Dark mode is a manual toggle (`ThemeToggle`) that sets `.dark` or `data-theme="dark"` on `<html>`. The phone's system setting is ignored, so a teammate's phone can't flip the demo.
-- **The landing sits on the cobalt `stage`** in both themes, with `stage-foreground` text (secondary text at 85% or more so it stays above 4.5:1) and a white `stage` button for Scan. It's the one place cobalt fills a screen. The theme toggle is hidden there.
+- **Colors come from the logo**: forest `#103520` (the letters) and sage `#798f64` (the leaf). Forest is so dark (13.5:1 on white) that it works as the app's ink: text, the one main button, the focus `ring`. It reads as near-black with a green cast, so the app never feels green.
+- **Sage is for brand moments only**: the logo's leaf, `primary-tint` surfaces (the Cheapest tag, selected chips), the camera `trace-line` and `stage-accent` on the landing. Never a full background and never body text (3.5:1).
+- **The landing sits on `stage`.** Palette "Forest ink" (the default) keeps it light and lets it follow the theme. Palette "Forest stage" (`app/palettes.css`, `data-palette="forest"` on `<html>`) puts it on forest with cream type, like a full-bleed brand moment. Only the landing changes; every other screen is the same in both. Secondary text on stage stays at 85% or more. The theme toggle is hidden there.
 - **Camera screens are always dark** in both themes. They use only `camera`, `camera-foreground`, `camera-muted`, `camera-control`, `camera-scrim`, `trace-line` and `trace-halo`.
 - **Neutrals carry the page.** `background` is the canvas, `card` holds content, `foreground` is text, `muted-foreground` is supporting text. The greys are cool so listing photos keep their true color.
-- **Cobalt (`primary`) means "confirmed" or "do this next".** Use it for the one filled main action on a screen, `primary-tint` with `primary-tint-foreground` for selected chips and New tags, the `verified` dot, the moved-up marker and the focus `ring`. Never decorate with it.
-- **No green.** Color shows how strong the evidence is, never how virtuous something is. No leaf icons, kraft textures or earthy "eco" palettes.
+- **`primary` means "do this next".** Forest in light mode, light sage (with forest text) in dark mode, where forest would disappear. One filled main action per screen. Never decorate with it.
+- **Green is the brand, never a verdict.** Evidence marks (`verified`, `claimed`, `unknown`, the level dots) are neutral ink, so color shows how strong the evidence is, never how virtuous something is. The leaf lives only in the logo and the tab icon: no leaf icons, kraft textures or earthy "eco" palettes elsewhere.
+- **Dark mode is a cool neutral near-black**, not green-black, so the app doesn't turn green at night.
 - **Fiber bars** use `fiber-plant` (wheat), `fiber-animal` (clay), `fiber-regenerated` (lilac) and `fiber-synthetic` (slate). Synthetic is slate, never red: the plain-language line carries the fact. Every segment is labeled, so color is never the only signal. Unaccounted share uses the `hatch` pattern.
 - **`destructive` is for errors only**: a blocked camera, an unreadable tag. A garment difference is a grey ✗ chip, not red.
 - **Receipts** sit on `receipt-paper` with `receipt-ink`, a hair warmer than `card` so they read as paper.
@@ -62,7 +65,7 @@ Three families, each with one job.
 | `type-title-2` | Fraunces | 26 / 30, -0.01em | Section headings, empty-state headlines. |
 | `type-numeral` | Fraunces | 64 / 60, -0.03em | The one big number: "50%", "2.1". |
 | `type-quote` | Fraunces italic | 19 / 26 | The Learned line and the spoken transcript. |
-| `type-wordmark` | Fraunces 500 | 28 / 28 | "Sift" in the top bar. Plain type, no logo yet. |
+| `type-wordmark` | Fraunces 500 | 28 / 28 | Fallback only. The brand is the `Logo` component (traced from the PNG: `public/brand/sift-logo.svg`), 32px tall on phones and 40px on laptops, with `text-logo`/`text-stage-foreground` letters and a `--logo-leaf` leaf. |
 | `type-headline` | Figtree 600 | 17 / 22 | Card and sheet titles. |
 | `type-body` | Figtree | 17 / 24 | Body copy. |
 | `type-button` | Figtree 600 | 16 / 20 | Button labels. |
@@ -98,7 +101,7 @@ Listing photos are 4:5, `radius-image`, with a faint inner ring so white photos 
 
 ## Iconography
 
-[Lucide](https://lucide.dev) at a 1.75 stroke, 20px by default (16px in small buttons). Icons inside `Button` use `data-icon="inline-start"` or `"inline-end"` and no size classes. No emoji. No leaf, globe or recycling symbols. Status uses shapes (solid, half, hollow dots), not icons.
+[Lucide](https://lucide.dev) at a 1.75 stroke, 20px by default (16px in small buttons). Icons inside `Button` use `data-icon="inline-start"` or `"inline-end"` and no size classes. No emoji. No leaf (outside the logo), globe or recycling symbols. Status uses shapes (solid, half, hollow dots), not icons.
 
 ## Motion
 

@@ -49,7 +49,7 @@ function Iris({ open }: { open: MotionValue<number> }) {
     const seams = useTransform(open, seamPath);
     return (
         <svg viewBox='-50 -50 100 100' className='absolute inset-0 size-full' aria-hidden>
-            <motion.path d={d} fill='#141728' fillRule='evenodd' />
+            <motion.path d={d} fill='#0b1710' fillRule='evenodd' />
             <motion.path d={seams} fill='none' stroke='rgba(255,255,255,0.12)' strokeWidth='0.5' />
         </svg>
     );
@@ -65,10 +65,10 @@ function Dial({ progress }: { progress: MotionValue<number> }) {
             const major = k % 6 === 0;
             const [r1, r2] = major ? [45, 49.5] : [46.5, 49];
             const p = (r: number, f: (x: number) => number) => +(r * f(a)).toFixed(2); // rounded so server and browser agree
-            return <line key={k} x1={p(r1, Math.cos)} y1={p(r1, Math.sin)} x2={p(r2, Math.cos)} y2={p(r2, Math.sin)} stroke='white' strokeOpacity={lit ? 1 : major ? 0.45 : 0.25} strokeWidth={lit ? (major ? 1.1 : 0.8) : major ? 0.8 : 0.5} strokeLinecap='round' />;
+            return <line key={k} x1={p(r1, Math.cos)} y1={p(r1, Math.sin)} x2={p(r2, Math.cos)} y2={p(r2, Math.sin)} stroke='currentColor' strokeOpacity={lit ? 1 : major ? 0.45 : 0.25} strokeWidth={lit ? (major ? 1.1 : 0.8) : major ? 0.8 : 0.5} strokeLinecap='round' />;
         });
     return (
-        <svg viewBox='-50 -50 100 100' className='absolute -inset-[10%] size-[120%]' aria-hidden>
+        <svg viewBox='-50 -50 100 100' className='absolute -inset-[10%] size-[120%] text-stage-foreground' aria-hidden>
             <defs>
                 <mask id={mask}>
                     <motion.path d={d} fill='white' />
@@ -175,12 +175,12 @@ export function HeroDial({ onOpen }: { onOpen: (el: HTMLElement) => void }) {
                     className='relative size-(--lens) rounded-full outline-none focus-visible:ring-4 focus-visible:ring-stage-foreground/60'
                 >
                     <Dial progress={progress} />
-                    <motion.div className='absolute -inset-[5%] rounded-full bg-stage-foreground/25 blur-2xl' animate={reduce ? undefined : { opacity: [0.45, 0.85, 0.45] }} transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }} aria-hidden />
-                    <div className='absolute inset-0 rounded-full border-[6px] border-stage-foreground shadow-[0_0_48px_rgba(255,255,255,0.35)]' />
-                    <div className='absolute inset-[6px] overflow-hidden rounded-full' style={{ background: 'radial-gradient(circle at 36% 28%, #2a3050 0%, #0e1020 60%, #07080f 100%)' }} aria-hidden>
+                    <motion.div className='absolute -inset-[5%] rounded-full bg-stage-accent/35 blur-2xl' animate={reduce ? undefined : { opacity: [0.45, 0.85, 0.45] }} transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }} aria-hidden />
+                    <div className='absolute inset-0 rounded-full border-[6px] border-stage-foreground shadow-[0_0_48px_color-mix(in_srgb,var(--stage-accent)_55%,transparent)]' />
+                    <div className='absolute inset-[6px] overflow-hidden rounded-full' style={{ background: 'radial-gradient(circle at 36% 28%, #1f3a2b 0%, #0c1a12 60%, #060d09 100%)' }} aria-hidden>
                         <AnimatePresence mode='popLayout'>
                             <motion.div key={item.id} className='absolute inset-[18%]' initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-                                <GarmentFigure g={g} traced={shown} line='#ffffff' />
+                                <GarmentFigure g={g} traced={shown} line='var(--trace-line)' />
                             </motion.div>
                         </AnimatePresence>
                         <Iris open={open} />

@@ -5,22 +5,23 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { CameraHandoff, type HandoffFrom } from './camera-handoff';
-import { VariantSwitcher } from './variant-switcher';
+import { Logo } from '@/components/sift/logo';
+import { ComparisonBar } from './comparison-bar';
 import type { Variant } from './variants';
 
 export type OpenCamera = (el: HTMLElement | null, shape?: 'rect' | 'circle', photo?: File | null) => void;
 
 // Source for the footnote (DESCRIPTION.md §18).
 const WRAP_URL = 'https://sustainablebrands.com/read/behavior-change/trending-while-wrap-scottish-designers-tout-merits-of-durable-fashion-mango-has-a-different-idea';
-const MARKETS = ['Depop', 'Poshmark', 'Grailed', 'Mercari', 'eBay'];
+// const MARKETS = ['Depop', 'Poshmark', 'Grailed', 'Mercari', 'eBay']; // its line is commented out below to keep the landing one screen
 const SCAN = '/scan';
 // The camera, and the results it opens, live over this page at /scan and /results.
 const atScan = () => [SCAN, '/results'].includes(window.location.pathname);
 
 type Props = {
     variant: Variant;
-    home?: boolean; // the real home page: no prototype switcher
     scanButton?: boolean; // false when the centerpiece itself is the scan button
+    compare?: boolean; // /landing pages: show the design and palette switcher
     hero: (open: OpenCamera) => React.ReactNode;
 };
 
@@ -28,7 +29,7 @@ type Props = {
  * Landing layout on the full cobalt stage (both themes). Phone: name on top, the centerpiece in the middle,
  * headline and actions below. Desktop: text on the left, centerpiece on the right.
  */
-export function LandingShell({ variant, home = false, scanButton = true, hero }: Props) {
+export function LandingShell({ variant, scanButton = true, compare = false, hero }: Props) {
     const router = useRouter();
     const heroRef = useRef<HTMLDivElement>(null);
     const hold = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -37,6 +38,11 @@ export function LandingShell({ variant, home = false, scanButton = true, hero }:
     const [file, setFile] = useState<File | null>(null);
 
     // The camera lives at /scan over this page: Back (button or swipe) shrinks it back into the lens.
+    // The home page is always forest, even after visiting a light ("Ink") comparison page.
+    useEffect(() => {
+        if (!compare) delete document.documentElement.dataset.palette;
+    }, [compare]);
+
     useEffect(() => {
         const onPop = () => !atScan() && setFrom(null);
         window.addEventListener('popstate', onPop);
@@ -59,12 +65,12 @@ export function LandingShell({ variant, home = false, scanButton = true, hero }:
 
     return (
         <div className='relative flex min-h-dvh w-full flex-col overflow-hidden bg-stage text-stage-foreground'>
-            <header className='relative z-20 grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center px-4 lg:px-8'>
-                <span className='type-wordmark select-none' onPointerDown={startHold} onPointerUp={endHold} onPointerLeave={endHold} onContextMenu={(e) => e.preventDefault()}>
-                    Sift
+            <header className='relative z-20 flex h-14 shrink-0 items-center px-4 lg:h-16 lg:px-8'>
+                <span className='select-none [--logo-leaf:var(--stage-accent)]' onPointerDown={startHold} onPointerUp={endHold} onPointerLeave={endHold} onContextMenu={(e) => e.preventDefault()}>
+                    <Logo className='h-8 text-stage-foreground lg:h-10' />
                 </span>
-                {!home && <VariantSwitcher current={variant} />}
             </header>
+            {compare && <ComparisonBar current={variant} />}
 
             <main className='mx-auto flex w-full max-w-6xl flex-1 flex-col lg:grid lg:grid-cols-[1fr_1.1fr] lg:items-center lg:gap-16 lg:px-8 lg:pb-12'>
                 <div ref={heroRef} className='relative min-h-[max(44dvh,300px)] flex-1 lg:order-2 lg:h-[min(78dvh,720px)] lg:min-h-0 lg:flex-none'>
@@ -100,7 +106,7 @@ export function LandingShell({ variant, home = false, scanButton = true, hero }:
                                 WRAP
                             </a>
                         </p>
-                        <p className='type-label text-stage-foreground/85 uppercase'>{MARKETS.join(' · ')}</p>
+                        {/* <p className='type-label text-stage-foreground/85 uppercase'>{MARKETS.join(' · ')}</p> */}
                     </footer>
                 </div>
             </main>

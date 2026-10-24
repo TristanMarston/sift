@@ -56,3 +56,17 @@
     backdrop-filter: none;
   }
 }
+
+/* Receipt wall (landing G): each column holds its cards twice and slides up by one copy, forever. */
+@keyframes wall-drift {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(0, -50%, 0); }
+}
+@utility wall-drift {
+  animation: wall-drift var(--dur, 180s) linear infinite;
+  animation-delay: var(--delay, 0s);
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wall-drift { animation: none; }
+}

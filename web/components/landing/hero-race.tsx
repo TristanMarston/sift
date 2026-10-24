@@ -113,16 +113,16 @@ export function HeroRace() {
 
             <motion.div className='relative min-h-[72px] flex-[0.8] lg:max-h-60 lg:flex-1' animate={{ opacity: intro ? 0 : 1, y: intro ? 16 : 0 }} transition={{ ...spring.ui, delay: intro ? 0 : 0.15 }}>
                 <div className='absolute inset-y-0 right-11 left-0'>
-                    <svg viewBox={`0 0 ${N} 100`} preserveAspectRatio='none' className='absolute inset-0 size-full overflow-visible'>
+                    <svg viewBox={`0 0 ${N} 100`} preserveAspectRatio='none' className='absolute inset-0 size-full overflow-visible text-stage-foreground'>
                         <defs>
                             <clipPath id='race-reveal'>
                                 <motion.rect x='0' y='-10' height='120' width={wear} />
                             </clipPath>
                         </defs>
-                        <line x1='0' x2={N} y1='99' y2='99' stroke='white' strokeOpacity='0.25' vectorEffect='non-scaling-stroke' />
+                        <line x1='0' x2={N} y1='99' y2='99' stroke='currentColor' strokeOpacity='0.25' vectorEffect='non-scaling-stroke' />
                         <g clipPath='url(#race-reveal)' fill='none' strokeLinejoin='round'>
-                            <path d={spendPath(fragile)} stroke='white' strokeOpacity='0.7' strokeWidth='2' strokeDasharray='5 4' vectorEffect='non-scaling-stroke' />
-                            <path d={spendPath(sturdy)} stroke='white' strokeWidth='3' vectorEffect='non-scaling-stroke' />
+                            <path d={spendPath(fragile)} stroke='currentColor' strokeOpacity='0.7' strokeWidth='2' strokeDasharray='5 4' vectorEffect='non-scaling-stroke' />
+                            <path d={spendPath(sturdy)} stroke='currentColor' strokeWidth='3' vectorEffect='non-scaling-stroke' />
                         </g>
                     </svg>
                     <Tip r={fragile} wear={wear} />
@@ -130,7 +130,7 @@ export function HeroRace() {
                     <AnimatePresence>
                         {even && (
                             <motion.span
-                                className='absolute size-3.5 -translate-1/2 rounded-full border-[3px] border-stage bg-stage-foreground shadow-[0_0_0_4px_rgba(255,255,255,0.3)]'
+                                className='absolute size-3.5 -translate-1/2 rounded-full border-[3px] border-stage bg-stage-foreground shadow-[0_0_0_4px_color-mix(in_srgb,var(--stage-accent)_50%,transparent)]'
                                 style={{ left: `${(EVEN / N) * 100}%`, top: `${y(sturdy.cents)}%` }}
                                 initial={{ scale: 0 }}
                                 animate={{ scale: 1 }}
@@ -218,13 +218,13 @@ function Column({ r, beat, bought, zoom, dashed }: ColumnProps) {
                         </motion.span>
                     )}
                 </AnimatePresence>
-                <motion.span className='absolute bottom-0 left-0 rounded-pill bg-white/15 px-2 py-0.5 type-label text-stage-foreground uppercase backdrop-blur-sm' {...fade(beat >= 3)}>
+                <motion.span className='absolute bottom-0 left-0 rounded-pill bg-stage-foreground/10 px-2 py-0.5 type-label text-stage-foreground uppercase backdrop-blur-sm' {...fade(beat >= 3)}>
                     Tees bought · <span className='tabular'>{bought}</span>
                 </motion.span>
             </div>
             <motion.span className='flex items-center gap-2' {...fade(beat >= 2)}>
                 <svg viewBox='0 0 16 4' className='h-1 w-4 shrink-0' aria-hidden>
-                    <line x1='0' x2='16' y1='2' y2='2' stroke='white' strokeWidth={dashed ? 2 : 3} strokeDasharray={dashed ? '4 3' : undefined} strokeOpacity={dashed ? 0.7 : 1} />
+                    <line x1='0' x2='16' y1='2' y2='2' stroke='currentColor' strokeWidth={dashed ? 2 : 3} strokeDasharray={dashed ? '4 3' : undefined} strokeOpacity={dashed ? 0.7 : 1} />
                 </svg>
                 <span className='truncate type-footnote font-semibold lg:type-callout lg:font-semibold'>{r.note}</span>
             </motion.span>
