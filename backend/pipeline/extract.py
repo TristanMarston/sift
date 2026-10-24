@@ -51,8 +51,8 @@ _CERTS = {
 }
 _FLAGS = {
     "is_vintage": r"\b(?:vintage|vtg)\b(?![\s-]*(?:wash|style|inspired|fit|look|fade|effect))",
-    "is_deadstock": r"\bdead[\s-]?stock\b|\bnew old stock\b",
-    "is_upcycled": r"\bup[\s-]?cycl(?:ed|e)\b",
+    "is_deadstock": r"\bdead[\s-]?stock\b|\bnew old stock\b|\b(?-i:NOS)\b",        # NOS: capitals only ("Nos Amis")
+    "is_upcycled": r"\bup[\s-]?cycl(?:ed|e)\b|(?<!not )\breworked\b",           # reworked: remade from a garment
 }
 _RETAIL = re.compile(r"\b(?:retail(?:s|ed)?(?:\s+(?:price|value))?(?:\s+(?:for|at))?|msrp)\s*[:\-]?\s*"
                      r"\$\s*(\d[\d,]*(?:\.\d{1,2})?)", re.I)
