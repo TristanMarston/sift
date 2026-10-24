@@ -187,3 +187,12 @@ def test_a_nylon_shell_counts_for_outerwear_only(row):
     assert M.quality(row(category="jackets_outerwear", **blend), {})[0]["level"] == "unknown"  # below the 80% bar
     poly = dict(materials=fibers(("polyester", 100), synthetic_share=100), evidence=[ev("materials.fibers")])
     assert M.quality(row(category="jackets_outerwear", **poly), {})[0]["level"] == "unknown"   # pills and abrades sooner
+
+
+def test_dresses_and_skirts_in_wool_linen_or_silk_count_as_durable(row):
+    for fiber in ("wool", "linen", "silk"):
+        q, _ = M.quality(row(category="dresses_skirts", materials=fibers((fiber, 100)), evidence=[ev("materials.fibers")]), {})
+        assert q["level"] == "medium", fiber
+    for fabric in (fibers(("cotton", 100)), fibers(("polyester", 100), synthetic_share=100), fibers(("wool", 60), ("polyester", 40))):
+        q, _ = M.quality(row(category="dresses_skirts", materials=fabric, evidence=[ev("materials.fibers")]), {})
+        assert q["level"] == "unknown"
