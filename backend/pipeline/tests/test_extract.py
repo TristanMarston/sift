@@ -307,9 +307,11 @@ def test_missing_material_is_null_with_unknown_evidence():
     assert [(e.field, e.status) for e in out.evidence] == [("materials.fibers", "unknown")]
 
 
-def test_actor_retail_price_beats_text():
+def test_actor_retail_price_beats_text_and_has_its_own_evidence():
     out = X.extract(norm(description="retail $99", cost=dict(price_cents=2000, total_cents=2000, retail_price_cents=8000)))
     assert out.cost.retail_price_cents == 8000
+    assert [(e.status, e.source, e.snippet) for e in out.evidence if e.field == "cost.retail_price_cents"] == \
+           [("claimed", "specifics", "$80.00")]
 
 
 def test_certification_evidence_and_other_fields_untouched():

@@ -101,6 +101,23 @@ def test_depop_first_size_no_colour_and_no_markdown():
     assert mapped("depop", 1).color is None
 
 
+def test_depop_title_is_the_first_line_of_the_description_because_its_own_title_is_five_words_of_it():
+    assert mapped("depop", 0).title == "The North Face white fuzzy jacket"            # was "The North Face White Fuzzy"
+    assert mapped("depop", 2).title == "women’s The North Face TNF Apex softshell jacket, size XL"
+    assert mapped("depop", 0, description="\n\nCarhartt Detroit Jacket in brown #workwear#detroit\nSize L").title == \
+           "Carhartt Detroit Jacket in brown"
+
+
+@pytest.mark.parametrize("description", [None, "", "#vintage #y2k #carhartt"])
+def test_depop_title_falls_back_to_the_actors_title(description):
+    assert mapped("depop", 0, description=description).title == "The North Face White Fuzzy"
+
+
+def test_depop_title_from_a_long_first_line_is_cut_at_a_word():
+    title = mapped("depop", 0, description="Carhartt " * 30).title
+    assert len(title) <= 120 and title.endswith("Carhartt")
+
+
 def test_depop_sold_and_non_us_seller_with_a_usd_price_is_kept_with_its_region():
     n = mapped("depop", 0, isSold=True, country="GB")
     assert n.status == "sold" and n.seller.region == "GB"
@@ -111,9 +128,17 @@ def test_depop_sold_and_non_us_seller_with_a_usd_price_is_kept_with_its_region()
 def test_poshmark_fields():
     n = mapped("poshmark", 0)
     assert (n.id, n.brand, n.size, n.color, n.subcategory) == ("poshmark:6acbf84b28951ffc17205cc0", "The North Face", "M", "Blue", "Jackets & Coats")
-    assert (n.cost.price_cents, n.cost.original_price_cents, n.cost.total_cents) == (9000, 22500, 9000)
+    assert (n.cost.price_cents, n.cost.total_cents) == (9000, 9000)
     assert (n.condition, n.condition_raw, n.seller.region) == (None, None, "US")
     assert n.title == fx("poshmark")[0]["name"] and len(n.image_urls) == 3
+
+
+def test_poshmark_original_price_is_the_retail_price_not_a_markdown():
+    """Poshmark's "Original Price" is what the item cost new (API.md: retail_price_cents), not an earlier listing price."""
+    n = mapped("poshmark", 0)
+    assert (n.cost.retail_price_cents, n.cost.original_price_cents) == (22500, None)
+    assert mapped("poshmark", 0, regular_price=0).cost.retail_price_cents is None
+    assert mapped("poshmark", 2).cost.retail_price_cents is None
 
 
 def test_poshmark_status():
