@@ -1,0 +1,276 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sift.local/schema/api.schema.json",
+  "title": "Sift API contract",
+  "description": "Source of truth for frontend <-> backend payloads. See schema/API.md.",
+  "$defs": {
+    "Marketplace": {"enum": ["depop", "poshmark", "grailed", "mercari", "ebay"]},
+    "Category": {
+      "enum": ["jackets_outerwear", "hoodies_sweatshirts", "tshirts", "sneakers",
+               "jeans_pants", "sweaters_knitwear", "shirts", "dresses_skirts"]
+    },
+    "Condition": {"enum": ["new_with_tags", "like_new", "good", "fair"]},
+    "Level": {"enum": ["high", "medium", "low", "unknown"]},
+    "Cents": {"type": "integer", "minimum": 0},
+    "NullableCents": {"type": ["integer", "null"], "minimum": 0},
+    "Unit": {"type": "number", "minimum": 0, "maximum": 1},
+
+    "Box": {
+      "type": "object",
+      "required": ["x", "y", "w", "h"],
+      "additionalProperties": false,
+      "properties": {
+        "x": {"$ref": "#/$defs/Unit"},
+        "y": {"$ref": "#/$defs/Unit"},
+        "w": {"$ref": "#/$defs/Unit"},
+        "h": {"$ref": "#/$defs/Unit"}
+      }
+    },
+
+    "DetectResponse": {
+      "type": "object",
+      "required": ["image", "garments"],
+      "additionalProperties": false,
+      "properties": {
+        "image": {
+          "type": "object",
+          "required": ["width", "height"],
+          "additionalProperties": false,
+          "properties": {
+            "width": {"type": "integer", "minimum": 1},
+            "height": {"type": "integer", "minimum": 1}
+          }
+        },
+        "garments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "category", "label", "box", "confidence"],
+            "additionalProperties": false,
+            "properties": {
+              "id": {"type": "string"},
+              "category": {"anyOf": [{"$ref": "#/$defs/Category"}, {"type": "null"}]},
+              "label": {"type": "string"},
+              "box": {"$ref": "#/$defs/Box"},
+              "confidence": {"$ref": "#/$defs/Unit"}
+            }
+          }
+        }
+      }
+    },
+
+    "SearchParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "category": {"anyOf": [{"$ref": "#/$defs/Category"}, {"type": "null"}]},
+        "filters": {"$ref": "#/$defs/Filters"}
+      }
+    },
+
+    "Filters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_price_cents": {"$ref": "#/$defs/Cents"},
+        "marketplaces": {"type": "array", "items": {"$ref": "#/$defs/Marketplace"}, "uniqueItems": true},
+        "sizes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "conditions": {"type": "array", "items": {"$ref": "#/$defs/Condition"}, "uniqueItems": true}
+      }
+    },
+
+    "SearchResponse": {
+      "type": "object",
+      "required": ["query", "typical", "results"],
+      "additionalProperties": false,
+      "properties": {
+        "query": {"$ref": "#/$defs/SearchParams"},
+        "typical": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "required": ["price_cents", "expected_wears_mid", "cpw_cents"],
+              "additionalProperties": false,
+              "properties": {
+                "price_cents": {"$ref": "#/$defs/Cents"},
+                "expected_wears_mid": {"type": "integer", "minimum": 1},
+                "cpw_cents": {"$ref": "#/$defs/Cents"}
+              }
+            }
+          ]
+        },
+        "results": {"type": "array", "maxItems": 50, "items": {"$ref": "#/$defs/Result"}}
+      }
+    },
+
+    "Fact": {
+      "type": "object",
+      "required": ["kind", "label", "value", "status", "source", "source_url", "snippet", "as_of"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {"type": "string"},
+        "label": {"type": "string"},
+        "value": {"type": "string"},
+        "status": {"enum": ["verified", "claimed", "inferred", "unknown"]},
+        "source": {"enum": ["specifics", "listing_text", "product_line", "tag_image", "model", "brand_table", "baseline"]},
+        "source_url": {"type": ["string", "null"], "format": "uri"},
+        "snippet": {"type": ["string", "null"]},
+        "as_of": {"type": "string", "format": "date"}
+      }
+    },
+
+    "Marker": {
+      "type": "object",
+      "required": ["level", "score", "facts"],
+      "additionalProperties": false,
+      "properties": {
+        "level": {"$ref": "#/$defs/Level"},
+        "score": {"anyOf": [{"$ref": "#/$defs/Unit"}, {"type": "null"}]},
+        "facts": {"type": "array", "items": {"$ref": "#/$defs/Fact"}}
+      }
+    },
+
+    "Result": {
+      "type": "object",
+      "required": ["id", "marketplace", "url", "title", "brand", "category", "subcategory",
+                   "size", "color", "condition", "condition_raw", "thumb_url", "image_urls",
+                   "flags", "match", "cost", "materials", "quality", "eco", "wear",
+                   "confidence", "seller"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^(depop|poshmark|grailed|mercari|ebay):.+$"},
+        "marketplace": {"$ref": "#/$defs/Marketplace"},
+        "url": {"type": "string", "format": "uri"},
+        "title": {"type": "string"},
+        "brand": {"type": ["string", "null"]},
+        "category": {"$ref": "#/$defs/Category"},
+        "subcategory": {"type": ["string", "null"]},
+        "size": {"type": ["string", "null"]},
+        "color": {"type": ["string", "null"]},
+        "condition": {"anyOf": [{"$ref": "#/$defs/Condition"}, {"type": "null"}]},
+        "condition_raw": {"type": ["string", "null"]},
+        "thumb_url": {"type": ["string", "null"], "format": "uri"},
+        "image_urls": {"type": "array", "minItems": 1, "items": {"type": "string", "format": "uri"}},
+        "flags": {
+          "type": "object",
+          "required": ["is_vintage", "is_deadstock", "is_upcycled"],
+          "additionalProperties": false,
+          "properties": {
+            "is_vintage": {"type": "boolean"},
+            "is_deadstock": {"type": "boolean"},
+            "is_upcycled": {"type": "boolean"}
+          }
+        },
+        "match": {
+          "type": "object",
+          "required": ["similarity"],
+          "additionalProperties": false,
+          "properties": {"similarity": {"$ref": "#/$defs/Unit"}}
+        },
+        "cost": {
+          "type": "object",
+          "required": ["price_cents", "currency", "shipping_cents", "free_shipping", "total_cents",
+                       "original_price_cents", "retail_price_cents"],
+          "additionalProperties": false,
+          "properties": {
+            "price_cents": {"$ref": "#/$defs/Cents"},
+            "currency": {"const": "USD"},
+            "shipping_cents": {"$ref": "#/$defs/NullableCents"},
+            "free_shipping": {"type": ["boolean", "null"]},
+            "total_cents": {"$ref": "#/$defs/Cents"},
+            "original_price_cents": {"$ref": "#/$defs/NullableCents"},
+            "retail_price_cents": {"$ref": "#/$defs/NullableCents"}
+          }
+        },
+        "materials": {
+          "type": "object",
+          "required": ["fibers", "synthetic_share", "certifications", "composition_suspect"],
+          "additionalProperties": false,
+          "properties": {
+            "fibers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["fiber", "pct", "organic", "recycled"],
+                "additionalProperties": false,
+                "properties": {
+                  "fiber": {"type": "string"},
+                  "pct": {"type": ["number", "null"], "minimum": 0, "maximum": 100},
+                  "organic": {"type": ["boolean", "null"]},
+                  "recycled": {"type": ["boolean", "null"]}
+                }
+              }
+            },
+            "synthetic_share": {"type": ["number", "null"], "minimum": 0, "maximum": 100},
+            "certifications": {
+              "type": "array",
+              "items": {"enum": ["gots", "oeko_tex", "bluesign", "fair_trade", "rws", "rds", "b_corp"]}
+            },
+            "composition_suspect": {"type": "boolean"}
+          }
+        },
+        "quality": {"$ref": "#/$defs/Marker"},
+        "eco": {"$ref": "#/$defs/Marker"},
+        "wear": {
+          "type": "object",
+          "required": ["expected_wears", "basis", "cpw_cents", "break_even_wears"],
+          "additionalProperties": false,
+          "properties": {
+            "expected_wears": {
+              "type": "object",
+              "required": ["low", "high", "mid"],
+              "additionalProperties": false,
+              "properties": {
+                "low": {"type": "integer", "minimum": 1},
+                "high": {"type": "integer", "minimum": 1},
+                "mid": {"type": "integer", "minimum": 1}
+              }
+            },
+            "basis": {"enum": ["category_baseline", "evidence_adjusted"]},
+            "cpw_cents": {
+              "type": "object",
+              "required": ["at_30", "at_60", "at_100", "at_mid"],
+              "additionalProperties": false,
+              "properties": {
+                "at_30": {"$ref": "#/$defs/Cents"},
+                "at_60": {"$ref": "#/$defs/Cents"},
+                "at_100": {"$ref": "#/$defs/Cents"},
+                "at_mid": {"$ref": "#/$defs/Cents"}
+              }
+            },
+            "break_even_wears": {"type": ["integer", "null"], "minimum": 1}
+          }
+        },
+        "confidence": {"$ref": "#/$defs/Level"},
+        "seller": {
+          "type": "object",
+          "required": ["type", "rating", "region"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"enum": ["individual", "small_shop", "large_reseller", null]},
+            "rating": {"type": ["number", "null"]},
+            "region": {"type": ["string", "null"]}
+          }
+        }
+      }
+    },
+
+    "Error": {
+      "type": "object",
+      "required": ["error"],
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "type": "object",
+          "required": ["code", "message"],
+          "additionalProperties": false,
+          "properties": {
+            "code": {"enum": ["invalid_image", "invalid_params", "image_too_large", "internal"]},
+            "message": {"type": "string"}
+          }
+        }
+      }
+    }
+  }
+}
