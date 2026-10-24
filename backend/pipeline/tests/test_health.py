@@ -65,6 +65,7 @@ def test_the_real_blocked_run_reported_succeeded_with_zero_failed_requests_but_i
 def test_zero_rows_with_http_403_in_the_log_is_a_hard_block():
     v = assess(rows=rows(), log=log("mercari"))
     assert (v.kind, v.hard) == ("blocked", True) and any("403" in r for r in v.reasons)
+    assert not any("recovered" in n for n in v.notes)     # nothing came back, so nothing recovered
 
 
 def test_running_out_of_fresh_addresses_is_a_hard_block_even_if_a_few_rows_came_back():

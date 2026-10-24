@@ -25,13 +25,13 @@ def mapper(raw, category, scraped_at):
                             cost=dict(price_cents=raw["price"], total_cents=raw["price"])))
 
 
-def write_run(d, run_id, items, category="tshirts", status="SUCCEEDED", at="2026-10-24T01:00:00+00:00", file=True):
+def write_run(d, run_id, items, category="tshirts", status="SUCCEEDED", at="2026-10-24T01:00:00+00:00", file=True, verdict=None):
     (d / "raw" / "depop").mkdir(parents=True, exist_ok=True)
     if file:
         (d / "raw" / "depop" / f"{run_id}.jsonl").write_text("".join(json.dumps(i) + "\n" for i in items))
     with (d / "runs.jsonl").open("a") as f:
         f.write(json.dumps(dict(marketplace="depop", category=category, query="q", run_id=run_id, status=status,
-                                items=len(items), at=at)) + "\n")
+                                items=len(items), at=at, **({"verdict": verdict} if verdict else {}))) + "\n")
 
 
 def read_ids(d):
@@ -80,6 +80,12 @@ def test_failed_runs_and_missing_files_are_skipped(tmp_path):
     write_run(tmp_path, "ok", [{"id": "a", "price": 100}])
     N.normalize_all(tmp_path, {"depop": mapper})
     assert read_ids(tmp_path) == ["depop:a"]
+
+
+@pytest.mark.parametrize("verdict, kept", [("ok", 1), ("short", 1), (None, 1), ("empty", 0), ("blocked", 0), ("degraded", 0), ("failed", 0)])
+def test_rows_from_runs_judged_bad_never_reach_the_catalog(tmp_path, verdict, kept):
+    write_run(tmp_path, "r1", [{"id": "a", "price": 100}], verdict=verdict)
+    assert N.normalize_all(tmp_path, {"depop": mapper})["kept"] == kept
 
 
 def test_output_is_sorted_and_reruns_are_identical(tmp_path):

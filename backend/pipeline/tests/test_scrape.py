@@ -11,10 +11,12 @@ from scrape import Task
 
 
 class FakeClient:
-    """Stands in for ApifyClient. `statuses` maps call index -> SUCCEEDED/FAILED/NONE/RAISE."""
+    """Stands in for ApifyClient. `statuses` maps call index -> SUCCEEDED/FAILED/NONE/RAISE/INTERRUPT;
+    `rows_by_call` and `logs` map a call index to that run's dataset rows and log text."""
 
-    def __init__(self, items=3, statuses=None, rows=None):
+    def __init__(self, items=3, statuses=None, rows=None, rows_by_call=None, logs=None):
         self.calls, self.items, self.statuses, self.rows = [], items, statuses or {}, rows
+        self.rows_by_call, self.logs = rows_by_call or {}, logs or {}
 
     def actor(self, actor_id):
         client = self
@@ -28,12 +30,19 @@ class FakeClient:
                     raise RuntimeError("network down")
                 if status == "NONE":
                     return None
+                if status == "INTERRUPT":
+                    raise KeyboardInterrupt
                 return SimpleNamespace(id=f"run{n}", status=status, default_dataset_id=f"ds{n}", usage_total_usd=0.01,
                                        status_message=None if status == "SUCCEEDED" else "actor crashed")
         return Actor()
 
+    def run(self, run_id):
+        client = self
+        return SimpleNamespace(log=lambda: SimpleNamespace(get=lambda: client.logs.get(int(run_id[3:]), "")))
+
     def dataset(self, dataset_id):
-        rows = self.rows or [{"id": f"{dataset_id}-{k}", "title": "tee", "sellerUsername": "bob",
+        rows = self.rows_by_call.get(int(dataset_id[2:])) if int(dataset_id[2:]) in self.rows_by_call else None
+        rows = rows if rows is not None else self.rows or [{"id": f"{dataset_id}-{k}", "title": "tee", "sellerUsername": "bob",
                               "seller": {"username": "bob", "id": 7, "ratingAverage": 4.9}} for k in range(self.items)]
         return SimpleNamespace(iterate_items=lambda: iter(rows))
 
@@ -171,10 +180,10 @@ def test_successful_run_writes_scrubbed_raw_file_and_logs_it(tmp_path):
     assert log["est_charge_usd"] == pytest.approx(0.003)
 
 
-def test_an_empty_dataset_is_a_finished_run_with_zero_items(tmp_path):
+def test_an_empty_dataset_is_logged_as_an_empty_run(tmp_path):
     S.run_plan(FakeClient(items=0), [t()], None, tmp_path)
     (log,) = read_jsonl(tmp_path / "runs.jsonl")
-    assert (log["status"], log["items"]) == ("SUCCEEDED", 0)
+    assert (log["status"], log["items"], log["verdict"]) == ("SUCCEEDED", 0, "empty")
 
 
 @pytest.mark.parametrize("status, expected", [("FAILED", "FAILED"), ("TIMED-OUT", "TIMED-OUT"),
@@ -212,16 +221,16 @@ def test_quota_counts_rows_from_earlier_runs(tmp_path):
     assert len(again.calls) == 1  # 3 earlier + 3 now >= 5
 
 
-def test_three_failures_in_a_row_give_up_on_that_marketplace_only(tmp_path):
+def test_two_failures_in_a_row_give_up_on_that_marketplace_only(tmp_path):
     plan = [t("depop", q=f"d{i}") for i in range(5)] + [t("ebay", q="e0")]
-    client = FakeClient(statuses={0: "FAILED", 1: "FAILED", 2: "FAILED"})
+    client = FakeClient(statuses={0: "FAILED", 1: "FAILED"})
     S.run_plan(client, plan, None, tmp_path)
-    assert [a for a, _ in client.calls] == ["jongoose/depop-scraper"] * 3 + ["memo23/ebay-search-scraper-ppe"]
+    assert [a for a, _ in client.calls] == ["jongoose/depop-scraper"] * 2 + ["memo23/ebay-search-scraper-ppe"]
 
 
 def test_a_success_resets_the_failure_streak(tmp_path):
     plan = [t(q=f"d{i}") for i in range(6)]
-    client = FakeClient(statuses={0: "FAILED", 1: "FAILED", 3: "FAILED", 4: "FAILED"})
+    client = FakeClient(statuses={0: "FAILED", 2: "FAILED", 4: "FAILED"})
     S.run_plan(client, plan, None, tmp_path)
     assert len(client.calls) == 6
 

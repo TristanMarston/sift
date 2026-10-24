@@ -107,7 +107,7 @@ def _log_evidence(log: str, status_message: str | None):
     if spent:
         blocked.append(f"ran out of fresh addresses ({spent[0][0]} of {spent[0][1]}): the site keeps refusing us")
     elif rotations:
-        notes.append(f"{len(rotations)} address refusals (HTTP 403) recovered by switching address")
+        notes.append(f"{len(rotations)} address refusals (HTTP 403)")
     if any(_GAVE_UP.search(l) for l in warnings):
         blocked.append("the actor reports giving up")
     for text in (log, status_message or ""):
@@ -132,6 +132,10 @@ def assess(status: str, status_message: str | None, requested: int, rows: RowCou
     if blocked:
         return Verdict("blocked", blocked, notes)
     n = rows.saved
+    if n > 0:     # refusals only "recovered" if rows actually came back
+        notes = [note + " recovered by switching address" if "address refusals" in note else note for note in notes]
+    else:
+        notes = [note for note in notes if "address refusals" not in note]
     if n == 0:
         if hard:
             return Verdict("blocked", [f"no rows, and the log says: {hard[0]}"], notes)
