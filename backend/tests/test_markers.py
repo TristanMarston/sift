@@ -215,3 +215,20 @@ def test_blends_viscose_and_synthetics_are_not_natural(row):
                    fibers(("viscose", 100), synthetic_share=0),
                    fibers(("cotton", None), ("polyester", None))):
         assert "natural_fibers" not in kinds(M.eco(row(materials=fabric), {}))
+
+
+def test_a_fabric_named_in_the_title_counts_when_it_implies_a_fiber_that_suits_the_category(row):
+    """7,367 listings name a fabric but no fiber: "denim jeans", "corduroy shirt", "suede sneakers". The fabric is a
+    claimed fact (denim is cotton twill, suede is leather) and earns the fiber point, without inventing a composition."""
+    q, _ = M.quality(row(category="jeans_pants", title="Vintage Levi's 550 black denim jeans"), {})
+    assert q["level"] == "medium" and [f["kind"] for f in q["facts"]] == ["fabric"]
+    assert q["facts"][0]["value"] == "Denim (cotton)" and q["facts"][0]["status"] == "claimed"
+    q, _ = M.quality(row(category="sneakers", title="Vans Old Skool suede sneakers"), {})
+    assert q["level"] == "medium" and q["facts"][0]["value"] == "Suede (leather)"
+    q, _ = M.quality(row(category="hoodies_sweatshirts", title="Champion fleece pullover hoodie"), {})
+    assert q["level"] == "unknown" and q["facts"] == []            # fleece is polyester: no point, no fact
+    q, _ = M.quality(row(category="jeans_pants", title="Vintage Levi's 550 black denim jeans", description="pair it with denim"),
+                     {})
+    assert [f["kind"] for f in q["facts"]] == ["fabric"]           # the title names it once; the description does not add
+    q, _ = M.quality(row(category="jeans_pants", title="Grey sweatpants", description="goes with denim jackets"), {})
+    assert q["facts"] == []                                        # only the title counts: descriptions mention other clothes

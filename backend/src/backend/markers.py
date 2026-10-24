@@ -31,6 +31,12 @@ DURABLE = {
     "sneakers": ({"leather"}, 0),
     "dresses_skirts": ({"wool", "linen", "silk"}, 80),   # cotton left out: the default fabric of cheap dresses
 }
+# Fabrics sellers name in titles without a fiber ("denim jeans", "suede sneakers"): 7,367 listings at 76k. The fabric is a
+# claimed fact that implies one fiber (denim is cotton twill, suede is leather, corduroy and chambray are cotton weaves,
+# canvas is cotton) and earns the fiber point when that fiber suits the category. The composition stays unstated.
+FABRIC = {"denim": "cotton", "corduroy": "cotton", "chambray": "cotton", "canvas": "cotton", "suede": "leather",
+          "nubuck": "leather"}
+_FABRIC_RE = re.compile(r"\b(denim|corduroy|chambray|canvas|suede|nubuck)\b", re.I)
 FLAGS = [("is_vintage", "vintage", "Vintage", "Already had a first life"),
          ("is_deadstock", "deadstock", "Deadstock", "Old unsold stock, never worn"),
          ("is_upcycled", "upcycled", "Upcycled", "Remade from existing garments")]
@@ -107,6 +113,14 @@ def quality(row: dict, brands: dict) -> tuple[dict, list[dict]]:
             points -= 1
             scored.append(f)
     as_of = row["scraped_at"][:10]
+    if not fibers and (m := _FABRIC_RE.search(row["title"] or "")):
+        fabric, fiber = m[0].lower(), FABRIC[m[0].lower()]
+        good, _ = DURABLE.get(row["category"], (set(), 101))
+        if fiber in good:
+            f = _fact("fabric", "Fabric", f"{fabric.capitalize()} ({fiber})", as_of=as_of, snippet=m[0])
+            facts.append(f)
+            scored.append(f)
+            points += 1
     found = list(dict.fromkeys(m[0] for m in CONSTRUCTION.finditer(f"{row['title']}. {row.get('description') or ''}")))
     if found:
         f = _fact("construction", "Construction", ", ".join(dict.fromkeys(x.lower() for x in found)), as_of=as_of,
