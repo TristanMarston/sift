@@ -12,6 +12,10 @@
 #
 # bluesign rows cite bluesign's own "System Partner list (Brands)" PDF dated September 1, 2026: each name below
 # appears there as its own line (e.g. "PATAGONIA USA").
+# Rule (2026-10-24): only promises that reach a secondhand buyer count. Time-limited guarantees for the original buyer
+# (Nike 2-year warranty, Smartwool 2-year, KUHL 18-month, L.L.Bean 1-year satisfaction) were sourced but left out: they
+# almost never apply to a resold item, and a guarantee here adds +2 quality to every item of the brand.
+# Carhartt is missing because carhartt.com blocks automated fetches: add its row by hand (tests/test_brands.py).
 brands:
   - name: Patagonia
     aliases: [patagonia inc]
@@ -31,13 +35,6 @@ brands:
     certifications:
       # "THE NORTH FACE USA" (fetched 2026-10-24)
       - {name: bluesign, url: "https://www.bluesign.com/wp-content/uploads/2026/09/bluesign-System-Partner-list-Brands_2026.09.01.pdf"}
-    as_of: 2026-10-24
-    verified_by: "agent-sourced, needs teammate check"
-
-  - name: Nike
-    aliases: [nike acg]
-    # "material or workmanship flaw within two years of the manufacture date" (fetched 2026-10-24)
-    guarantee: {value: "Two-year warranty on material or workmanship flaws", url: "https://www.nike.com/help/a/shoe-warranty"}
     as_of: 2026-10-24
     verified_by: "agent-sourced, needs teammate check"
 
@@ -109,25 +106,7 @@ brands:
     as_of: 2026-10-24
     verified_by: "agent-sourced, needs teammate check"
 
-  - name: Smartwool
-    # "So if, for any reason, you aren't completely happy with your Smartwool® gear within two years of purchasing,"
-    # [Smartwool will provide new gear] (fetched 2026-10-24)
-    guarantee: {value: "Two-year satisfaction guarantee", url: "https://www.smartwool.com/en-us/pages/our-guarantee"}
-    as_of: 2026-10-24
-    verified_by: "agent-sourced, needs teammate check"
-
-  - name: KÜHL
-    aliases: [kuhl]
-    # "covered by a limited warranty against manufacturer defects for 18 months from the original purchase date."
-    # (fetched 2026-10-24)
-    guarantee: {value: "18-month limited warranty against manufacturer defects", url: "https://www.kuhl.com/warranty/"}
-    as_of: 2026-10-24
-    verified_by: "agent-sourced, needs teammate check"
-
   - name: L.L.Bean
-    # "If you are not 100% satisfied with one of our products, you may return it within one year of purchase for a
-    # refund." (fetched 2026-10-24)
-    guarantee: {value: "One-year satisfaction guarantee", url: "https://global.llbean.com/llb/shop/513705.html?nav=footer"}
     certifications:
       # "LL BEAN USA" (fetched 2026-10-24)
       - {name: bluesign, url: "https://www.bluesign.com/wp-content/uploads/2026/09/bluesign-System-Partner-list-Brands_2026.09.01.pdf"}
