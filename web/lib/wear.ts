@@ -37,3 +37,10 @@ export const cheapestDropsTo = <T extends Priced>(items: T[]) => byPerWear(items
 
 /** The wear counts the dial stops at: once, a few, many, then all of them. Each stop shows a clearly lower cost per wear. */
 export const wearSteps = (wears: number) => [...[1, 5, 20, 50].filter((s) => s < wears), wears];
+
+/** How the receipt words break-even: cheaper than the typical match up front, wins within its expected life,
+ *  or would need more wears than it is expected to last (then "wear it N+ times" would be a promise it can't keep). */
+export function breakEvenVerdict(breakEvenWears: number | null, expectedHigh: number): 'cheaper' | 'wins' | 'never' {
+    if (breakEvenWears === null) return 'cheaper';
+    return breakEvenWears <= expectedHigh ? 'wins' : 'never';
+}

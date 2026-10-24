@@ -9,6 +9,7 @@ import { ease, spring } from '@/lib/motion';
 import { levelText, MARKET, marketLine, perWearText, priceText } from '@/lib/results';
 import type { Fact, Level, Result, SearchResponse } from '@/lib/search';
 import { useMedia } from '@/lib/use-media';
+import { breakEvenVerdict } from '@/lib/wear';
 import { cn } from '@/lib/utils';
 import { FactLine, LevelDots, noEvidence } from './evidence';
 import { ListingPhoto } from './result-row';
@@ -149,14 +150,23 @@ export function ReceiptSheet({ r, typical, onClose }: Props) {
                         {typical && (
                             <Section label='VS. TYPICAL MATCH'>
                                 <Lines lines={[`The typical match costs ${priceText(typical.price_cents)}, about ${perWearText(typical.cpw_cents)} a wear.`]} />
-                                {w.break_even_wears !== null ? (
-                                    <>
-                                        <p className='pt-1 type-receipt font-semibold'>Break-even: wear this {w.break_even_wears}+ times to win.</p>
-                                        <p className='pt-0.5 type-footnote text-receipt-ink/70'>If you won&apos;t wear it that often, the cheaper one is the better buy.</p>
-                                    </>
-                                ) : (
-                                    <p className='pt-1 type-receipt font-semibold'>It costs less than the typical match up front.</p>
-                                )}
+                                {{
+                                    cheaper: <p className='pt-1 type-receipt font-semibold'>It costs less than the typical match up front.</p>,
+                                    wins: (
+                                        <>
+                                            <p className='pt-1 type-receipt font-semibold'>Break-even: wear this {w.break_even_wears}+ times to win.</p>
+                                            <p className='pt-0.5 type-footnote text-receipt-ink/70'>If you won&apos;t wear it that often, the cheaper one is the better buy.</p>
+                                        </>
+                                    ),
+                                    never: (
+                                        <>
+                                            <p className='pt-1 type-receipt font-semibold'>Unlikely to beat the typical match on cost per wear.</p>
+                                            <p className='pt-0.5 type-footnote text-receipt-ink/70'>
+                                                It would take {w.break_even_wears}+ wears, more than the {w.expected_wears.high} it&apos;s expected to last.
+                                            </p>
+                                        </>
+                                    ),
+                                }[breakEvenVerdict(w.break_even_wears, w.expected_wears.high)]}
                             </Section>
                         )}
 
