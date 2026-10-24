@@ -4,7 +4,7 @@ import type { Garment } from './types';
 export type Box = { x: number; y: number; w: number; h: number }; // fractions of the photo, top-left origin
 export type DetectResponse = {
     image: { width: number; height: number };
-    garments: { id: string; category: string | null; label: string; brand: string | null; box: Box; confidence: number }[]; // category null: none of the 8; brand: a logo or label read off the garment
+    garments: { id: string; category: string | null; label: string; brand?: string | null; box: Box; confidence: number }[]; // category null: none of the 8; brand: a logo or label read off the garment
 };
 
 /** API.md: with no garments found, the whole photo is searched as one. Inset a little so its trace reads as a frame. */
