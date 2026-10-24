@@ -8,12 +8,14 @@
 # A query is a string (uses the marketplace default in `max_items`) or {query: ..., max_items: ...}.
 # Caps stay <= 500 so one long tail cannot eat the budget.
 
-quotas:        # raw rows per marketplace at this stage: 20k target x ~1.3 over-scrape = 26,000. Raise for the 50k stage.
-  depop: 10400
-  poshmark: 5200
+quotas:        # raw rows per marketplace in total. The "cheap-heavy" mix for the ~$190 the token has left: Grailed ($0.012 a row)
+               # keeps its 20k-stage 3,900 rows; the rest is the 20k-stage ratio of the other four, scaled 3.16x.
+               # 73,600 raw rows, about $190; Depop is 45% (max 50%). run/cli.py batch splits each batch in this ratio.
+  depop: 32800
+  poshmark: 16400
   grailed: 3900
-  mercari: 3900
-  ebay: 2600
+  mercari: 12300
+  ebay: 8200
 
 max_items:     # default cap per query
   depop: 200

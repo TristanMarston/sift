@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import jsonl
 import scrape as S
 from scrape import Task
 
@@ -264,6 +265,36 @@ def test_max_spend_stops_before_the_worst_case_would_exceed_it(tmp_path):
     assert len(client.calls) == 2  # after two runs 0.20 is spent; a third could reach 0.33
 
 
+def test_a_lane_can_leave_the_run_report_to_its_batch(tmp_path):
+    S.run_plan(FakeClient(), [t()], None, tmp_path, write_report=False)
+    assert (tmp_path / "runs.jsonl").exists() and not (tmp_path / "run_report.md").exists()
+
+
+def test_lanes_can_share_one_snapshot_of_past_runs_instead_of_reading_the_file(tmp_path):
+    """Lanes start at once; one lane's first entries must not shift another lane's spend or quota."""
+    jsonl.append(tmp_path / "runs.jsonl", dict(marketplace="ebay", category="tshirts", query="x", status="SUCCEEDED",
+                                               items=10, est_charge_usd=5.0))
+    done = [dict(marketplace="depop", category="tshirts", query="one", status="SUCCEEDED", items=3, est_charge_usd=0.0)]
+    client = FakeClient()
+    S.run_plan(client, [t(q="one"), t(q="two")], None, tmp_path, max_spend=Decimal("1"), past=done)
+    assert [kw["run_input"]["query"] for _, kw in client.calls] == ["two"]
+
+
+def test_clean_rows_are_what_reaches_disk_free_rows_skipped_and_seller_identity_scrubbed():
+    rows = [{"type": "search"}, {"type": "listing", "listingId": "m1", "sellerUsername": "bob",
+                                 "seller": {"id": 1, "ratingAverage": 5}}]
+    assert list(S.clean_rows("mercari", rows)) == [{"type": "listing", "listingId": "m1", "seller": {"ratingAverage": 5}}]
+    assert list(S.clean_rows("depop", [{"id": 1, "slug": "bob-tee", "location": "Austin"}])) == [{"id": 1}]
+
+
+def test_quota_rows_count_rows_of_good_runs_only():
+    past = [dict(marketplace="depop", status="SUCCEEDED", items=5),
+            dict(marketplace="depop", status="SUCCEEDED", items=7, verdict="blocked"),
+            dict(marketplace="ebay", status="FAILED", items=0),
+            dict(marketplace="ebay", status="SUCCEEDED", items=3, verdict="short")]
+    assert S.quota_rows(past) == {"depop": 5, "ebay": 3}
+
+
 # --- the real queries.yaml -----------------------------------------------------------------
 
 @pytest.fixture(scope="module")
@@ -325,10 +356,10 @@ def test_every_query_is_capped_at_500_and_unique_per_marketplace(cfg):
         assert len(flat) == len(set(flat)), mp
 
 
-def test_pool_can_reach_the_50k_stage(cfg):
+def test_the_query_pool_can_fill_every_quota_with_room_for_short_queries(cfg):
     for mp, quota in cfg.quotas.items():
         capacity = sum(n for by_mp in cfg.queries.values() for _, n in by_mp[mp])
-        assert capacity >= 3 * quota, (mp, capacity, quota)
+        assert capacity >= 1.2 * quota, (mp, capacity, quota)
 
 
 def test_demo_props_and_conference_tees_are_queried(cfg):
