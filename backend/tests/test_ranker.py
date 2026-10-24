@@ -165,3 +165,18 @@ def test_headline_says_how_close_the_best_match_is(hits):
     low = [(row, min(sim, 0.7)) for row, sim in hits]
     assert R.rank(low, QUERY, CFG)["headline"]["match"] == "similar"
     assert R.rank([], QUERY, CFG)["headline"]["match"] is None
+
+
+def test_wear_steps_show_how_the_expected_wears_were_reached(hits):
+    """web/BACKEND-REQUESTS.md: typical wears, then the quality multiplier, then the condition multiplier; the
+    product rounds to expected_wears.mid."""
+    res = {r["id"]: r for r in R.rank(hits, QUERY, CFG)["results"]}
+    mid = res["depop:mid"]            # Carhartt Detroit: quality high, condition like new
+    assert mid["wear"]["steps"] == [{"label": "Typical for jackets & outerwear", "value": "120 wears"},
+                                    {"label": "High quality", "value": "× 1.5"},
+                                    {"label": "Like new condition", "value": "× 0.95"}]
+    assert round(120 * 1.5 * 0.95) == mid["wear"]["expected_wears"]["mid"]
+    cheap = res["depop:cheap"]        # no evidence, fair
+    assert cheap["wear"]["steps"][1] == {"label": "Quality unknown", "value": "× 1"}
+    unknown = R.rank([(make_row("x", condition=None, **price(1000)), 0.9)], QUERY, CFG)["results"][0]
+    assert unknown["wear"]["steps"][2] == {"label": "Condition not stated", "value": "× 0.85"}

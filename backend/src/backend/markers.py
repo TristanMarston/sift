@@ -153,6 +153,12 @@ def quality(row: dict, brands: dict) -> tuple[dict, list[dict]]:
 # Eco score (0-1). Every item here is secondhand, so the new-garment impact is avoided for all of them; what separates
 # them is what happens next. Weights are a team judgement (API.md states them).
 ECO_WEIGHTS = {"fibers": 0.35, "durability": 0.30, "shipping": 0.15, "circularity": 0.20}
+ECO_LABELS = {"fibers": "Fabric", "durability": "How long it lasts", "shipping": "Where it ships from",
+              "circularity": "Second life"}   # the item panel's bars; copy rules: short, sentence case, no em dashes
+ECO_PART = {"secondhand": None, "vintage": "circularity", "deadstock": "circularity", "upcycled": "circularity",
+            "recycled": "circularity", "organic": "circularity", "certification": "circularity",
+            "natural_fibers": "fibers", "materials": "fibers", "fabric_unknown": "fibers", "synthetic_share": "fibers",
+            "animal_materials": "fibers", "durability": "durability", "shipping": "shipping"}
 ECO_HIGH, ECO_LOW = 0.70, 0.40      # 100% cotton alone is medium; cotton + vintage, or cotton + built to last, is high
 SHIP_US, SHIP_ABROAD, SHIP_UNKNOWN = 1.0, 0.4, 0.6
 
@@ -226,10 +232,13 @@ def eco(row: dict, brands: dict, wears: int | None = None, typical: int | None =
     else:
         shipping = SHIP_ABROAD
         facts.append(_fact("shipping", "Shipping", f"Ships from {region}: long haul", status="verified", as_of=as_of))
-    score = (ECO_WEIGHTS["fibers"] * share + ECO_WEIGHTS["durability"] * durability + ECO_WEIGHTS["shipping"] * shipping
-             + ECO_WEIGHTS["circularity"] * min(1.0, circularity / 2))
+    part_scores = {"fibers": share, "durability": durability, "shipping": shipping, "circularity": min(1.0, circularity / 2)}
+    score = sum(ECO_WEIGHTS[k] * v for k, v in part_scores.items())
     level = "high" if score >= ECO_HIGH else "low" if score < ECO_LOW else "medium"
-    return {"level": level, "score": round(score, 3), "facts": facts}
+    for f in facts:
+        f["part"] = ECO_PART[f["kind"]]
+    parts = [{"key": k, "label": ECO_LABELS[k], "weight": ECO_WEIGHTS[k], "score": round(v, 3)} for k, v in part_scores.items()]
+    return {"level": level, "score": round(score, 3), "facts": facts, "parts": parts}
 
 
 def confidence(scored: list[dict]) -> str:

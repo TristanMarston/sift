@@ -163,8 +163,14 @@ Any non-2xx response has the body `{"error": {"code": "...", "message": "..."}}`
 
   "eco": {
     "level": "medium", "score": 0.6, "percentile": 72,
+    "parts": [
+      {"key": "fibers", "label": "Fabric", "weight": 0.35, "score": 0.5},
+      {"key": "durability", "label": "How long it lasts", "weight": 0.30, "score": 0.5},
+      {"key": "shipping", "label": "Where it ships from", "weight": 0.15, "score": 1.0},
+      {"key": "circularity", "label": "Second life", "weight": 0.20, "score": 0.5}
+    ],
     "facts": [
-      {"kind": "secondhand", "label": "Secondhand", "value": "Already in use (vintage)",
+      {"kind": "secondhand", "part": null, "label": "Secondhand", "value": "Already in use (vintage)",
        "status": "verified", "source": "listing_text", "source_url": null,
        "snippet": "vintage 90s", "as_of": "2026-10-23"}
     ]
@@ -175,6 +181,11 @@ Any non-2xx response has the body `{"error": {"code": "...", "message": "..."}}`
     "basis": "evidence_adjusted",
     "cpw_cents": {"at_30": 160, "at_60": 80, "at_100": 48, "at_mid": 30},
     "break_even_wears": 72,
+    "steps": [
+      {"label": "Typical for jackets & outerwear", "value": "100 wears"},
+      {"label": "High quality", "value": "× 1.5"},
+      {"label": "Good condition", "value": "× 0.8"}
+    ],
     "facts": [
       {"kind": "baseline", "label": "Typical lifespan", "value": "67–167 wears for jackets & outerwear",
        "status": "inferred", "source": "baseline", "source_url": "https://www.carbonfact.com/hubfs/A&FW_PEFCR_v3.1.pdf",
@@ -224,7 +235,10 @@ Any non-2xx response has the body `{"error": {"code": "...", "message": "..."}}`
   `level`: `high` ≥ 0.70 (cotton + vintage, or cotton + built to last), `low` < 0.40 (synthetic, or long-haul with
   nothing else), else `medium`; never `unknown`. `eco.percentile` = share of the other results with a lower score:
   show "Greener than 72% of these matches". The facts say which signals applied (`fabric_unknown`, `durability`,
-  `shipping` are new kinds).
+  `shipping` are new kinds). `eco.parts` lists the four parts in display order with their weight and 0–1 score
+  (`sum(weight × score)` = `score`); every eco fact carries `part`, the key it feeds, or `null` for `secondhand`.
+- `wear.steps`: how `expected_wears.mid` was reached, in order: the category's typical wears, the quality multiplier,
+  the condition multiplier ("Condition not stated" when missing). Show `label` and `value` as written.
 - `confidence` is the overall amount of evidence behind `wear`. `unknown` is allowed.
 - `fact.status`: `verified | claimed | inferred | unknown`. Suggested UI: verified = solid,
   claimed = "as declared", inferred = "likely", unknown = grey "unknown".

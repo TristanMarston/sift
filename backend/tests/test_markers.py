@@ -276,3 +276,21 @@ def test_sneakers_named_leather_in_the_title_get_the_fiber_point(row):
     assert q["level"] == "medium" and q["facts"][0]["value"] == "Leather"
     q, _ = M.quality(row(category="jeans_pants", title="Levi's 501 with leather patch"), {})
     assert q["facts"] == []
+
+
+# --- eco parts: what the item panel shows as bars (web/BACKEND-REQUESTS.md) ---------------------------
+
+def test_eco_parts_add_up_to_the_score_and_every_fact_names_its_part(row):
+    r = row(category="jeans_pants", materials=fibers(("cotton", 100), synthetic_share=0), seller={"region": "US"},
+            flags={"is_vintage": True, "is_deadstock": False, "is_upcycled": False})
+    e = M.eco(r, {}, wears=120, typical=80)
+    assert [p["key"] for p in e["parts"]] == ["fibers", "durability", "shipping", "circularity"]
+    assert [p["label"] for p in e["parts"]] == ["Fabric", "How long it lasts", "Where it ships from", "Second life"]
+    assert sum(p["weight"] for p in e["parts"]) == 1
+    assert abs(sum(p["weight"] * p["score"] for p in e["parts"]) - e["score"]) < 0.001
+    assert {p["key"]: p["score"] for p in e["parts"]} == {"fibers": 1.0, "durability": 1.0, "shipping": 1.0, "circularity": 0.5}
+    parts = {f["kind"]: f["part"] for f in e["facts"]}
+    assert parts["secondhand"] is None and parts["vintage"] == "circularity" and parts["natural_fibers"] == "fibers"
+    assert parts["durability"] == "durability" and parts["shipping"] == "shipping"
+    assert all("part" in f for f in e["facts"])
+    assert all("—" not in p["label"] for p in e["parts"])

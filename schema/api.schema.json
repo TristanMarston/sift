@@ -143,6 +143,7 @@
       "additionalProperties": false,
       "properties": {
         "kind": {"type": "string"},
+        "part": {"description": "Eco facts only: the eco.parts key this fact feeds, or null (secondhand).", "anyOf": [{"type": "string", "enum": ["fibers", "durability", "shipping", "circularity"]}, {"type": "null"}]},
         "label": {"type": "string"},
         "value": {"type": "string"},
         "status": {"enum": ["verified", "claimed", "inferred", "unknown"]},
@@ -155,12 +156,19 @@
 
     "EcoMarker": {
       "type": "object",
-      "required": ["level", "score", "facts", "percentile"],
+      "required": ["level", "score", "facts", "percentile", "parts"],
       "additionalProperties": false,
       "properties": {
         "level": {"$ref": "#/$defs/Level"},
         "score": {"$ref": "#/$defs/Unit"},
         "facts": {"type": "array", "items": {"$ref": "#/$defs/Fact"}},
+        "parts": {
+          "description": "The four parts of the score, in display order; sum(weight x score) = score (within rounding).",
+          "type": "array", "minItems": 4, "maxItems": 4,
+          "items": {"type": "object", "required": ["key", "label", "weight", "score"], "additionalProperties": false,
+                    "properties": {"key": {"enum": ["fibers", "durability", "shipping", "circularity"]}, "label": {"type": "string"},
+                                   "weight": {"$ref": "#/$defs/Unit"}, "score": {"$ref": "#/$defs/Unit"}}}
+        },
         "percentile": {"description": "Share of the other results with a lower eco score (0-100): \"greener than N% of these matches\".", "type": "integer", "minimum": 0, "maximum": 100}
       }
     },
@@ -263,9 +271,15 @@
         "eco": {"$ref": "#/$defs/EcoMarker"},
         "wear": {
           "type": "object",
-          "required": ["expected_wears", "basis", "cpw_cents", "break_even_wears", "facts"],
+          "required": ["expected_wears", "basis", "cpw_cents", "break_even_wears", "steps", "facts"],
           "additionalProperties": false,
           "properties": {
+            "steps": {
+              "description": "How expected_wears.mid was reached: typical wears, the quality multiplier, the condition multiplier. Shown as written.",
+              "type": "array",
+              "items": {"type": "object", "required": ["label", "value"], "additionalProperties": false,
+                        "properties": {"label": {"type": "string"}, "value": {"type": "string"}}}
+            },
             "expected_wears": {
               "type": "object",
               "required": ["low", "high", "mid"],
