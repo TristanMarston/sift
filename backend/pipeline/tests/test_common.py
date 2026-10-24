@@ -124,6 +124,16 @@ def test_shorts_are_never_filed_as_jeans_or_pants(label, expected):
     assert C.category_from_label(label) == expected
 
 
+@pytest.mark.parametrize("label, expected", [
+    ("Women > Jeans > Boot cut", "jeans_pants"), ("Boot Cut Jeans", "jeans_pants"), ("Women > Jeans > Boot-cut", "jeans_pants"),
+    ("Men > Shoes > Boots", "sneakers"), ("Combat Boot", "sneakers"),
+    ("Women > Coats & jackets > Hooded jacket", "jackets_outerwear"), ("Hooded Coat", "jackets_outerwear"),
+    ("Hooded Sweatshirt", "hoodies_sweatshirts"), ("Men > Sweats & hoodies > Hooded", "hoodies_sweatshirts"),
+])
+def test_boot_cut_jeans_are_not_boots_and_a_hooded_jacket_is_a_jacket(label, expected):
+    assert C.category_from_label(label) == expected
+
+
 def test_resolve_category_prefers_the_label_and_never_lets_a_hat_inherit_the_query_category():
     assert C.resolve_category("Jackets & Coats", "tshirts") == "jackets_outerwear"
     assert C.resolve_category("", "tshirts") == "tshirts" and C.resolve_category(None, "sneakers") == "sneakers"

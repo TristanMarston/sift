@@ -62,8 +62,8 @@ def seller_type(listing_count: int | None) -> str | None:
 # First match wins, so order matters. Footwear of any kind is "sneakers": it is the only shoe category.
 _CATEGORY_RULES = [
     ("dresses_skirts", r"\bdress(?:es)?\b(?!\s+(?:shirt|pant|shoe|boot|sock|slack))|\bskirts?\b|\bgowns?\b"),
-    ("sneakers", r"sneaker|trainer|athletic shoe|\bshoes?\b|\bboots?\b|footwear|\bclogs?\b|\bloafers?\b"),
-    ("hoodies_sweatshirts", r"hoodie|hooded|sweatshirt"),
+    ("sneakers", r"sneaker|trainer|athletic shoe|\bshoes?\b|\bboots?\b(?![\s-]*cut)|footwear|\bclogs?\b|\bloafers?\b"),
+    ("hoodies_sweatshirts", r"hoodie|hooded(?!\s+(?:jacket|coat|parka|vest))|sweatshirt"),
     ("sweaters_knitwear", r"sweater|cardigan|knitwear|jumper|\bknits?\b|turtleneck"),
     ("jackets_outerwear", r"jacket|coat|parka|puffer|\bvests?\b|windbreaker|anorak|blazer|\bsuits?\b|outerwear|\bfleece\b|poncho"),
     ("tshirts", r"\bt[- ]?shirts?|\btees?\b"),

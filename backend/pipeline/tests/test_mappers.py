@@ -39,7 +39,7 @@ def test_every_real_sample_maps_to_a_valid_row_and_the_label_beats_the_query_cat
 def test_a_missing_label_falls_back_to_the_query_category(mp):
     labels = {"depop": dict(category=None, productType=None, group=None), "poshmark": dict(category=None, breadcrumbs=[]),
               "grailed": dict(category=None, categoryPath=None), "mercari": dict(category=None, categoryPath=None),
-              "ebay": dict(categoryPath=None)}[mp]
+              "ebay": dict(categoryPath=None, itemSpecifics={})}[mp]   # eBay's Type specific is part of its label
     assert mapped(mp, query_category="sneakers", **labels).category == "sneakers"
 
 
@@ -48,7 +48,8 @@ def test_a_missing_label_falls_back_to_the_query_category(mp):
     ("poshmark", dict(category="Hats", breadcrumbs=["Women", "Accessories", "Hats"])),
     ("grailed", dict(category="accessories", categoryPath="accessories.hats")),
     ("mercari", dict(category="Hats", categoryPath="Women > Accessories > Hats")),
-    ("ebay", dict(categoryPath="Clothing, Shoes & Accessories > Men > Men's Accessories > Hats")),
+    ("ebay", dict(categoryPath="Clothing, Shoes & Accessories > Men > Men's Accessories > Hats",
+                  itemSpecifics={"Type": "Baseball Cap"})),
 ])
 def test_a_hat_is_dropped_not_filed_under_the_query_category(mp, label):
     with pytest.raises(Drop, match="unmapped_category"):
@@ -218,6 +219,18 @@ def test_ebay_zero_percent_positive_means_no_recent_feedback_not_a_bad_seller(sc
 def test_ebay_condition_uses_only_the_label_before_the_seller_prose_and_html_entities_are_decoded():
     assert mapped("ebay", 3).condition == "good"
     assert "&#039;" not in mapped("ebay", 1).description and "men's" in mapped("ebay", 1).description
+
+
+@pytest.mark.parametrize("type_, category", [("T-Shirt", "tshirts"), ("Blouse", "shirts"), ("Tank Top", None), (None, None)])
+def test_ebay_type_says_what_a_generic_tops_category_is(type_, category):
+    """eBay files women's tees under "Women's Clothing > Tops", which is none of our 8 categories."""
+    spec = {k: v for k, v in fx("ebay")[0]["itemSpecifics"].items() if k != "Type"} | ({"Type": type_} if type_ else {})
+    tops = dict(categoryPath="Clothing, Shoes & Accessories > Women > Women's Clothing > Tops", itemSpecifics=spec)
+    if category is None:
+        with pytest.raises(Drop, match="unmapped_category"):
+            mapped("ebay", 0, **tops)
+    else:
+        assert mapped("ebay", 0, **tops).category == category
 
 
 def test_ebay_foreign_item_location_is_kept_with_its_country_and_ended_listings_are_sold():
