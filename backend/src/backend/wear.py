@@ -26,6 +26,17 @@ def expected_wears(baseline: dict, level: str, condition: str | None) -> dict:
     return {"low": w(baseline["low"]), "high": w(baseline["high"]), "mid": w(mid)}
 
 
+def steps(baseline: dict, level: str, condition: str | None, category: str) -> list[dict]:
+    """How expected_wears.mid was reached, for the item panel: typical wears, then the quality multiplier, then the
+    condition multiplier (web/BACKEND-REQUESTS.md). Short strings, no em dashes."""
+    mid = baseline.get("mid", (baseline["low"] + baseline["high"]) / 2)
+    quality = "Quality unknown" if level == "unknown" else f"{level.capitalize()} quality"
+    cond = f"{CONDITION_LABEL[condition]} condition" if condition else "Condition not stated"
+    return [{"label": f"Typical for {CATEGORY_LABEL[category]}", "value": f"{_round(mid)} wears"},
+            {"label": quality, "value": f"× {QUALITY_MULT[level]:g}"},
+            {"label": cond, "value": f"× {CONDITION[condition]:g}"}]
+
+
 def cpw(total_cents: int, wears: int) -> int:
     return _round(total_cents / max(1, wears))
 

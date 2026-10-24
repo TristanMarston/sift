@@ -48,6 +48,7 @@ def _result(row: dict, sim: float, cfg: Config) -> dict:
             "basis": "category_baseline" if q["level"] == "unknown" else "evidence_adjusted",
             "cpw_cents": W.cpw_table(row["cost"]["total_cents"], wears["mid"]),
             "break_even_wears": None,
+            "steps": W.steps(baseline, q["level"], row["condition"], row["category"]),
             "facts": W.wear_facts(row["category"], cfg.baselines, row["condition"], row["condition_raw"]),
         },
         "confidence": markers.confidence(scored),

@@ -48,7 +48,7 @@ Base URL: `https://lu-anthony-73--sift-api.us-west.modal.run` · Contract: `sche
 Receipt facts to render (generic `label` + `value` works): new kinds `construction`, `survival` ("Already lasted"),
 `natural_fibers`; fabric read from a care-tag photo arrives as source `tag_image`, status `verified`. `shipping_cents`
 null → "Shipping unknown" (already handled). Break-even beyond the item's life → "Unlikely to beat the typical match"
-(already handled, #36). **`cost.fee_cents` is new (#47):** the marketplace's buyer fee, already inside
+(already handled, #36). **`eco.parts` + `fact.part` + `wear.steps` (#67, Tristan's BACKEND-REQUESTS.md) feed the item panel's bars and "How we got N wears".** **`cost.fee_cents` is new (#47):** the marketplace's buyer fee, already inside
 `total_cents`; the receipt shows "Includes up to $3.25 Depop buyer fee" / "Includes $1.42 Mercari buyer fee".
 
 ## Completed features
