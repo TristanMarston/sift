@@ -49,7 +49,7 @@ export type Receipt = {
 export type Match = {
     listing: Listing;
     score: number;
-    band: 'exact' | 'similar';
+    band: 'exact' | 'close' | 'similar';
     reasons: { label: string; ok: boolean }[];
     receipt?: Receipt;
 };

@@ -139,3 +139,10 @@ def test_match_order_is_the_order_the_index_gave(hits):
     swapped = [hits[1], hits[0], *hits[2:]]                       # 0.90 before 0.95
     resp = R.rank(swapped, QUERY, CFG)
     assert resp["orders"]["match"][:2] == [swapped[0][0]["id"], swapped[1][0]["id"]]
+
+
+@pytest.mark.parametrize("sim, band", [(0.95, "exact"), (0.9, "exact"), (0.8986, "close"), (0.8, "close"), (0.72, "similar")])
+def test_three_match_bands(sim, band):
+    """0.90 and 0.72 both read "similar" before; a 0.80-0.90 match looks like the same garment in another colour or
+    cut, so it gets its own band."""
+    assert R.band(sim) == band
