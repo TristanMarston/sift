@@ -26,7 +26,8 @@ _BARE_FIELD_RE = re.compile(rf"\b(organic\s+|recycled\s+)?({_BARE}|leather|down|
 _FAUX_LEATHER = re.compile(r"\b(?:vegan|faux|synthetic)\s+leather\b", re.I)
 _REAL_LEATHER = re.compile(r"\b(?:genuine|real|full[- ]grain|top[- ]grain)\s+leather\b", re.I)
 _SYNTHETIC = {"polyester", "nylon", "acrylic", "elastane"}
-MATERIAL_KEYS = ("material", "fabric type", "fabric", "composition")  # structured specifics we trust
+# Structured specifics we trust for composition. Lining and insulation are left out: they would add up past 100%.
+MATERIAL_KEYS = ("material", "outer shell material", "fabric type", "fabric", "composition")
 
 _CERTS = {
     "gots": r"\bgots\b|global organic textile standard",
@@ -124,7 +125,7 @@ def extract(n: Normalized, lines: list[ProductLine] = PRODUCT_LINES) -> Listing:
         source = "listing_text"
     if fibers:
         note("materials.fibers", "claimed", source, snippet)
-    elif line := match_product_line(n.brand, n.title, lines):
+    elif line := match_product_line(n.brand, f"{n.title} {spec.get('product line', '')} {spec.get('model', '')}", lines):
         fibers = line.fibers
         note("materials.fibers", "inferred", "product_line", line.note)
     else:

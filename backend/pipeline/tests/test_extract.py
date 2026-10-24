@@ -198,6 +198,20 @@ def test_a_material_field_is_unambiguous_so_leather_and_down_count(material, exp
     assert [f.fiber for f in out.materials.fibers] == expected
 
 
+def test_ebay_outer_shell_material_counts_but_lining_and_insulation_do_not():
+    out = X.extract(norm(specifics={"Outer Shell Material": "Nylon", "Lining Material": "Polyester",
+                                    "Insulation Material": "Down", "Fabric Type": "Ripstop"}))
+    assert [f.fiber for f in out.materials.fibers] == ["nylon"]
+    assert out.evidence[0].source == "specifics"
+
+
+def test_product_line_can_come_from_the_specifics():
+    out = X.extract(norm(brand="The North Face", title="TNF puffer jacket mens",
+                         specifics={"Product Line": "The North Face Nuptse"}))
+    assert [f.fiber for f in out.materials.fibers] == ["nylon", "down"]
+    assert (out.evidence[0].status, out.evidence[0].source) == ("inferred", "product_line")
+
+
 def test_specifics_without_a_material_fall_back_to_text():
     out = X.extract(norm(description="100% nylon", specifics={"Color": "Blue", "Material": ""}))
     assert [f.fiber for f in out.materials.fibers] == ["nylon"] and out.evidence[0].source == "listing_text"

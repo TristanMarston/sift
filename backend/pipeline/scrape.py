@@ -25,6 +25,18 @@ class Actor:
     item_usd: Decimal          # price per result (SPEC.md §6)
     start_usd: Decimal         # price per run start
     build_input: Callable[[str, int], dict]
+    keep: frozenset | None = None   # if set, only these top-level keys of a record are written
+
+
+# eBay's default output includes ~60 KB of raw page modules per item, and they contain the seller's handle
+# and buyers' feedback. Keep only the fields the mapper reads (check the real output when changing this).
+EBAY_KEEP = frozenset({
+    "title", "description", "images", "image", "price", "priceValue", "totalPrice", "shippingCost", "shippingType",
+    "shippingCurrency", "shipping", "currency", "condition", "conditionId", "itemSpecifics", "itemLocation", "brand",
+    "categoryPath", "categoryId", "listingStatus", "itemId", "url", "marketplace", "searchQuery", "scrapedAt",
+    "quantity", "quantityAvailable", "quantitySold", "availability", "buyingFormat", "bestOfferEnabled", "freeReturns",
+    "startDate", "endDate", "model", "mpn", "sponsored", "promoted", "topRatedPlus", "recentPriceDrop", "watchers",
+    "sellerAccountType", "sellerFeedbackPercentage", "sellerFeedbackScore", "sellerHasStore", "sellerMemberSince"})
 
 
 ACTORS = {
@@ -40,7 +52,7 @@ ACTORS = {
     "ebay": Actor("memo23/ebay-search-scraper-ppe", Decimal("0.005"), Decimal("0.02"),
                   lambda q, n: {"searchQueries": [q], "maxItems": n, "marketplace": "ebay.com", "mode": "active",
                                 "condition": "used", "detailedItems": True, "includeDescription": True,
-                                "includeSummary": False}),
+                                "includeSummary": False}, EBAY_KEEP),
 }
 
 
@@ -53,22 +65,29 @@ def charge_cap(marketplace: str, max_items: int) -> Decimal:
 
 # --- privacy ---------------------------------------------------------------------------------
 
-# Lowercase key names dropped at any depth; inside a `seller`/`user` block `id`, `name` and `url` go too.
+# Flat keys dropped at any depth (lowercase). Dicts under a seller-ish key (`seller`, `sellerProfile`, `user`) are
+# stricter: only the rating/count/location fields in SELLER_SAFE survive, whatever else the actor puts there.
 IDENTITY_KEYS = {"sellerusername", "seller_username", "sellerurl", "seller_url", "sellername", "seller_name",
                  "sellerid", "seller_id", "sellerstorename", "username", "userid", "user_id",
                  "avatarurl", "avatar_url", "profileurl", "profile_url"}
-SELLER_BLOCKS = {"seller", "user"}
-SELLER_BLOCK_DROP = {"id", "name", "url"}
+SELLER_SAFE = {"ratingaverage", "ratingcount", "totalboughtandsold", "trustedseller", "listingsforsalecount",
+               "location", "locationabbreviation", "countrycode", "sellerscore", "buyerscore"}  # compared without "_"
 
 
-def scrub(value, in_seller=False):
-    """Copy of an actor record without seller usernames, profile URLs, avatars or ids."""
+def _seller_block(key: str) -> bool:
+    return key.lower().startswith("seller") or key.lower() == "user"
+
+
+def scrub(value, in_seller=False, keep=None):
+    """Copy of an actor record without seller usernames, profile URLs, avatars, account ids or contact data.
+    `keep`: if given, only these top-level keys survive."""
     if isinstance(value, list):
-        return [scrub(v, in_seller) for v in value]
+        return [scrub(v) for v in value]
     if not isinstance(value, dict):
         return value
-    return {k: scrub(v, k.lower() in SELLER_BLOCKS) for k, v in value.items()
-            if k.lower() not in IDENTITY_KEYS and not (in_seller and k.lower() in SELLER_BLOCK_DROP)}
+    return {k: scrub(v, _seller_block(k) and not in_seller) for k, v in value.items()
+            if k.lower() not in IDENTITY_KEYS and (keep is None or k in keep)
+            and (not in_seller or k.lower().replace("_", "") in SELLER_SAFE)}
 
 
 # --- plan ------------------------------------------------------------------------------------
@@ -131,8 +150,7 @@ def estimate(plan, quotas) -> dict[str, dict]:
 def _execute(client, task: Task, cap: Decimal, data_dir: Path) -> dict:
     actor = ACTORS[task.marketplace]
     entry = dict(marketplace=task.marketplace, category=task.category, query=task.query, max_items=task.max_items,
-                 run_id=None, status="ERROR", status_message=None, items=0, est_charge_usd=0.0,
-                 usage_total_usd=None, at=datetime.now(timezone.utc).isoformat(timespec="seconds"))
+                 run_id=None, status="ERROR", status_message=None, items=0, est_charge_usd=0.0, at=datetime.now(timezone.utc).isoformat(timespec="seconds"))
     try:
         run = client.actor(actor.id).call(run_input=actor.build_input(task.query, task.max_items),
                                           max_total_charge_usd=cap, run_timeout=RUN_TIMEOUT)
@@ -141,7 +159,7 @@ def _execute(client, task: Task, cap: Decimal, data_dir: Path) -> dict:
     if run is None:
         return {**entry, "status": "NO_RUN", "status_message": "call() returned no run"}
     entry.update(run_id=run.id, status=run.status, status_message=run.status_message,
-                 usage_total_usd=run.usage_total_usd, est_charge_usd=float(actor.start_usd))
+                 est_charge_usd=float(actor.start_usd))
     if run.status != OK:
         return entry
     path = data_dir / "raw" / task.marketplace / f"{run.id}.jsonl"
@@ -150,7 +168,7 @@ def _execute(client, task: Task, cap: Decimal, data_dir: Path) -> dict:
     try:
         with path.with_suffix(".tmp").open("w") as f:
             for n, item in enumerate(client.dataset(run.default_dataset_id).iterate_items(), 1):
-                f.write(json.dumps(scrub(item), ensure_ascii=False) + "\n")
+                f.write(json.dumps(scrub(item, keep=actor.keep), ensure_ascii=False) + "\n")
         path.with_suffix(".tmp").replace(path)
     except Exception as e:
         return {**entry, "status": "ERROR", "status_message": f"dataset fetch failed: {type(e).__name__}: {e}"}

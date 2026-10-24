@@ -13,8 +13,8 @@ from scrape import Task
 class FakeClient:
     """Stands in for ApifyClient. `statuses` maps call index -> SUCCEEDED/FAILED/NONE/RAISE."""
 
-    def __init__(self, items=3, statuses=None):
-        self.calls, self.items, self.statuses = [], items, statuses or {}
+    def __init__(self, items=3, statuses=None, rows=None):
+        self.calls, self.items, self.statuses, self.rows = [], items, statuses or {}, rows
 
     def actor(self, actor_id):
         client = self
@@ -33,8 +33,8 @@ class FakeClient:
         return Actor()
 
     def dataset(self, dataset_id):
-        rows = [{"id": f"{dataset_id}-{k}", "title": "tee", "sellerUsername": "bob",
-                 "seller": {"username": "bob", "id": 7, "ratingAverage": 4.9}} for k in range(self.items)]
+        rows = self.rows or [{"id": f"{dataset_id}-{k}", "title": "tee", "sellerUsername": "bob",
+                              "seller": {"username": "bob", "id": 7, "ratingAverage": 4.9}} for k in range(self.items)]
         return SimpleNamespace(iterate_items=lambda: iter(rows))
 
 
@@ -116,6 +116,42 @@ def test_scrub_removes_identity_at_any_depth_and_keeps_the_rest():
             "nested": [{"sellerUrl": "x", "price": 5}], "price": {"amount": 5}}
     assert S.scrub(item) == {"id": 1, "seller": {"ratingAverage": 4.9, "totalBoughtAndSold": 977},
                              "nested": [{"price": 5}], "price": {"amount": 5}}
+
+
+def test_scrub_keeps_only_known_safe_fields_inside_any_seller_block():
+    profile = {"id": 496933, "created_at": "2017-01-11", "location": "Asia", "total_bought_and_sold": 960,
+               "paypal_merchant_id": "X1", "account_preferences": {"a": 1}, "follower_count": 3, "is_admin": False,
+               "listings_for_sale_count": 312,
+               "seller_score": {"sold_count": 960, "rating_average": 4.8, "rating_count": 489, "tag_list": ["fast"]}}
+    assert S.scrub({"sellerProfile": profile, "Seller": {"email": "a@b.c", "ratingCount": 2}}) == {
+        "sellerProfile": {"location": "Asia", "total_bought_and_sold": 960, "listings_for_sale_count": 312,
+                          "seller_score": {"sold_count": 960, "rating_average": 4.8, "rating_count": 489,
+                                           "tag_list": ["fast"]}},
+        "Seller": {"ratingCount": 2}}
+
+
+def test_scrub_keep_drops_every_other_top_level_key():
+    assert S.scrub({"title": "x", "legacy_module": {"profileLogo": {"title": "somebody"}}}, keep={"title"}) == {"title": "x"}
+
+
+def test_ebay_raw_files_keep_only_whitelisted_fields_so_page_modules_with_the_seller_handle_never_reach_disk(tmp_path):
+    row = {"title": "NF jacket", "itemSpecifics": {"Brand": "The North Face"}, "priceValue": 50,
+           "about_this_seller_section_module": {"sections": [{"profileLogo": {"title": "somehandle"},
+                                                              "dataItems": ["somehandle (17)"]}]},
+           "feedback": [{"buyer": "otherperson"}], "sellerFeedbackScore": 17}
+    S.run_plan(FakeClient(rows=[row]), [t("ebay")], None, tmp_path)
+    (path,) = (tmp_path / "raw" / "ebay").glob("*.jsonl")
+    text = path.read_text()
+    assert "somehandle" not in text and "otherperson" not in text
+    assert json.loads(text) == {"title": "NF jacket", "itemSpecifics": {"Brand": "The North Face"}, "priceValue": 50,
+                                "sellerFeedbackScore": 17}
+
+
+def test_the_ebay_whitelist_keeps_every_field_the_mapper_needs():
+    needed = {"title", "description", "images", "priceValue", "totalPrice", "shippingCost", "shippingType", "currency",
+              "condition", "itemSpecifics", "itemLocation", "brand", "categoryPath", "listingStatus", "itemId", "url",
+              "sellerAccountType", "sellerHasStore", "sellerFeedbackScore", "sellerFeedbackPercentage"}
+    assert needed <= S.ACTORS["ebay"].keep
 
 
 def test_scrub_does_not_touch_item_ids_outside_seller_blocks():
