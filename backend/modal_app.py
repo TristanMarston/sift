@@ -50,6 +50,7 @@ api_image = (
                  "python-multipart", "anthropic")
     .run_function(_download_api_models)                                  # baked in: cold starts skip 500 MB of downloads
     .env({"SIFT_INDEX": f"/vol/{os.getenv('SIFT_INDEX_NAME', 'full')}/index",
+          "SIFT_HAIKU": os.getenv("SIFT_HAIKU", "0"),   # baked in: the container must attach the same secrets as the deploy
           "SIFT_CORS_ORIGINS": os.getenv("SIFT_CORS_ORIGINS", "http://localhost:3000"),
           "SIFT_CORS_ORIGIN_REGEX": os.getenv("SIFT_CORS_ORIGIN_REGEX", "https://sift(-[a-z0-9-]+)?[.]vercel[.]app")})
     .add_local_python_source("backend", ignore=["**/__pycache__"])     # the default ignore would drop category_text.npy

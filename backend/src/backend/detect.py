@@ -174,7 +174,7 @@ SCHEMA = {
         "type": "object", "additionalProperties": False, "required": ["label", "category", "box"],
         "properties": {
             "label": {"type": "string"},
-            "category": {"type": ["string", "null"], "enum": [*CATEGORIES, None]},
+            "category": {"anyOf": [{"type": "string", "enum": CATEGORIES}, {"type": "null"}]},
             "box": {"type": "object", "additionalProperties": False, "required": ["x", "y", "w", "h"],
                     "properties": {k: {"type": "number"} for k in "xywh"}},
         }}}},
