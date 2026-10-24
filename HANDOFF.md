@@ -12,6 +12,10 @@ the contract; `CLAUDE.md` rules still apply (branch per feature, PR, TDD for dat
   Scraping and deploying are open again; tell the team before you run either.
 - **Oct 24, 12:00 PT:** buyer fees are in every total (#47) and iPhone HEIC photos are accepted (#48); the live API
   was rebuilt and redeployed with both (51,101 listings, live test passes).
+- **Oct 24 afternoon:** Haram's scrape merged (75,841 listings; shipping + tags for the new rows running, then
+  re-index + redeploy). Quality: buyer fees (#47), HEIC (#48), no Grailed drift in batches (#51), a `close` match
+  band (#52), fabric facts from titles (#53), **colour-aware re-rank** (#54: run `modal run modal_app.py::colors
+  --name full` after every `::embed`, then redeploy), sliver-free detection (#55).
 - Biggest open items: the frontend pointing at the live API, a real phone-photo test of the demo props, and picking
   the demo moment.
 
@@ -36,7 +40,7 @@ Base URL: `https://lu-anthony-73--sift-api.us-east.modal.run` · Contract: `sche
 | --- | --- |
 | `GET /health` | `{"status":"ok","index_size":51101}` |
 | `POST /detect` | multipart `image` (JPEG/PNG/WebP/**HEIC**). SegFormer boxes + Claude Haiku labels ("black leather jacket", "white ribbed crop top"), one garment per tab (overlaps merged, shoe pairs = 1). Product shots → one whole-photo garment with a category. `category` may be **null**. **~3 s warm, ~10 s cold** — the web app gives up at 8 s and searches the whole photo. |
-| `POST /search` | multipart `image` + `params` JSON (`SearchParams`). Top 50, cross-posted duplicates collapsed to the **cheapest copy**. **No category → read from the photo**; `query.category` in the response says which was used. ~0.5 s. |
+| `POST /search` | multipart `image` + `params` JSON (`SearchParams`). Top 50, cross-posted duplicates collapsed to the **cheapest copy**; ordered by similarity **minus a colour penalty** once the index has `colors.npy` (`match.similarity` stays SigLIP's; `match.band` is `exact` ≥ 0.9, `close` ≥ 0.8, else `similar`). **No category → read from the photo**; `query.category` in the response says which was used. ~0.5 s. |
 | `POST /jpeg` | the uploaded photo back as an upright JPEG (long edge ≤ 1024 px), for browsers that cannot decode an iPhone HEIC. The web app calls it on its own when `createImageBitmap` fails (#48). |
 | Errors | always `{"error": {"code", "message"}}`: 400 `invalid_image` / `invalid_params`, 413 `image_too_large`, 500 `internal`. |
 | CORS | `http://localhost:3000` and `https://sift(-…)?.vercel.app` (preview URLs included). |
@@ -124,6 +128,11 @@ Get the data on your machine: `backend/DATA.md` (snapshot zip from the Modal vol
 
 ## Known limits
 
+- **Detection:** 1 false positive in 50 garments over 26 test photos (a dark bag under a flat-laid tee became
+  "dark pants"; Haiku agrees with SegFormer, so a threshold can't fix it). Avoid clutter under demo props.
+- **Colour re-rank** only applies once `colors.npy` sits next to the index (`modal run modal_app.py::colors`), and
+  it re-orders the SigLIP top candidates; it never adds listings SigLIP didn't shortlist.
+
 - **Sneakers 85% unknown quality** (materials vary by colorway; tags don't exist on shoes). Dresses 56%.
 - `/detect` cold start ~10 s → deploy with `SIFT_MIN_CONTAINERS=1` during the demo.
 - Condition factors (fair ×0.6 … new ×1.0) are labelled assumptions — no published source exists.
@@ -133,12 +142,12 @@ Get the data on your machine: `backend/DATA.md` (snapshot zip from the Modal vol
 
 | Area | PRs |
 | --- | --- |
-| Search + index + ranker | #4 index · #5 ranker · #21 duplicates · #25 PEFCR midpoint |
-| Detection | #7 detector · #24/#29 Haiku on · #30/#31 one tab per garment |
+| Search + index + ranker | #4 index · #5 ranker · #21 duplicates · #25 PEFCR midpoint · #52 close band · #54 colour re-rank |
+| Detection | #7 detector · #24/#29 Haiku on · #30/#31 one tab per garment · #55 slivers |
 | API + hosting | #14 API · #15 Modal · #16 DATA.md · #27 snapshots carry tags · #48 HEIC + /jpeg |
-| Evidence / quality | #9 cited wear baselines · #11 brand facts · #12 product lines · #17 construction & survival · #22 care tags · #23 nylon shells · #32 Carhartt · #33 dresses · #34 durable flag + Samba OG |
+| Evidence / quality | #9 cited wear baselines · #11 brand facts · #12 product lines · #17 construction & survival · #22 care tags · #23 nylon shells · #32 Carhartt · #33 dresses · #34 durable flag + Samba OG · #53 fabric facts |
 | Eco | #35 NOS / reworked · #37 natural fibers + Patagonia B Corp |
 | Price / condition | #18 Poshmark condition · #26 Poshmark shipping · #38/#39/#41 Depop shipping · #47 buyer fees |
-| Reliability | #19 Ctrl-C fix · #20 review fixes + backend CI |
+| Reliability | #19 Ctrl-C fix · #20 review fixes + backend CI · #51 no Grailed drift in batches |
 | Web | #28 nullable types · #36 honest break-even |
 | Teammates' (merged) | #6 pipeline review, #13 batches (Andy) · #8, #10 web (Tristan) |
