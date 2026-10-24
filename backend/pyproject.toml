@@ -13,6 +13,7 @@ dependencies = [
     "pillow>=13.0.0",
     "onnxruntime>=1.31.0",
     "huggingface-hub>=2.3.0",
+    "anthropic>=2.3.0",
 ]
 
 [project.scripts]
@@ -31,4 +32,4 @@ dev = [
 
 [tool.pytest.ini_options]
 pythonpath = ["pipeline"]
-testpaths = ["pipeline/tests", "tests"]
+testpaths = ["pipeline/tests", "pipeline/run/tests", "tests"]

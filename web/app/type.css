@@ -1,0 +1,121 @@
+/* Generated from design-system/project/tokens.json. Edit that file, then run `npm run tokens`. */
+@utility type-display {
+  font-family: var(--font-serif);
+  font-size: 2.75rem;
+  line-height: 2.875rem;
+  letter-spacing: -0.02em;
+  font-weight: 400;
+}
+
+@utility type-title-1 {
+  font-family: var(--font-serif);
+  font-size: 2.125rem;
+  line-height: 2.375rem;
+  letter-spacing: -0.015em;
+  font-weight: 400;
+}
+
+@utility type-title-2 {
+  font-family: var(--font-serif);
+  font-size: 1.625rem;
+  line-height: 1.875rem;
+  letter-spacing: -0.01em;
+  font-weight: 400;
+}
+
+@utility type-numeral {
+  font-family: var(--font-serif);
+  font-size: 4rem;
+  line-height: 3.75rem;
+  letter-spacing: -0.03em;
+  font-weight: 400;
+}
+
+@utility type-quote {
+  font-family: var(--font-serif);
+  font-size: 1.1875rem;
+  line-height: 1.625rem;
+  letter-spacing: -0.005em;
+  font-weight: 400;
+  font-style: italic;
+}
+
+@utility type-wordmark {
+  font-family: var(--font-serif);
+  font-size: 1.75rem;
+  line-height: 1.75rem;
+  letter-spacing: -0.02em;
+  font-weight: 500;
+}
+
+@utility type-headline {
+  font-family: var(--font-sans);
+  font-size: 1.0625rem;
+  line-height: 1.375rem;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+}
+
+@utility type-body {
+  font-family: var(--font-sans);
+  font-size: 1.0625rem;
+  line-height: 1.5rem;
+  letter-spacing: 0em;
+  font-weight: 400;
+}
+
+@utility type-button {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.25rem;
+  letter-spacing: 0em;
+  font-weight: 600;
+}
+
+@utility type-callout {
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  line-height: 1.25rem;
+  letter-spacing: 0em;
+  font-weight: 500;
+}
+
+@utility type-footnote {
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  letter-spacing: 0.01em;
+  font-weight: 400;
+}
+
+@utility type-data {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  letter-spacing: 0.02em;
+  font-weight: 400;
+}
+
+@utility type-receipt {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  letter-spacing: 0.01em;
+  font-weight: 400;
+}
+
+@utility type-label {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 0.875rem;
+  letter-spacing: 0.08em;
+  font-weight: 500;
+}
+
+@utility type-counter {
+  font-family: var(--font-mono);
+  font-size: 1.75rem;
+  line-height: 2rem;
+  letter-spacing: -0.01em;
+  font-weight: 500;
+}

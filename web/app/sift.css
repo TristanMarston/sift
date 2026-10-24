@@ -1,0 +1,58 @@
+/* Sift effects that plain utilities can't express. */
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Thermal-receipt torn edges. --zig is the tooth size. */
+@utility receipt-edge {
+  --zig: 7px;
+  mask:
+    conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) top / calc(2 * var(--zig)) 51% repeat-x,
+    conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / calc(2 * var(--zig)) 51% repeat-x;
+}
+@utility receipt-edge-bottom {
+  --zig: 7px;
+  mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / calc(2 * var(--zig)) 100%;
+}
+
+/* Dot leaders between a receipt label and its value. */
+@utility leader {
+  flex: 1;
+  min-width: 12px;
+  margin: 0 6px 5px;
+  border-bottom: 1px dotted currentColor;
+  opacity: 0.35;
+}
+
+/* Unknown share of a fiber bar. */
+@utility hatch {
+  background: repeating-linear-gradient(135deg, var(--unknown) 0 2px, transparent 2px 6px);
+}
+
+/* Soft band the scan line drags behind it. */
+@utility scan-glow {
+  background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.18));
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.85);
+}
+
+/* Theme toggle: the new theme grows out of the button as a circle (see theme-toggle.tsx). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .backdrop-blur-xl,
+  .backdrop-blur-md {
+    backdrop-filter: none;
+  }
+}
