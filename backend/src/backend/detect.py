@@ -25,6 +25,7 @@ MEAN, STD = np.array([0.485, 0.456, 0.406], np.float32), np.array([0.229, 0.224,
 MIN_AREA = 0.005   # share of the image a garment must cover
 MIN_SCORE = 0.5    # YOLOS class probability
 SAME = 0.5         # IoU above which two YOLOS boxes of one category are the same garment
+PART = 0.25        # a SegFormer blob this share of a garment's largest blob belongs to the same garment
 SURE = 0.7         # SegFormer mean confidence: real garments score 0.84-0.99, fragments on product shots 0.4-0.7
 
 SEG_CLASSES = {4: ("top", None), 5: ("skirt", "dresses_skirts"), 6: ("pants", "jeans_pants"),
@@ -95,12 +96,14 @@ def _seg_box(idx: np.ndarray, probs: np.ndarray):
 
 
 def seg_regions(labels: np.ndarray, probs: np.ndarray) -> list[dict]:
-    """One region per garment class: its largest blob (a second person must not stretch the box)."""
+    """One region per garment class: its largest blob plus any blob at least PART of its size (a garment cut in
+    two by an arm), so small patches elsewhere (another person, the background) do not stretch the box."""
     min_px, out = MIN_AREA * labels.size, []
     for cls, (label, category) in SEG_CLASSES.items():
         blobs = _blobs(labels == cls)
         if blobs and len(blobs[0]) >= min_px:
-            out.append(_region(label, category, *_seg_box(blobs[0], probs)))
+            keep = [b for b in blobs if len(b) >= PART * len(blobs[0])]
+            out.append(_region(label, category, *_seg_box(np.concatenate(keep), probs)))
     shoes = [b for b in _blobs(np.isin(labels, SEG_SHOES))[:2] if len(b) >= min_px / 4]
     if shoes:
         out.append(_region("shoes", "sneakers", *_seg_box(np.concatenate(shoes), probs)))

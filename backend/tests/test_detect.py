@@ -188,3 +188,9 @@ def test_unsure_segmentation_counts_as_nothing_so_product_shots_go_to_haiku_or_t
     assert D.detect(IMG, llm=None)["garments"] == []
     monkeypatch.setattr(D, "segformer", lambda im: [*unsure, {**TOP, "label": "top", "confidence": 0.95}])
     assert [g["confidence"] for g in D.detect(IMG, llm=None)["garments"]] == [0.95]
+
+
+def test_a_garment_split_by_an_arm_keeps_both_halves():
+    # a hand on the knee cuts the jeans into two blobs: the box must cover both legs
+    rs = D.seg_regions(*seg((PANTS, 10, 50, 40, 90), (PANTS, 45, 50, 70, 90)))
+    assert box(rs[0]) == [0.1, 0.5, 0.6, 0.4]
