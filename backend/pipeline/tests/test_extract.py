@@ -268,6 +268,22 @@ def test_a_material_field_is_unambiguous_so_leather_and_down_count(material, exp
     assert [f.fiber for f in out.materials.fibers] == expected
 
 
+@pytest.mark.parametrize("upper, expected", [("Leather", ["leather"]), ("Suede", ["leather"]), ("Leather, Suede", ["leather"]),
+                                             ("Synthetic", []), ("Mesh", [])])
+def test_ebay_sneaker_upper_material_counts_and_suede_is_leather(upper, expected):
+    out = X.extract(norm(category="sneakers", specifics={"Upper Material": upper, "Outsole Material": "Rubber",
+                                                         "Lining Material": "Fabric"}))
+    assert [f.fiber for f in out.materials.fibers] == expected
+
+
+def test_text_percentages_beat_a_material_field_that_names_the_same_fibers_without_them():
+    out = X.extract(norm(description="Soft. 100% merino wool.", specifics={"Material": "Wool"}))
+    assert [(f.fiber, f.pct) for f in out.materials.fibers] == [("wool", 100)]
+    assert (out.evidence[0].source, out.evidence[0].snippet) == ("listing_text", "100% merino")
+    blend = X.extract(norm(description="82% cotton 18% polyester", specifics={"Material": "Cotton"}))
+    assert [(f.fiber, f.pct) for f in blend.materials.fibers] == [("cotton", 82), ("polyester", 18)]
+
+
 def test_ebay_outer_shell_material_counts_but_lining_and_insulation_do_not():
     out = X.extract(norm(specifics={"Outer Shell Material": "Nylon", "Lining Material": "Polyester",
                                     "Insulation Material": "Down", "Fabric Type": "Ripstop"}))

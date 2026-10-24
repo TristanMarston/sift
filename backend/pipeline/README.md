@@ -130,7 +130,7 @@ Adds the evidence. It never invents: if the listing does not say, the field is e
 
 | Fact | Where it looks | Status |
 | --- | --- | --- |
-| Materials | 1. structured fields (eBay `Material`, `Outer Shell Material`, `Fabric Type`, …) 2. title + description 3. `product_lines.yaml` | `claimed` (1, 2) or `inferred` (3) |
+| Materials | 1. structured fields (eBay `Material`, `Outer Shell Material`, sneakers' `Upper Material`, `Fabric Type`, …; suede counts as leather) 2. title + description, also when it names the field's fibers with the percentages the field lacks 3. `product_lines.yaml` | `claimed` (1, 2) or `inferred` (3) |
 | Composition | `60% cotton / 40% polyester`, `100% organic cotton`; bare words (`cotton tee`) give a fiber with no percentage | `claimed` |
 | Certifications | GOTS, OEKO-TEX, bluesign, Fair Trade, RWS, RDS, B Corp | `claimed` |
 | Vintage / deadstock / upcycled | **title** (`vintage`, `vtg`, `deadstock`, ...) and structured style fields only (descriptions carry shop boilerplate) | `claimed` |

@@ -22,14 +22,15 @@ _BARE = ("cotton(?!\\s+on\\b)|polyester|nylon|wool|merino|" + _LAMBSWOOL + "|lin
          "rayon|modal|lyocell|tencel|acrylic|elastane|spandex|lycra|cashmere|alpaca|mohair")
 # Keys are letters only, so every spelling of lambswool and "camel hair" find their entry.
 _CANON = {"poly": "polyester", "polyamide": "nylon", "spandex": "elastane", "lycra": "elastane", "rayon": "viscose",
-          "tencel": "lyocell", "merino": "wool", "lambswool": "wool", "lambwool": "wool", "camelhair": "camel"}
+          "tencel": "lyocell", "merino": "wool", "lambswool": "wool", "lambwool": "wool", "camelhair": "camel",
+          "suede": "leather"}
 # Words sellers put between the percentage and the fiber: "100% pure new wool", "100% Italian boiled wool".
 _ADJ = r"(?:(?:pure|virgin|new|fine|extra[\s-]?fine|super[\s-]?fine|italian|scottish|worsted|boiled|premium|genuine|" \
        r"shetland|baby)[\s/]+)*"
 _PCT = re.compile(rf"(?<![\d.])(\d{{1,3}}(?:\.\d+)?)\s*%\s*{_ADJ}(organic\s+|recycled\s+)?({_FIBER})\b", re.I)
 _BARE_RE = re.compile(rf"\b(organic\s+|recycled\s+)?({_BARE})\b", re.I)
-# A dedicated material field is unambiguous, so there "leather", "down" and "poly" are fibers too.
-_BARE_FIELD_RE = re.compile(rf"\b(organic\s+|recycled\s+)?({_BARE}|leather|down|poly)\b", re.I)
+# A dedicated material field is unambiguous, so there "leather", "down" and "poly" are fibers too, and suede is leather.
+_BARE_FIELD_RE = re.compile(rf"\b(organic\s+|recycled\s+)?({_BARE}|leather|suede|down|poly)\b", re.I)
 _DOWN = re.compile(r"(?<!button )(?<!button-)\b(?:down\s+(?:jacket|coat|vest|parka|puffer|hooded|hoodie|sweater|fill(?:ed)?|"
                    r"insulat\w+)|(?:goose|duck|feather)\s+down|down-filled)\b", re.I)
 _FAUX_LEATHER = re.compile(r"\b(?:vegan|faux|synthetic)\s+leather\b", re.I)
@@ -37,7 +38,7 @@ _REAL_LEATHER = re.compile(r"\b(?:genuine|real|full[- ]grain|top[- ]grain)\s+lea
 _SYNTHETIC = {"polyester", "nylon", "acrylic", "modacrylic", "elastane", "polyurethane"}
 # Structured specifics we trust for composition. Lining and insulation are left out: they would add up past 100%.
 FLAG_KEYS = ("styles", "style", "era")
-MATERIAL_KEYS = ("material", "outer shell material", "fabric type", "fabric", "composition")
+MATERIAL_KEYS = ("material", "outer shell material", "upper material", "fabric type", "fabric", "composition")
 
 _CERTS = {
     "gots": r"\bgots\b|global organic textile standard",
@@ -151,9 +152,11 @@ def extract(n: Normalized, lines: list[ProductLine] = PRODUCT_LINES) -> Listing:
 
     fibers, snippet = parse_fibers(" ".join(spec.get(k, "") for k in MATERIAL_KEYS), field=True)
     source = "specifics"
-    if not fibers:
-        fibers, snippet = parse_fibers(text)
-        source = "listing_text"
+    in_text, text_snippet = parse_fibers(text)
+    # The field wins, unless it is empty or the text names the same fibers with the percentages the field lacks
+    if not fibers or (all(f.pct is None for f in fibers) and any(f.pct is not None for f in in_text)
+                      and {f.fiber for f in fibers} <= {f.fiber for f in in_text}):
+        fibers, snippet, source = in_text, text_snippet, "listing_text"
     if fibers:
         note("materials.fibers", "claimed", source, snippet)
     elif line := match_product_line(n.brand, f"{n.title} {spec.get('product line', '')} {spec.get('model', '')}", lines):
