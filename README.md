@@ -1,5 +1,8 @@
 # Sift
 
+> **Picking this up? Read [`HANDOFF.md`](HANDOFF.md) first:** what's live, what's running overnight (don't touch the Apify token or the Modal app), and what each of us can do next.
+
+
 Take a photo of clothing. We find look-alikes across secondhand marketplaces and rank them by
 **cost per wear**, with a Wear Receipt showing the cost, quality, and eco evidence.
 Cal Hacks 13.0.
