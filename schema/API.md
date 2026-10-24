@@ -214,6 +214,9 @@ Any non-2xx response has the body `{"error": {"code": "...", "message": "..."}}`
 - `thumb_url` is a small (~320 px) variant of the first photo, fast on a phone. Use `image_urls` for the full gallery.
 - `quality.level == "unknown"` and `facts == []` → show **"Not enough evidence yet."**
   `score` is then `null`, and the item sorts last on that marker but stays in the list.
+- `eco.level` is never `unknown`: secondhand itself is the eco win (no new garment is made), so an item with
+  nothing else known is `medium` (score 0.5); evidence moves it to `high` (natural fibers, recycled, organic,
+  vintage, certified) or `low` (mostly synthetic). The facts say which.
 - `confidence` is the overall amount of evidence behind `wear`. `unknown` is allowed.
 - `fact.status`: `verified | claimed | inferred | unknown`. Suggested UI: verified = solid,
   claimed = "as declared", inferred = "likely", unknown = grey "unknown".
@@ -233,7 +236,7 @@ The frontend never sorts or scores. It shows `results` looked up by id in the or
 | Sort: cost per wear (default) | `orders.cpw` (lowest `wear.cpw_cents.at_mid` first) |
 | Sort: price | `orders.price` (lowest `cost.total_cents` first) |
 | Sort: look match | `orders.match` (highest `match.similarity` first) |
-| Sort: eco | `orders.eco` (highest `eco.score` first, unknown last) |
+| Sort: eco | `orders.eco` (highest `eco.score` first) |
 | Match ↔ value slider | `slider[round(position × 10)]`, position 0 = best value … 1 = closest match |
 | "The cheapest match drops to #N" | `headline.cheapest_rank_by_cpw` (null when there are no results) |
 

@@ -85,9 +85,20 @@ def test_leather_sneakers_and_organic_labels(row):
 
 # --- eco -------------------------------------------------------------------------------
 
-def test_secondhand_is_always_shown_but_scores_nothing(row):
+def test_secondhand_alone_is_the_medium_baseline_never_unknown(row):
+    """Buying secondhand is the eco win itself (no new garment is made), so every item has a level: medium with
+    nothing else known, high with evidence for it, low with evidence against (mostly synthetic)."""
     e = M.eco(row(), {})
-    assert e["level"] == "unknown" and e["score"] is None and kinds(e) == ["secondhand"]
+    assert e["level"] == "medium" and e["score"] == 0.5 and kinds(e) == ["secondhand"]
+    assert M.eco(row(materials=fibers(("cotton", 100), synthetic_share=0)), {})["score"] == 0.75
+
+
+def test_a_fabric_named_in_the_title_is_a_natural_fiber_estimate_for_eco(row):
+    e = M.eco(row(category="jeans_pants", title="Levi's black denim jeans"), {})
+    f = next(f for f in e["facts"] if f["kind"] == "natural_fibers")
+    assert e["score"] == 0.75 and f["value"] == "Denim (cotton)" and f["status"] == "claimed"
+    e = M.eco(row(category="hoodies_sweatshirts", title="Champion fleece hoodie"), {})
+    assert kinds(e) == ["secondhand"] and e["score"] == 0.5
 
 
 def test_vintage_plus_recycled_is_high(row):

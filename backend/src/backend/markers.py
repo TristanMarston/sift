@@ -73,6 +73,16 @@ def _level(points, bands):
     return next(level for floor, level in bands if points >= floor)
 
 
+def title_fabric(row: dict) -> tuple[str, str, str] | None:
+    """(word as written, implied fiber, display value) for a fabric the title names, e.g. ("denim", "cotton",
+    "Denim (cotton)"); a sneaker title's plain "leather" is its upper. None when the title names none."""
+    m = (_SHOE_RE if row["category"] == "sneakers" else _FABRIC_RE).search(row["title"] or "")
+    if not m:
+        return None
+    fabric, fiber = m[0].lower(), FABRIC.get(m[0].lower(), m[0].lower())
+    return m[0], fiber, fabric.capitalize() if fabric == fiber else f"{fabric.capitalize()} ({fiber})"
+
+
 def quality(row: dict, brands: dict) -> tuple[dict, list[dict]]:
     """(marker, scored) where `scored` are the facts that moved the points (for confidence)."""
     facts, scored, points = [], [], 0.0
@@ -114,12 +124,10 @@ def quality(row: dict, brands: dict) -> tuple[dict, list[dict]]:
             points -= 1
             scored.append(f)
     as_of = row["scraped_at"][:10]
-    if not fibers and (m := (_SHOE_RE if row["category"] == "sneakers" else _FABRIC_RE).search(row["title"] or "")):
-        fabric, fiber = m[0].lower(), FABRIC.get(m[0].lower(), m[0].lower())
+    if not fibers and (fab := title_fabric(row)):
         good, _ = DURABLE.get(row["category"], (set(), 101))
-        if fiber in good:
-            value = fabric.capitalize() if fabric == fiber else f"{fabric.capitalize()} ({fiber})"
-            f = _fact("fabric", "Fabric", value, as_of=as_of, snippet=m[0])
+        if fab[1] in good:
+            f = _fact("fabric", "Fabric", fab[2], as_of=as_of, snippet=fab[0])
             facts.append(f)
             scored.append(f)
             points += 1
@@ -174,14 +182,19 @@ def eco(row: dict, brands: dict) -> dict:
         facts.append(_fact("natural_fibers", "Natural fibers", _composition(fibers), status=e.get("status", "claimed"),
                            source=e.get("source", "listing_text"), as_of=e.get("as_of", as_of), snippet=e.get("snippet")))
         points += 1
+    elif not fibers and (fab := title_fabric(row)) and fab[1] in NATURAL:   # "denim jeans": the seller named the fabric
+        facts.append(_fact("natural_fibers", "Natural fibers", fab[2], as_of=as_of, snippet=fab[0]))
+        points += 1
     if (m["synthetic_share"] or 0) > SYNTHETIC_LIMIT:
         facts.append(_fact("synthetic_share", "Synthetic fibers", f"{m['synthetic_share']:g}% synthetic", as_of=as_of))
         points -= 1
     animal = sorted({f["fiber"] for f in m["fibers"]} & ANIMAL)
     if animal:
         facts.append(_fact("animal_materials", "Animal materials", ", ".join(animal), as_of=as_of))
-    level = _level(points, [(2, "high"), (1, "medium"), (float("-inf"), "low")])
-    score = None if level == "unknown" else min(1.0, max(0.0, (points + 1) / 4))
+    # Secondhand is the eco win itself (no new garment is made), so an item with nothing else known is medium, never
+    # unknown. Evidence moves it: high with 2 points (natural, recycled, organic, vintage, certified), low below 0.
+    level = "high" if points >= 2 else "low" if points < 0 else "medium"
+    score = min(1.0, max(0.0, (points + 2) / 4))
     return {"level": level, "score": score, "facts": facts}
 
 
