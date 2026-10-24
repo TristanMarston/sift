@@ -48,7 +48,7 @@ Targets:
 | 3 | Row = static fields of `api.schema.json#Result` + description + status + evidence | The ranker can map rows to `Result` without renaming |
 | 4 | Ranker fields (`match`, `quality`, `eco`, `wear`, `confidence`, `thumb_url`) are not emitted | They are computed downstream |
 | 5 | Extraction = regex + structured fields + product lines | Deterministic, free, fits TDD |
-| 6 | The user adds `APIFY_TOKEN` to `/workspace/.env`; Claude runs the scrapes after the user approves the spend | Apify guidance: get a go-ahead before the first paid run |
+| 6 | The user adds `APIFY_TOKEN` to `.env` at the repo root; Claude runs the scrapes after the user approves the spend | Apify guidance: get a go-ahead before the first paid run |
 | 7 | Targets are 20k, then 50k, over-scraping ~30% | Covers dedup, non-USD rows and rows with no images |
 | 8 | Python 3.12 (the repo's pin: `.python-version`, `pyproject.toml`, README, API.md) | The repo moved from 3.14 to 3.12 in commit 0523172, after this spec was drafted. All dependencies install on 3.12 |
 | 9 | Raw files have seller identity keys scrubbed at write time | SCRAPING.md says "keep raw" and "store no seller identity", which conflict |

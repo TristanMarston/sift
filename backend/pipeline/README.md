@@ -49,7 +49,7 @@ cd backend
 uv sync                                    # install dependencies
 uv run pytest                              # ~600 tests, no network, no money
 
-# put your Apify token in the repo root: /workspace/.env  ->  APIFY_TOKEN=...
+# put your Apify token in .env at the repo root (next to DESCRIPTION.md):  APIFY_TOKEN=...
 uv run python pipeline/01_scrape.py --dry-run      # see the plan and what it would cost. Calls nothing.
 uv run python pipeline/01_scrape.py --test         # go/no-go: 20 items per marketplace, about $0.50
 uv run python pipeline/02_normalize.py --test
@@ -187,7 +187,7 @@ embeds the photos with `backend.embed` (Marqo-FashionSigLIP, 768-d unit vectors)
 
 | Input | What it is |
 | --- | --- |
-| `/workspace/.env` | `APIFY_TOKEN=...`. Needed for step 01 only (not for `--dry-run`). Never committed. |
+| `.env` (repo root) | `APIFY_TOKEN=...`. Needed for step 01 and `run/cli.py` (not for `--dry-run`). Never committed. |
 | `queries.yaml` | What to search, and how much. See below. |
 | `product_lines.yaml` | Known product lines → material (`Carhartt Detroit → cotton duck`). Used only when a listing states no material. |
 | `scrape.py` → `ACTORS` | Which Apify actor serves each marketplace, its input format, its price per row (for caps and estimates), and for eBay the list of fields kept. |

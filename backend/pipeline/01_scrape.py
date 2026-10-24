@@ -60,7 +60,7 @@ def main():
 
     load_dotenv(HERE.parents[1] / ".env")
     if not os.environ.get("APIFY_TOKEN"):
-        sys.exit("APIFY_TOKEN is not set (put it in /workspace/.env)")
+        sys.exit(f"APIFY_TOKEN is not set (put it in {HERE.parents[1] / '.env'})")
     started = datetime.now(timezone.utc)
 
     def classify(task, raw):   # judge each saved row with the marketplace's own mapper
