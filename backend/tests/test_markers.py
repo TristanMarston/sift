@@ -125,3 +125,48 @@ def test_confidence_reflects_how_much_evidence_moved_the_estimate(row):
     rich = M.quality(row(brand="Levi's", category="jeans_pants", materials=fibers(("cotton", 100)),
                          evidence=[ev("materials.fibers", "specifics")]), BRANDS)[1]
     assert M.confidence(rich) == "high"
+
+
+# --- quality from build: construction, survival, weak materials ----------------------------
+
+VINTAGE = {"is_vintage": True, "is_deadstock": False, "is_upcycled": False}
+
+
+def test_a_durable_construction_named_in_the_listing_adds_a_cited_point(row):
+    q, scored = M.quality(row(category="jeans_pants", title="Levi's 501 selvedge jeans 32x32"), {})
+    f = next(f for f in q["facts"] if f["kind"] == "construction")
+    assert q["level"] == "medium" and f["value"] == "selvedge" and f["snippet"] == "selvedge" and f in scored
+
+
+def test_several_construction_words_still_count_once(row):
+    r = row(title="Carhartt double knee pants", description="Heavy duck canvas, triple stitched. Reinforced knees.")
+    q, _ = M.quality(r, {})
+    assert [f["value"] for f in q["facts"] if f["kind"] == "construction"] == ["double knee, duck canvas, triple stitched"]
+    assert q["score"] == M.quality(row(title="Carhartt double knee pants"), {})[0]["score"]
+
+
+def test_a_vintage_piece_still_in_good_condition_has_already_lasted(row):
+    q, _ = M.quality(row(flags=VINTAGE, condition="good"), {})
+    f = next(f for f in q["facts"] if f["kind"] == "survival")
+    assert q["level"] == "medium" and f["value"] == "Vintage and still in good condition"
+    # deadstock-style vintage with tags was never worn, and a worn-out vintage piece proves nothing
+    assert "survival" not in kinds(M.quality(row(flags=VINTAGE, condition="new_with_tags"), {})[0])
+    assert "survival" not in kinds(M.quality(row(flags=VINTAGE, condition="fair"), {})[0])
+
+
+def test_stretch_jeans_lose_the_cotton_point_and_score_low(row):
+    stretch = fibers(("cotton", 98), ("elastane", 2), synthetic_share=2)
+    q, _ = M.quality(row(category="jeans_pants", materials=stretch, evidence=[ev("materials.fibers")]), {})
+    assert q["level"] == "low"
+    rigid = M.quality(row(category="jeans_pants", materials=fibers(("cotton", 100)), evidence=[ev("materials.fibers")]), {})
+    assert rigid[0]["level"] == "medium"
+
+
+def test_faux_and_pu_leather_score_low(row):
+    for fiber in ("synthetic_leather", "polyurethane"):
+        q, _ = M.quality(row(category="jackets_outerwear", materials=fibers((fiber, None)), evidence=[ev("materials.fibers")]), {})
+        assert q["level"] == "low", fiber
+
+
+def test_construction_words_are_matched_as_words(row):
+    assert "construction" not in kinds(M.quality(row(title="Waxed-look nylon bomber, not heavyweightish"), {})[0])
