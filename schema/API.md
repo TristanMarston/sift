@@ -16,7 +16,7 @@ Decided in the interview on Fri Oct 23, 2026.
 | Marker form | `level` (`high`/`medium`/`low`/`unknown`) + `score` 0–1 (**for sorting only, never shown**) + `facts[]` with source and status. |
 | Eco | Shown as facts (materials, recycled, deadstock, certifications). It is not a "sustainable" claim (DESCRIPTION.md §10.6). |
 | Photo flow | Two calls: `POST /detect` → the frontend crops → `POST /search` per garment. |
-| Ranking | The backend computes every number (expected wears, CPW, break-even). The **client** sorts and applies the slider locally, with no extra calls. |
+| Ranking | The **backend** computes every number *and* every order: the 4 sorts, 11 slider stops and the "cheapest drops to #N" headline arrive in one response. The frontend only picks a list to show, so the reshuffle is instant with no extra calls. |
 | Result set | A fixed top 50 with no paging. Items below the similarity cutoff are dropped, so the list may be empty. |
 | Receipt | Embedded in each search result. There is no per-item endpoint. |
 | Evidence in v1 | Listing materials (backend/pipeline/SCRAPING.md §4) and brand facts (the curated `brands` table). There are no owner reviews or community counts yet. |
@@ -90,12 +90,21 @@ Any non-2xx response has the body `{"error": {"code": "...", "message": "..."}}`
 {
   "query": {"category": "jackets_outerwear", "filters": {}},
   "typical": {"price_cents": 4000, "expected_wears_mid": 60, "cpw_cents": 67},
-  "results": [ /* Result × 0–50 */ ]
+  "results": [ /* Result × 0–50, in cost-per-wear order */ ],
+  "orders": {
+    "cpw":   ["poshmark:64f1a2", "depop:91", "ebay:77"],
+    "price": ["depop:91", "poshmark:64f1a2", "ebay:77"],
+    "match": ["ebay:77", "poshmark:64f1a2", "depop:91"],
+    "eco":   ["poshmark:64f1a2", "ebay:77", "depop:91"]
+  },
+  "slider": [ /* 11 id lists: slider[0] = orders.cpw … slider[10] = orders.match */ ],
+  "headline": {"cheapest_id": "depop:91", "cheapest_rank_by_cpw": 2}
 }
 ```
 
-`typical` is the median match among `results`. It is the "vs. typical match" baseline
-on the receipt and the reference for `break_even_wears`. It is `null` when `results` is empty.
+- `typical` is the median match among `results` (median price, median expected wears). It is the
+  "vs. typical match" baseline on the receipt and the reference for `break_even_wears`. `null` when `results` is empty.
+- `orders`, `slider` and `headline` are §3. Every list is a permutation of the `results` ids.
 
 ### `Result` (one card + its receipt)
 
@@ -116,7 +125,7 @@ on the receipt and the reference for `break_even_wears`. It is `null` when `resu
   "image_urls": ["https://...", "https://..."],
   "flags": {"is_vintage": true, "is_deadstock": false, "is_upcycled": false},
 
-  "match": {"similarity": 0.91},
+  "match": {"similarity": 0.91, "band": "exact"},
 
   "cost": {
     "price_cents": 4800, "currency": "USD",
@@ -158,7 +167,14 @@ on the receipt and the reference for `break_even_wears`. It is `null` when `resu
     "expected_wears": {"low": 120, "high": 200, "mid": 160},
     "basis": "evidence_adjusted",
     "cpw_cents": {"at_30": 160, "at_60": 80, "at_100": 48, "at_mid": 30},
-    "break_even_wears": 72
+    "break_even_wears": 72,
+    "facts": [
+      {"kind": "baseline", "label": "Typical lifespan", "value": "80–160 wears for jackets & outerwear (assumption)",
+       "status": "inferred", "source": "baseline", "source_url": null,
+       "snippet": "Sift team assumption (draft)", "as_of": "2026-10-23"},
+      {"kind": "condition", "label": "Condition", "value": "Good: about 80% of its life left (assumption)",
+       "status": "inferred", "source": "baseline", "source_url": null, "snippet": "Good - used", "as_of": "2026-10-23"}
+    ]
   },
 
   "confidence": "high",
@@ -180,8 +196,12 @@ on the receipt and the reference for `break_even_wears`. It is `null` when `resu
 - `wear.basis`: `category_baseline` (no evidence, so the range is the labelled per-category
   assumption) or `evidence_adjusted`.
 - `wear.break_even_wears` = how many wears it takes for this item's CPW to drop below
-  `typical.cpw_cents`, i.e. `ceil(total_cents / typical.cpw_cents)`. Show the line
-  "Break-even: wear this N+ times to win" only when the item costs more than `typical.price_cents`.
+  `typical.cpw_cents`, i.e. `ceil(total_cents / typical.cpw_cents)`. It is **non-null only when the item
+  costs more than the typical match**, so the UI shows "Break-even: wear this N+ times to win" exactly when it is set.
+- `wear.facts` are the assumptions behind `expected_wears` (the category baseline and the condition factor).
+  Show them under "Expected wears" so the number is never a black box.
+- `match.band`: `exact` when `similarity ≥ 0.9`, otherwise `similar`.
+- `thumb_url` is a small (~320 px) variant of the first photo, fast on a phone. Use `image_urls` for the full gallery.
 - `quality.level == "unknown"` and `facts == []` → show **"Not enough evidence yet."**
   `score` is then `null`, and the item sorts last on that marker but stays in the list.
 - `confidence` is the overall amount of evidence behind `wear`. `unknown` is allowed.
@@ -194,21 +214,27 @@ on the receipt and the reference for `break_even_wears`. It is `null` when `resu
   `kind` generically using `label` + `value`.
 - The seller block never contains a username, profile URL or full location (backend/pipeline/SCRAPING.md §3).
 
-## 3. Client-side sorting
+## 3. Sorting (done by the backend)
 
-The frontend does all re-ordering. Nulls always go last.
+The frontend never sorts or scores. It shows `results` looked up by id in the order it needs:
 
-| Sort | Key |
+| UI control | Use |
 | --- | --- |
-| Cost per wear (default) | `wear.cpw_cents.at_mid` ascending |
-| Price | `cost.total_cents` ascending |
-| Look match | `match.similarity` descending |
-| Eco | `eco.score` descending |
+| Sort: cost per wear (default) | `orders.cpw` (lowest `wear.cpw_cents.at_mid` first) |
+| Sort: price | `orders.price` (lowest `cost.total_cents` first) |
+| Sort: look match | `orders.match` (highest `match.similarity` first) |
+| Sort: eco | `orders.eco` (highest `eco.score` first, unknown last) |
+| Match ↔ value slider | `slider[round(position × 10)]`, position 0 = best value … 1 = closest match |
+| "The cheapest match drops to #N" | `headline.cheapest_rank_by_cpw` (null when there are no results) |
 
-**Match ↔ value slider** (`w` from 0 = value to 1 = match): sort by
-`w · rank_pct(similarity) + (1 − w) · rank_pct(cpw_at_mid)`, where `rank_pct`
-is the item's percentile within the current 50 (higher = better). Ties are broken by `id`.
-The "cheapest match drops to #N" headline is computed by the client.
+Ties always break by `id`, so an order never flickers between responses. The slider blends each item's
+rank by value and by match: `slider[i]` sorts by `i/10 × match rank + (1 − i/10) × value rank`, so `slider[0]`
+equals `orders.cpw` and `slider[10]` equals `orders.match`.
+
+```ts
+const byId = Object.fromEntries(resp.results.map(r => [r.id, r]));
+const shown = resp.orders[sort].map(id => byId[id]);          // or resp.slider[Math.round(pos * 10)]
+```
 
 ## 4. Enums
 
