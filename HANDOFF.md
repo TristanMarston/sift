@@ -10,6 +10,8 @@ the contract; `CLAUDE.md` rules still apply (branch per feature, PR, TDD for dat
   `/detect`. PRs #4–#39 are merged; 885 backend tests pass; backend CI runs on every PR touching `backend/` or `schema/`.
 - **The overnight jobs finished** (Oct 24): 51,131 listings, shipping known for 100%, index rebuilt and redeployed.
   Scraping and deploying are open again; tell the team before you run either.
+- **Oct 24, 12:00 PT:** buyer fees are in every total (#47) and iPhone HEIC photos are accepted (#48); the live API
+  was rebuilt and redeployed with both (51,101 listings, live test passes).
 - Biggest open items: the frontend pointing at the live API, a real phone-photo test of the demo props, and picking
   the demo moment.
 
@@ -33,15 +35,17 @@ Base URL: `https://lu-anthony-73--sift-api.us-east.modal.run` · Contract: `sche
 | Endpoint | Behaviour worth knowing |
 | --- | --- |
 | `GET /health` | `{"status":"ok","index_size":51101}` |
-| `POST /detect` | multipart `image`. SegFormer boxes + Claude Haiku labels ("black leather jacket", "white ribbed crop top"), one garment per tab (overlaps merged, shoe pairs = 1). Product shots → one whole-photo garment with a category. `category` may be **null**. **~3 s warm, ~10 s cold** — the web app gives up at 8 s and searches the whole photo. |
+| `POST /detect` | multipart `image` (JPEG/PNG/WebP/**HEIC**). SegFormer boxes + Claude Haiku labels ("black leather jacket", "white ribbed crop top"), one garment per tab (overlaps merged, shoe pairs = 1). Product shots → one whole-photo garment with a category. `category` may be **null**. **~3 s warm, ~10 s cold** — the web app gives up at 8 s and searches the whole photo. |
 | `POST /search` | multipart `image` + `params` JSON (`SearchParams`). Top 50, cross-posted duplicates collapsed to the **cheapest copy**. **No category → read from the photo**; `query.category` in the response says which was used. ~0.5 s. |
+| `POST /jpeg` | the uploaded photo back as an upright JPEG (long edge ≤ 1024 px), for browsers that cannot decode an iPhone HEIC. The web app calls it on its own when `createImageBitmap` fails (#48). |
 | Errors | always `{"error": {"code", "message"}}`: 400 `invalid_image` / `invalid_params`, 413 `image_too_large`, 500 `internal`. |
 | CORS | `http://localhost:3000` and `https://sift(-…)?.vercel.app` (preview URLs included). |
 
 Receipt facts to render (generic `label` + `value` works): new kinds `construction`, `survival` ("Already lasted"),
 `natural_fibers`; fabric read from a care-tag photo arrives as source `tag_image`, status `verified`. `shipping_cents`
 null → "Shipping unknown" (already handled). Break-even beyond the item's life → "Unlikely to beat the typical match"
-(already handled, #36).
+(already handled, #36). **`cost.fee_cents` is new (#47):** the marketplace's buyer fee, already inside
+`total_cents`; the receipt shows "Includes up to $3.25 Depop buyer fee" / "Includes $1.42 Mercari buyer fee".
 
 ## Completed features
 
@@ -58,6 +62,8 @@ null → "Shipping unknown" (already handled). Break-even beyond the item's life
 | Evidence: product lines | ✅ | `pipeline/product_lines.yaml` | `durable: true` lines earn +2; material-only lines (Samba OG) just supply fabric |
 | Evidence: care tags (Haiku) | ✅ | `pipeline/tags.py`, `03b_tags.py` | 1,979 listings got verified fabric; cached |
 | Depop shipping | ✅ | `pipeline/depop_shipping.py`, `03c_…` | shipping now known for 100% of listings (was 59%) |
+| Buyer fees in the total | ✅ | `normalize/common.py`, `depop.py`, `mercari.py` | Mercari's own checkout fee; Depop's stated maximum ("up to 5% + $1", help centre); eBay US, Grailed, Poshmark 0, sourced (#47) |
+| HEIC photos + `POST /jpeg` | ✅ | `src/backend/app.py`, `web/components/camera/capture.ts` | pillow-heif decodes at the door; embedding pipeline unchanged (#48) |
 | Poshmark condition + shipping | ✅ | `normalize/poshmark.py` | condition from seller text (41%); $6.49 flat Posh Post |
 | Data storage + backups | ✅ | `backend/DATA.md` | Modal volume `sift-index`: dated snapshots, tag + shipping caches, `full/index` |
 | Web: nullable types, honest break-even | ✅ | `web/lib/detect.ts`, `search.ts`, `wear.ts` | #28, #36 |
@@ -90,8 +96,7 @@ Get the data on your machine: `backend/DATA.md` (snapshot zip from the Modal vol
   index have 51,101. Where are the other ~18k? If they're on your Mac, `cli.py export` them and share the zip (they'd
   need tags + Depop shipping before indexing).
 - **#42 is superseded:** its 4 commits are already on `main` through #43. Close it.
-- From Haram's review, for the API/ranker: buyer fees are not in `total_cents` (Depop marketplace fee, Mercari
-  ~3.5%), and sizes are raw strings while the size filter is exact.
+- Sizes are raw strings (`M`, `M (38-40)`) while the API's size filter is exact (Haram's review): still open.
 
 ## What you (or your agent) can do now
 
@@ -130,10 +135,10 @@ Get the data on your machine: `backend/DATA.md` (snapshot zip from the Modal vol
 | --- | --- |
 | Search + index + ranker | #4 index · #5 ranker · #21 duplicates · #25 PEFCR midpoint |
 | Detection | #7 detector · #24/#29 Haiku on · #30/#31 one tab per garment |
-| API + hosting | #14 API · #15 Modal · #16 DATA.md · #27 snapshots carry tags |
+| API + hosting | #14 API · #15 Modal · #16 DATA.md · #27 snapshots carry tags · #48 HEIC + /jpeg |
 | Evidence / quality | #9 cited wear baselines · #11 brand facts · #12 product lines · #17 construction & survival · #22 care tags · #23 nylon shells · #32 Carhartt · #33 dresses · #34 durable flag + Samba OG |
 | Eco | #35 NOS / reworked · #37 natural fibers + Patagonia B Corp |
-| Price / condition | #18 Poshmark condition · #26 Poshmark shipping · #38/#39/#41 Depop shipping |
+| Price / condition | #18 Poshmark condition · #26 Poshmark shipping · #38/#39/#41 Depop shipping · #47 buyer fees |
 | Reliability | #19 Ctrl-C fix · #20 review fixes + backend CI |
 | Web | #28 nullable types · #36 honest break-even |
 | Teammates' (merged) | #6 pipeline review, #13 batches (Andy) · #8, #10 web (Tristan) |
