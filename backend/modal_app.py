@@ -31,7 +31,7 @@ def _download_model():
 
 image = (
     modal.Image.debian_slim(python_version="3.12")
-    .pip_install("numpy", "pillow", "onnxruntime", "huggingface_hub", "pydantic", "pyyaml")
+    .pip_install("numpy", "pillow", "pillow-heif", "onnxruntime", "huggingface_hub", "pydantic", "pyyaml")
     .run_function(_download_model)
     .add_local_python_source("backend")
     .add_local_dir(HERE / "pipeline", "/root/pipeline", ignore=["data", "tests", "**/__pycache__"])
@@ -46,7 +46,7 @@ def _download_api_models():
 
 api_image = (
     modal.Image.debian_slim(python_version="3.12")
-    .pip_install("numpy", "pillow", "onnxruntime", "huggingface_hub", "pydantic", "pyyaml", "fastapi",
+    .pip_install("numpy", "pillow", "pillow-heif", "onnxruntime", "huggingface_hub", "pydantic", "pyyaml", "fastapi",
                  "python-multipart", "anthropic")
     .run_function(_download_api_models)                                  # baked in: cold starts skip 500 MB of downloads
     .env({"SIFT_INDEX": f"/vol/{os.getenv('SIFT_INDEX_NAME', 'full')}/index",

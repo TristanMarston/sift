@@ -19,6 +19,19 @@ export async function detect(photo: Blob): Promise<DetectResponse | null> {
     }
 }
 
+/** POST /jpeg: a photo the browser cannot decode (an iPhone HEIC in Chrome) comes back as a JPEG. null without a backend or on error. */
+export async function toJpeg(photo: Blob): Promise<Blob | null> {
+    if (!BASE) return null;
+    try {
+        const body = new FormData();
+        body.append('image', photo, 'photo');
+        const res = await fetch(`${BASE}/jpeg`, { method: 'POST', body, signal: AbortSignal.timeout(15000) });
+        return res.ok ? await res.blob() : null;
+    } catch {
+        return null;
+    }
+}
+
 /** True when a backend address is set. Without one, results come from the bundled samples. */
 export const hasBackend = Boolean(BASE);
 

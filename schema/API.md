@@ -32,7 +32,7 @@ Decided in the interview on Fri Oct 23, 2026.
 ### `POST /detect`
 Finds the garments in a photo.
 
-- Request: `multipart/form-data`, field `image` (JPEG/PNG/WebP, ≤ 10 MB).
+- Request: `multipart/form-data`, field `image` (JPEG/PNG/WebP/HEIC, ≤ 10 MB).
   The frontend should downscale to a long edge of ~1024 px before upload.
 - Response `200`: `DetectResponse`
 
@@ -73,6 +73,11 @@ Finds look-alikes for one garment crop and returns the full receipt data for eac
   Every field is optional. `category` (from `/detect`) restricts the search to that
   category. `sizes` is a case-insensitive exact match on the raw size string.
 - Response `200`: `SearchResponse` (§2). The results come pre-sorted by CPW. 0–50 items.
+
+### `POST /jpeg`
+For a browser that cannot decode the photo it was handed (Chrome with an iPhone HEIC): the same photo back as an
+upright JPEG with a long edge of at most 1024 px, so the usual crop-and-search carries on. Same request shape and
+error codes as `/detect`; response `200` is the image (`Content-Type: image/jpeg`).
 
 ### Errors
 Any non-2xx response has the body `{"error": {"code": "...", "message": "..."}}`.

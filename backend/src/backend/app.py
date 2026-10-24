@@ -11,16 +11,18 @@ from functools import cache
 from pathlib import Path
 from typing import Literal
 
+import pillow_heif
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from backend import ranker
 
+pillow_heif.register_heif_opener()   # iPhone HEIC opens like any other format; nothing downstream changes
 MAX_BYTES = 10 * 1024 * 1024
-FORMATS = {"JPEG", "PNG", "WEBP"}
+FORMATS = {"JPEG", "PNG", "WEBP", "HEIF"}
 K = 50
 DUPLICATE = 0.97  # photo similarity at which two listings are one item; checked by eye on the first real batch
 MIN_SIM = 0.3  # cosine below this looks nothing alike: dropped, so a search may come back empty (API.md: Result set)
@@ -67,7 +69,7 @@ def _photo(upload: UploadFile | None) -> Image.Image:
     except (UnidentifiedImageError, OSError):
         raise ApiError(400, "invalid_image", "the file is not a readable image") from None
     if im.format not in FORMATS:
-        raise ApiError(400, "invalid_image", f"unsupported image type {im.format}; use JPEG, PNG or WebP")
+        raise ApiError(400, "invalid_image", f"unsupported image type {im.format}; use JPEG, PNG, WebP or HEIC")
     from backend.detect import upright  # same EXIF handling as /detect, so crops line up
     return upright(im)
 
@@ -127,6 +129,16 @@ def create_app(index=None, cfg=None, embed=None, detect=None, categorize=None, o
     @app.post("/detect")
     def detect_route(image: UploadFile | None = File(None)):
         return detect_fn(_photo(image))
+
+    @app.post("/jpeg")
+    def jpeg(image: UploadFile | None = File(None)):
+        """For a browser that cannot decode the photo it was given (Chrome with an iPhone HEIC): the same file back as
+        an upright JPEG, long edge at most 1024 px, so the web app's crop-and-search carries on unchanged."""
+        im = _photo(image)
+        im.thumbnail((1024, 1024))
+        buf = io.BytesIO()
+        im.save(buf, "JPEG", quality=90)
+        return Response(buf.getvalue(), media_type="image/jpeg")
 
     @app.post("/search")
     def search(image: UploadFile | None = File(None), params: str | None = Form(None)):

@@ -1,4 +1,5 @@
 // Turning the live camera or an uploaded file into the photo we search. Browser-only.
+import { toJpeg } from '@/lib/api';
 import { coverCrop, fitLongEdge } from '@/lib/photo';
 import { cropRect } from '@/lib/results';
 
@@ -25,7 +26,7 @@ export function captureFrame(video: HTMLVideoElement): Promise<Shot> {
 
 /** An uploaded photo keeps its own shape (cropping could cut off a garment), scaled to 1024px on the long edge. */
 export async function photoFromFile(file: File): Promise<Shot> {
-    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const bitmap = await decode(file);
     const { w, h } = fitLongEdge(bitmap.width, bitmap.height);
     const canvas = document.createElement('canvas');
     canvas.width = w;
@@ -33,6 +34,17 @@ export async function photoFromFile(file: File): Promise<Shot> {
     canvas.getContext('2d')!.drawImage(bitmap, 0, 0, w, h);
     bitmap.close();
     return toShot(canvas);
+}
+
+/** Chrome cannot decode an iPhone HEIC; the API hands it back as a JPEG and the rest of the flow is unchanged. */
+async function decode(file: Blob): Promise<ImageBitmap> {
+    try {
+        return await createImageBitmap(file, { imageOrientation: 'from-image' });
+    } catch (e) {
+        const jpeg = await toJpeg(file);
+        if (!jpeg) throw e;
+        return createImageBitmap(jpeg, { imageOrientation: 'from-image' });
+    }
 }
 
 /** One garment cut from the photo with a little padding: what /search looks at. */
