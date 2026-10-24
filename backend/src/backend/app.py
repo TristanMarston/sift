@@ -3,7 +3,7 @@
   uv run uvicorn backend.app:app --port 8000
 
 SIFT_INDEX: the step-05 index folder (default pipeline/data/index). SIFT_CORS_ORIGINS: comma-separated web origins
-(default http://localhost:3000). Models and the index load on first use, so the server starts at once."""
+(default http://localhost:3000); SIFT_CORS_ORIGIN_REGEX: a pattern for more (e.g. Vercel preview URLs). Models and the index load on first use, so the server starts at once."""
 import io
 import json
 import os
@@ -78,7 +78,8 @@ def _params(raw: str | None) -> SearchParams:
         raise ApiError(400, "invalid_params", f"`params` must be JSON matching SearchParams: {e}") from None
 
 
-def create_app(index=None, cfg=None, embed=None, detect=None, categorize=None, origins=None) -> FastAPI:
+def create_app(index=None, cfg=None, embed=None, detect=None, categorize=None, origins=None,
+               origin_regex=None) -> FastAPI:
     """Pass the index, ranking config and models to test; otherwise each loads on first use."""
     @cache
     def deps():
@@ -107,7 +108,8 @@ def create_app(index=None, cfg=None, embed=None, detect=None, categorize=None, o
 
     app = FastAPI(title="Sift API")
     app.add_middleware(CORSMiddleware, allow_methods=["GET", "POST"], allow_headers=["*"],
-                       allow_origins=origins or os.getenv("SIFT_CORS_ORIGINS", "http://localhost:3000").split(","))
+                       allow_origins=origins or os.getenv("SIFT_CORS_ORIGINS", "http://localhost:3000").split(","),
+                       allow_origin_regex=origin_regex or os.getenv("SIFT_CORS_ORIGIN_REGEX"))
 
     @app.exception_handler(ApiError)
     def api_error(request: Request, e: ApiError):
