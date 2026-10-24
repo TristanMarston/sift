@@ -60,14 +60,16 @@ def _slider(cpw: list[str], match: list[str]) -> list[list[str]]:
 
 
 def rank(hits: list[tuple[dict, float]], query: dict, cfg: Config) -> dict:
+    """`hits` come in the index's order: similarity, minus the colour penalty when the index has colours."""
     results = [_result(row, sim, cfg) for row, sim in hits]
+    given = {r["id"]: i for i, r in enumerate(results)}
     typ = W.typical([r["cost"]["total_cents"] for r in results], [r["wear"]["expected_wears"]["mid"] for r in results])
     for r in results:
         r["wear"]["break_even_wears"] = W.break_even(r["cost"]["total_cents"], typ)
     orders = {
         "cpw": _order(results, lambda r: r["wear"]["cpw_cents"]["at_mid"]),
         "price": _order(results, lambda r: r["cost"]["total_cents"]),
-        "match": _order(results, lambda r: -r["match"]["similarity"]),
+        "match": _order(results, lambda r: given[r["id"]]),
         "eco": _order(results, lambda r: (r["eco"]["score"] is None, -(r["eco"]["score"] or 0))),
     }
     by_id = {r["id"]: r for r in results}

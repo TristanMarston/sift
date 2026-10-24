@@ -114,3 +114,33 @@ def test_duplicates_do_not_use_up_result_slots():
 
 def test_without_dedupe_nothing_changes():
     assert len(dup_index().search(unit(1, 0, 0))) == 4
+
+
+# --- colour re-rank ----------------------------------------------------------------------------
+
+def test_colour_rerank_lifts_the_right_colour_without_changing_similarity():
+    """Shortlist by SigLIP, then penalise a colour far from the query's: a green tee at 0.78 beats a grey one at 0.83."""
+    from backend import color as C
+    rows = [r(0, id="depop:grey"), r(1, id="depop:green"), r(2, id="depop:red")]
+    vecs = np.array([[1.0, 0.0, 0.0], [0.94, 0.34, 0.0], [0.9, 0.44, 0.0]], np.float32)   # grey most similar
+    grey, green, red = (C.srgb_to_lab(np.array([c], np.float32))[0] for c in [(128, 128, 128), (20, 90, 40), (200, 30, 30)])
+    idx = Index(vecs, rows, colors=np.stack([grey, green, red]))
+    hits = idx.search(unit(1, 0, 0), color=green)
+    assert [row["id"] for row, _ in hits] == ["depop:green", "depop:grey", "depop:red"]
+    assert [round(sim, 2) for _, sim in hits] == [0.94, 1.0, 0.9]          # the reported similarity is still SigLIP's
+    assert [row["id"] for row, _ in idx.search(unit(1, 0, 0))] == ["depop:grey", "depop:green", "depop:red"]
+
+
+def test_unknown_colours_are_not_penalised():
+    rows = [r(0, id="depop:a"), r(1, id="depop:b")]
+    idx = Index(np.eye(2, 3, dtype=np.float32), rows, colors=np.array([[np.nan] * 3, [50, 0, 0]], np.float32))
+    assert [row["id"] for row, _ in idx.search(unit(1, 0, 0), color=np.array([50, 0, 0]))] == ["depop:a", "depop:b"]
+
+
+def test_load_reads_colours_when_present(tmp_path):
+    rows = [r(0), r(1)]
+    (tmp_path / "rows.jsonl").write_text("".join(json.dumps(x) + "\n" for x in rows))
+    np.save(tmp_path / "embeddings.npy", np.eye(2, 3, dtype=np.float32))
+    assert Index.load(tmp_path).colors is None
+    np.save(tmp_path / "colors.npy", np.zeros((2, 3), np.float32))
+    assert Index.load(tmp_path).colors.shape == (2, 3)

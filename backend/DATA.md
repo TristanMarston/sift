@@ -26,6 +26,7 @@ uv run python pipeline/03c_depop_shipping.py --dry-run && uv run python pipeline
 
 # 3. rebuild the search index on Modal (photos download at datacenter speed; the index stays on the volume)
 uv run modal run modal_app.py::embed --listings pipeline/data/listings.jsonl --name full
+uv run modal run modal_app.py::colors --name full      # 3b. one colour per listing (colors.npy): the colour re-rank
 
 # 4. check it
 uv run modal run modal_app.py::query --photo some_jacket.jpg --name full

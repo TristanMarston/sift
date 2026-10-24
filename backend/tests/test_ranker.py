@@ -131,3 +131,11 @@ def test_load_config_reads_the_repo_files():
     assert set(cfg.baselines["categories"]) == {"tshirts", "hoodies_sweatshirts", "shirts", "sweaters_knitwear",
                                                 "jeans_pants", "jackets_outerwear", "sneakers", "dresses_skirts"}
     assert isinstance(cfg.brands, dict)
+
+
+def test_match_order_is_the_order_the_index_gave(hits):
+    """The index already ranks by similarity (minus the colour penalty when it has colours), so the match sort keeps
+    that order instead of re-sorting by the raw similarity."""
+    swapped = [hits[1], hits[0], *hits[2:]]                       # 0.90 before 0.95
+    resp = R.rank(swapped, QUERY, CFG)
+    assert resp["orders"]["match"][:2] == [swapped[0][0]["id"], swapped[1][0]["id"]]

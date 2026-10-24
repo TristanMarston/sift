@@ -19,6 +19,7 @@ from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from backend import ranker
+from backend.color import garment_color
 
 pillow_heif.register_heif_opener()   # iPhone HEIC opens like any other format; nothing downstream changes
 MAX_BYTES = 10 * 1024 * 1024
@@ -144,11 +145,13 @@ def create_app(index=None, cfg=None, embed=None, detect=None, categorize=None, o
     def search(image: UploadFile | None = File(None), params: str | None = Form(None)):
         q = _params(params)
         idx, conf = deps()
-        vec = embed_fn(_photo(image))
+        im = _photo(image)
+        vec = embed_fn(im)
         category = q.category or category_of(vec)
         f = q.filters or Filters()
         hits = idx.search(vec, k=K, min_sim=MIN_SIM, category=category, max_price_cents=f.max_price_cents,
-                          marketplaces=f.marketplaces, sizes=f.sizes, conditions=f.conditions, dedupe=DUPLICATE)
+                          marketplaces=f.marketplaces, sizes=f.sizes, conditions=f.conditions, dedupe=DUPLICATE,
+                          color=garment_color(im))   # re-ranks by colour once the index has colors.npy
         return ranker.rank(hits, {**q.model_dump(exclude_unset=True), "category": category}, conf)
 
     return app
