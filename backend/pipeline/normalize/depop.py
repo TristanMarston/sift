@@ -21,7 +21,9 @@ def map_item(raw: dict, category: str, scraped_at) -> Normalized:
     label = " ".join(str(raw.get(k) or "") for k in ("category", "productType", "group"))
     sizes = raw.get("sizes") or []
     size = (sizes[0] if sizes else raw.get("size")) or None
-    if re.search(r"\b(?:months?|years?)\b", size or "", re.I):   # Depop's kids sizes ("6 years"); it has no kids label
+    # Depop has no kids label, but its kids department uses only broad categories ("Kids > Shoes", where adults get
+    # "Men > Footwear > Sneakers"), and kids sizes say "6 years" or "12-18 months"
+    if raw.get("category") in ("Clothing", "Shoes") or re.search(r"\b(?:months?|years?)\b", size or "", re.I):
         raise Drop("kids")
     external_id = str(require(raw.get("id"), "no_id"))
     return Normalized(

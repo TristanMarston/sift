@@ -119,6 +119,14 @@ def test_depop_title_from_a_long_first_line_is_cut_at_a_word():
     assert len(title) <= 120 and title.endswith("Carhartt")
 
 
+@pytest.mark.parametrize("category", ["Clothing", "Shoes"])
+def test_depop_kids_items_have_only_a_broad_category(category):
+    """Depop's kids department has broad categories ("Kids > Shoes"); adult items have specific ones ("Men > Footwear >
+    Sneakers"). Checked on the listing pages. A kids item whose size is "Other" is caught this way."""
+    with pytest.raises(Drop, match="kids"):
+        mapped("depop", 0, category=category, sizes=["Other"], size="Other")
+
+
 def test_depop_sold_and_non_us_seller_with_a_usd_price_is_kept_with_its_region():
     n = mapped("depop", 0, isSold=True, country="GB")
     assert n.status == "sold" and n.seller.region == "GB"
