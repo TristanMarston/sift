@@ -86,3 +86,31 @@ def test_load_rejects_misaligned_files(tmp_path):
     (tmp_path / "rows.jsonl").write_text("".join(json.dumps(r(i)) + "\n" for i in range(2)))
     with pytest.raises(ValueError):
         Index.load(tmp_path)
+
+
+# --- duplicates: the same item cross-posted or relisted ------------------------------------
+
+def dup_index():
+    same = unit(1, 0.01, 0)                       # photo similarity to unit(1, 0, 0) ~ 0.99995: the same photo
+    vecs = np.stack([unit(1, 0, 0), same, unit(1, 0.3, 0), unit(0, 1, 0)])
+    rows = [r(0, id="mercari:0", marketplace="mercari", cost=dict(price_cents=5400, total_cents=5400)),
+            r(1, id="poshmark:1", marketplace="poshmark", cost=dict(price_cents=4500, total_cents=4500)),
+            r(2), r(3)]
+    return Index(vecs, rows)
+
+
+def test_duplicates_collapse_to_the_cheapest_copy():
+    assert ids(dup_index().search(unit(1, 0, 0), dedupe=0.97)) == ["poshmark:1", "depop:2", "depop:3"]
+
+
+def test_look_alikes_below_the_cutoff_are_kept():
+    hits = dup_index().search(unit(1, 0, 0), dedupe=0.97)
+    assert "depop:2" in ids(hits)                 # ~0.958 to depop:0: a different item that looks similar
+
+
+def test_duplicates_do_not_use_up_result_slots():
+    assert ids(dup_index().search(unit(1, 0, 0), k=2, dedupe=0.97)) == ["poshmark:1", "depop:2"]
+
+
+def test_without_dedupe_nothing_changes():
+    assert len(dup_index().search(unit(1, 0, 0))) == 4

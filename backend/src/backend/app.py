@@ -22,6 +22,7 @@ from backend import ranker
 MAX_BYTES = 10 * 1024 * 1024
 FORMATS = {"JPEG", "PNG", "WEBP"}
 K = 50
+DUPLICATE = 0.97  # photo similarity at which two listings are one item; checked by eye on the first real batch
 MIN_SIM = 0.3  # cosine below this looks nothing alike: dropped, so a search may come back empty (API.md: Result set)
 INDEX = Path(os.getenv("SIFT_INDEX", Path(__file__).resolve().parents[2] / "pipeline" / "data" / "index"))
 
@@ -133,7 +134,7 @@ def create_app(index=None, cfg=None, embed=None, detect=None, categorize=None, o
         category = q.category or category_of(vec)
         f = q.filters or Filters()
         hits = idx.search(vec, k=K, min_sim=MIN_SIM, category=category, max_price_cents=f.max_price_cents,
-                          marketplaces=f.marketplaces, sizes=f.sizes, conditions=f.conditions)
+                          marketplaces=f.marketplaces, sizes=f.sizes, conditions=f.conditions, dedupe=DUPLICATE)
         return ranker.rank(hits, {**q.model_dump(exclude_unset=True), "category": category}, conf)
 
     return app
