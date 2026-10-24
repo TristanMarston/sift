@@ -119,7 +119,15 @@ def test_without_haiku_or_when_it_fails_the_segmentation_labels_stand():
         raise RuntimeError("no network")
     assert D.relabel(IMG, [TOP, PANTS_R], None) == [TOP, PANTS_R]
     assert D.relabel(IMG, [TOP, PANTS_R], broken) == [TOP, PANTS_R]
+
     assert D.relabel(IMG, [TOP], lambda c, h: []) == [TOP]
+
+def test_slivers_next_to_a_real_garment_are_dropped():
+    """A collar or a strip of a top seen in a neighbouring crop (a 50th of the largest garment) is not a tab."""
+    tee, sliver = g("white ribbed top", "shirts", 0.35, 0.31, 0.2, 0.26, 0.85), g("white crop top", "tshirts", 0.37, 0.53, 0.13, 0.02, 0.75)
+    jeans = g("ripped jeans", "jeans_pants", 0.31, 0.55, 0.49, 0.34, 0.94)
+    small_tee = g("black t-shirt", "tshirts", 0.34, 0.33, 0.07, 0.15, 0.81)     # a 16th of the jeans: a real layer
+    assert D.merge([jeans, tee, sliver, small_tee]) == [jeans, tee, small_tee]
 
 
 def test_haiku_answers_are_cleaned():
