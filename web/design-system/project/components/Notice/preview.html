@@ -1,0 +1,32 @@
+<!-- @dsCard group="Screens" height=620 -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Notice</title>
+<style>
+body { margin: 0; padding: 20px; background: var(--background); color: var(--foreground); font-family: var(--font-sans); }
+.row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.col { display: flex; flex-direction: column; gap: 16px; }
+.cam { background: var(--camera); border-radius: 24px; overflow: hidden; position: relative; }
+.note { font: 13px/18px var(--font-mono); color: var(--muted-foreground); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+var S = window.Sift, h = React.createElement, D = S.samples, use = React.useState, effect = React.useEffect;
+function replay(label, onClick) { return h(S.Button, { variant: 'secondary', size: 'sm', onClick: onClick }, label || 'Replay'); }
+function card(children, dark) { return h('div', { style: { background: dark ? 'var(--camera)' : 'var(--card)', borderRadius: 20, boxShadow: 'var(--shadow-card)' } }, children); }
+function App() {
+  var I = S.icons;
+  return h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 } },
+    card(h(S.Notice, { icon: I.Shirt, title: 'No exact match', body: 'This one might be one of a kind. Similar styles are below.' })),
+    card(h(S.Notice, { icon: I.SearchX, title: 'Nothing close yet', body: 'Try describing it instead.', actions: h(S.Button, { variant: 'secondary' }, 'Describe it instead') })),
+    card(h(S.Notice, { icon: I.Tag, tone: 'error', title: "Couldn't read this tag", body: 'Get closer and fill the frame, or type the fibers in.', actions: [h(S.Button, { key: 1, variant: 'secondary' }, 'Retake'), h(S.Button, { key: 2, variant: 'outline' }, 'Type it in')] })),
+    card(h(S.Notice, { icon: I.CameraOff, surface: 'camera', title: "Camera's off", body: 'Upload a photo instead, or allow the camera in Settings.', actions: h(S.Button, { variant: 'camera' }, 'Upload a photo') }), true));
+}
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+</script>
+</body>
+</html>

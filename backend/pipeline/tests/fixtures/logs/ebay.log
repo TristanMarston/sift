@@ -1,0 +1,54 @@
+ACTOR: Pulling container image of build bLmGHygOwk3CWdSEk from registry.
+ACTOR: Creating container.
+ACTOR: Starting container.
+ACTOR: Running under "LIMITED_PERMISSIONS".
+INFO  System info {"apifyVersion":"3.7.2","apifyClientVersion":"2.23.3","crawleeVersion":"3.16.0","osType":"Linux","nodeVersion":"v22.23.3"}
+input>>>>> {
+  searchQueries: [ 'the north face jacket' ],
+  maxItems: 20,
+  marketplace: 'ebay.com',
+  mode: 'active',
+  condition: 'used',
+  detailedItems: true,
+  includeDescription: true,
+  includeSummary: false,
+  includeLegacyFields: true,
+  categoryPageMode: 'exact',
+  titleMustMatchQuery: false,
+  sortBy: 'best_match',
+  listingType: 'all',
+  freeShipping: false,
+  returnsAccepted: false,
+  motorsCategory: 'none',
+  monitoringMode: false,
+  enablePriceMonitoring: false,
+  feedbackSort: 'most_recent',
+  feedbackReceivedAs: 'seller',
+  feedbackRating: 'all',
+  feedbackImagesOnly: false,
+  feedbackExcludeAutomated: false,
+  maxConcurrency: 5,
+  minConcurrency: 1,
+  maxRequestRetries: 20,
+  proxy: {
+    useApifyProxy: true,
+    apifyProxyGroups: [ 'RESIDENTIAL' ],
+    apifyProxyCountry: 'US'
+  }
+}
+user is paying:: false username ojm6AjiGP71dCclY1
+[CHARGING] Maximum affordable items within charge limit: Infinity
+[main] mode=active marketplace=ebay.com detailedItems=true includeLegacyFields=true | 1 start URL(s), 1 of them keyword search(es)
+request.url:::: https://www.ebay.com/sch/i.html?_nkw=the+north+face+jacket&LH_ItemCondition=3000&_sop=12
+GET_SEARCH_RESULTS_M:::: [ebay.com] input: https://www.ebay.com/sch/i.html?_nkw=the+north+face+jacket&LH_ItemCondition=3000&_sop=12
+  → mobile: https://apisd.ebay.com/experience/search/v1/search_results?_nkw=the+north+face+jacket&LH_ItemCondition=3000&_sop=12&_ipg=200&_pgn=1&answersVersion=1&async=false&_vs=1&supportedUxComponentNames=ITEM_CARD%2CDENSE_ITEM_CARD%2CREWRITES_ITEMS%2CREWRITE_START%2CBASIC_MESSAGE%2CTWO_LINE_MESSAGE%2CBASIC_USER_MESSAGE%2CBASIC_SELLER_HEADER%2CPROMOTED_ITEM_CARD%2CVEHICLE_PARTS_FINDER%2CMOTORS_TIRE_FINDER%2CTOP_OF_PAGE_FINDER%2CTOP_OF_PAGE_WITH_VEHICLE%2CTOP_OF_PAGE_TIRE%2CGARAGE_ONE_CLICK_FINDER%2CVEHICLE_FINDER_V2%2CUNIVERSAL_FINDER%2CSTATUS_BAR_V2%2CICON_MESSAGE%2CTOGGLE_MESSAGE%2CSTORE_INFORMATION%2CPRESENCE_INFORMATION_V3%2CNULL_LOW_MESSAGE%2CREDIRECT_MESSAGE%2CFIRST_PARTY_ADS_BANNER%2CEBAY_LIVE_ADS_BANNER%2CITEMS_CAROUSEL_V3%2CNAVIGATION_ANSWER_PILL_CAROUSEL%2CNAVIGATION_IMAGE_ANSWER_CAROUSEL%2CNAVIGATION_ANSWER_TEXT_LIST%2CNAVIGATION_ANSWER_SIMPLE_IMAGE_CAROUSEL%2CIMAGE_ANSWER_GUIDANCE_CAROUSEL%2CPAGE_TITLE_BAR%2CASPECTS_IN_RIVER%2CITEM_CAROUSEL_BOS%2CGRID_VIEW_ITEM_CAROUSEL_BOS%2CE... [line-too-long]
+INFO  CheerioCrawler: Starting the crawler.
+[GET_SEARCH_RESULTS_M] Parsed 212 items (page 1, totalResults 206938)
+[GET_SEARCH_RESULTS_M] Enqueuing 20 item-detail requests (counter 20/20)
+INFO  CheerioCrawler: All requests from the queue have been processed, the crawler will shut down.
+INFO  CheerioCrawler: Final request statistics: {"requestsFinished":21,"requestsFailed":0,"retryHistogram":[21],"requestAvgFailedDurationMillis":null,"requestAvgFinishedDurationMillis":1869,"requestsFinishedPerMinute":83,"requestsFailedPerMinute":0,"requestTotalDurationMillis":39249,"requestsTotal":21,"crawlerRuntimeMillis":15157}
+INFO  CheerioCrawler: Finished! Total 21 requests: 21 succeeded, 0 failed. {"terminal":true}
+Crawl finished.
+length: 20
+[main] includeSummary=false — skipping the analytics row for 1 sold search(es), and the active-count probe each one would have made.
+[main] Success — 20 item(s) scraped.

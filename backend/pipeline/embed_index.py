@@ -9,7 +9,6 @@ out_dir/
 `fetch(url) -> PIL.Image` raises on failure; `embed(images) -> (n, dim) array`. Both are injected so the tests
 need no network and no model. A rerun skips listings already embedded and retries the ones whose photos failed."""
 import json
-import re
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -18,23 +17,10 @@ from pathlib import Path
 import numpy as np
 from pydantic import ValidationError
 
+from backend.images import small_url
 from listing import Listing
 
 TRIES = 2  # photos tried per listing: the first, then one fallback
-
-# Each CDN's smallest variant that is still >= 224 px (the model's input), measured Oct 23: ~10x fewer bytes.
-SMALL = [
-    (re.compile(r"^(https://media-photos\.depop\.com/.+/)P\d+\.jpg$"), r"\1P5.jpg"),                   # 320 px
-    (re.compile(r"^(https://di2ponv0v5otw\.cloudfront\.net/.+/)[lm]_([^/]+)$"), r"\1s_\2"),           # 285x380
-    (re.compile(r"^(https://media-assets\.grailed\.com/[^?]+)$"), r"\1?w=320"),                       # 320 wide
-]
-
-
-def small_url(url: str) -> str:
-    for pattern, repl in SMALL:
-        if pattern.match(url):
-            return pattern.sub(repl, url)
-    return url
 
 
 def _read(listings_path, stats):

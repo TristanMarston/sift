@@ -12,6 +12,19 @@ def slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]", "", text.lower())
 
 
+_INVISIBLE = re.compile("[\u200b\u200c\u200d\u2060\ufeff\u00ad]")  # zero-width characters, word joiner, BOM, soft hyphen
+
+
+def clean_text(text: str | None, one_line: bool = False) -> str | None:
+    """Drop invisible characters (a zero-width space inside "100%cotton" defeats the composition regex), turn
+    non-breaking spaces into plain ones and trim. A one-line field also collapses runs of whitespace. None if empty."""
+    if text is None:
+        return None
+    text = _INVISIBLE.sub("", text).translate({0xA0: " ", 0x2007: " ", 0x202F: " "})
+    text = re.sub(r"\s+", " ", text) if one_line else re.sub(r"[ \t]{2,}", " ", text)
+    return "\n".join(line.strip(" \t") for line in text.split("\n")).strip() or None
+
+
 def to_cents(value) -> int | None:
     """48, "48.00", "$1,200.50" -> cents. None for anything that is not a non-negative amount."""
     if value is None or isinstance(value, bool):
@@ -49,20 +62,29 @@ def seller_type(listing_count: int | None) -> str | None:
 # First match wins, so order matters. Footwear of any kind is "sneakers": it is the only shoe category.
 _CATEGORY_RULES = [
     ("dresses_skirts", r"\bdress(?:es)?\b(?!\s+(?:shirt|pant|shoe|boot|sock|slack))|\bskirts?\b|\bgowns?\b"),
-    ("sneakers", r"sneaker|trainer|athletic shoe|\bshoes?\b|\bboots?\b|footwear|\bclogs?\b|\bloafers?\b"),
-    ("hoodies_sweatshirts", r"hoodie|hooded|sweatshirt"),
+    ("sneakers", r"sneaker|trainer|athletic shoe|\bshoes?\b|\bboots?\b(?![\s-]*cut)|footwear|\bclogs?\b|\bloafers?\b"),
+    ("hoodies_sweatshirts", r"hoodie|hooded(?!\s+(?:jacket|coat|parka|vest))|sweatshirt"),
     ("sweaters_knitwear", r"sweater|cardigan|knitwear|jumper|\bknits?\b|turtleneck"),
-    ("jackets_outerwear", r"jacket|coat|parka|puffer|\bvests?\b|windbreaker|anorak|blazer|outerwear|\bfleece\b|poncho"),
-    ("tshirts", r"\bt[- ]?shirts?|\btees?\b"),
+    ("jackets_outerwear", r"jacket|coat|parka|puffer|\bvests?\b|windbreaker|anorak|blazer|\bsuits?\b|outerwear|\bfleece\b|poncho"),
+    ("tshirts", r"\bt[- ]?shirts?|\btees?\b|\b(?:short|long) sleeve shirts\b"),   # the last is Grailed's slug for T-shirts
     ("shirts", r"shirt|flannel|button[- ]?(?:up|down)|blouse|\bpolos?\b|overshirt"),
     ("jeans_pants", r"jeans?|\bpants?\b|trouser|chino|jogger|sweatpants?|slacks|leggings?|cargo|denim"),
 ]
 
 
 def category_from_label(label: str | None) -> str | None:
-    """A marketplace category label or path ("Men > Coats & Jackets") -> one of the 8 categories, else None."""
-    text = re.sub(r"[._]", " ", re.sub(r"clothing, shoes (?:&|and) accessories", "", (label or "").lower()))  # eBay's root
-    return next((cat for cat, pattern in _CATEGORY_RULES if re.search(pattern, text)), None)
+    """A marketplace category label or path ("Men > Coats & Jackets") -> one of the 8 categories, else None.
+    The leaf of a path is the most specific part, so it is tried first ("Sweats & hoodies > Track jacket" is a jacket).
+    Shorts are never one of the 8, though their labels say denim, jean or cargo ("Women > Shorts > Denim")."""
+    text = re.sub(r"clothing, shoes (?:&|and) accessories", "", (label or "").lower())  # eBay's root category
+    if re.search(r"\bshorts\b", text):
+        return None
+    for part in reversed(text.split(">")):
+        part = re.sub(r"[._]", " ", part)
+        for category, pattern in _CATEGORY_RULES:
+            if re.search(pattern, part):
+                return category
+    return None
 
 
 def resolve_category(label: str | None, fallback: str) -> str:
@@ -97,27 +119,33 @@ _BRANDS = ["The North Face", "Carhartt", "Carhartt WIP", "Patagonia", "Nike", "J
            "Uniqlo", "Arc'teryx", "Columbia", "Champion", "Adidas", "Dr. Martens", "Converse", "Vans", "Dickies",
            "Wrangler", "Reebok", "Puma", "Asics", "Hoka", "Salomon", "Allbirds", "Veja"]
 _BRAND_BY_SLUG = {slug(b): b for b in _BRANDS} | {
-    "northface": "The North Face", "tnf": "The North Face", "levistrauss": "Levi's", "levistraussco": "Levi's",
+    "northface": "The North Face", "tnf": "The North Face", "levi": "Levi's", "levistrauss": "Levi's", "levistraussco": "Levi's",
     "docmartens": "Dr. Martens", "airjordan": "Jordan"}
 _NO_BRAND = {"", "unbranded", "nobrand", "none", "na", "other", "vintage", "handmade", "generic", "unknown",
-             "custom", "unmarked"}
+             "custom", "unmarked",
+             # Grailed's style tags, listed as designers ("Carhartt × Flannel")
+             "flannel", "designer", "bandtees", "streetwear", "madeinusa", "japanesebrand", "military", "sportswear"}
 
 
 def normalize_brand(raw: str | None) -> str | None:
-    """Canonical spelling for known brands (the join key for brand facts); junk values become None.
+    """Canonical spelling for known brands (the join key for brand facts); junk values become None. A known brand
+    followed by a model is that brand ("Nike Dunk Low", "Levi's 501": Poshmark sellers type these).
     Unknown brands are trimmed, and title-cased only when typed all lowercase."""
     key = slug(raw or "")
     if key in _NO_BRAND:
         return None
-    if key in _BRAND_BY_SLUG:
-        return _BRAND_BY_SLUG[key]
-    name = " ".join(raw.split())
+    words = raw.split()
+    for n in range(len(words), 0, -1):   # longest first, so "Carhartt WIP Detroit" is Carhartt WIP
+        if (known := _BRAND_BY_SLUG.get(slug(" ".join(words[:n])))):
+            return known
+    name = " ".join(words)
     return name.title() if name.islower() else name
 
 
 def make_cost(price, currency=None, shipping=None, free_shipping=None, original=None, retail=None) -> dict:
     """The `cost` block. Raises Drop for a missing price or a non-USD currency (no FX conversion).
-    An unstated currency is taken as USD. `original` only counts when it is above the price (a markdown)."""
+    An unstated currency is taken as USD. `original` only counts when it is above the price (a markdown); a zero
+    `retail` price means none was given."""
     if currency and str(currency).upper() != "USD":
         raise Drop("non_usd")
     cents = to_cents(price)
@@ -128,7 +156,7 @@ def make_cost(price, currency=None, shipping=None, free_shipping=None, original=
         free_shipping = ship == 0
     return dict(price_cents=cents, currency="USD", shipping_cents=ship, free_shipping=free_shipping,
                 total_cents=cents + (ship or 0), original_price_cents=orig if orig and orig > cents else None,
-                retail_price_cents=to_cents(retail))
+                retail_price_cents=to_cents(retail) or None)
 
 
 def clean_images(urls) -> list[str]:

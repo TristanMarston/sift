@@ -1,5 +1,6 @@
 """Poshmark (123webdata/poshmark-scraper, detail mode) record -> Normalized. Poshmark is US-only and the actor
-returns no condition or location, so condition stays unknown and the region is "US"."""
+returns no condition or location, so condition stays unknown and the region is "US". Poshmark's "Original Price"
+(`regular_price`) is what the seller says the item cost new, so it is the retail price, not a markdown."""
 from listing import Normalized
 from normalize.common import (Drop, clean_images, is_kids, make_cost, normalize_brand, require, resolve_category)
 
@@ -18,5 +19,5 @@ def map_item(raw: dict, category: str, scraped_at) -> Normalized:
         category=resolve_category(" > ".join([*crumbs, raw.get("category") or ""]), category),
         subcategory=raw.get("category"), size=raw.get("size") or None, color=raw.get("color") or None,
         image_urls=require(clean_images(raw.get("images")), "no_image"),
-        cost=make_cost(raw.get("price"), raw.get("currency"), original=raw.get("regular_price")),
+        cost=make_cost(raw.get("price"), raw.get("currency"), retail=raw.get("regular_price")),
         seller=dict(region="US"))
