@@ -71,7 +71,8 @@ def test_is_kids(label, kids):
 
 @pytest.mark.parametrize("label, expected", [
     ("tops.t_shirts", "tshirts"), ("tops.button_ups", "shirts"), ("tops.sweatshirts_hoodies", "hoodies_sweatshirts"),
-    ("tops.long_sleeve_shirts", "shirts"), ("tops.sweaters_knitwear", "sweaters_knitwear"),
+    ("tops.long_sleeve_shirts", "tshirts"), ("tops.short_sleeve_shirts", "tshirts"),    # Grailed: "Long/Short Sleeve T-Shirts"
+    ("womens_tops.short_sleeve_shirts", "tshirts"), ("tops.sweaters_knitwear", "sweaters_knitwear"),
     ("bottoms.denim", "jeans_pants"), ("bottoms.sweatpants_joggers", "jeans_pants"), ("bottoms.shorts", None),
     ("footwear.sneakers", "sneakers"), ("outerwear.light_jackets", "jackets_outerwear"),
     ("tailoring.blazers", "jackets_outerwear"), ("flat shirt", "shirts"),
@@ -118,7 +119,7 @@ def test_the_leaf_of_a_category_path_wins_over_its_parents(label, expected):
 @pytest.mark.parametrize("label, expected", [
     ("Denim Shorts", None), ("Jean Shorts", None), ("Women > Shorts > Denim", None), ("Men > Shorts > Cargo shorts", None),
     ("Bottoms shorts denim-shorts", None),
-    ("tops.short_sleeve_shirts", "shirts"),                     # "short" sleeves are not shorts
+    ("tops.short_sleeve_shirts", "tshirts"),                    # "short" sleeves are not shorts
 ])
 def test_shorts_are_never_filed_as_jeans_or_pants(label, expected):
     assert C.category_from_label(label) == expected

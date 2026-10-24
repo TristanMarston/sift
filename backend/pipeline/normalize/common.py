@@ -66,7 +66,7 @@ _CATEGORY_RULES = [
     ("hoodies_sweatshirts", r"hoodie|hooded(?!\s+(?:jacket|coat|parka|vest))|sweatshirt"),
     ("sweaters_knitwear", r"sweater|cardigan|knitwear|jumper|\bknits?\b|turtleneck"),
     ("jackets_outerwear", r"jacket|coat|parka|puffer|\bvests?\b|windbreaker|anorak|blazer|\bsuits?\b|outerwear|\bfleece\b|poncho"),
-    ("tshirts", r"\bt[- ]?shirts?|\btees?\b"),
+    ("tshirts", r"\bt[- ]?shirts?|\btees?\b|\b(?:short|long) sleeve shirts\b"),   # the last is Grailed's slug for T-shirts
     ("shirts", r"shirt|flannel|button[- ]?(?:up|down)|blouse|\bpolos?\b|overshirt"),
     ("jeans_pants", r"jeans?|\bpants?\b|trouser|chino|jogger|sweatpants?|slacks|leggings?|cargo|denim"),
 ]
