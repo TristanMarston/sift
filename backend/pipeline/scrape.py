@@ -103,6 +103,14 @@ def scrub(value, in_seller=False, keep=None):
             and (not in_seller or k.lower().replace("_", "") in SELLER_SAFE)}
 
 
+def clean_rows(marketplace: str, items):
+    """An actor's records as they may be written to disk: free summary rows skipped, seller identity scrubbed."""
+    actor = ACTORS[marketplace]
+    for item in items:
+        if actor.is_item is None or actor.is_item(item):
+            yield scrub({k: v for k, v in item.items() if k not in actor.drop}, keep=actor.keep)
+
+
 # --- plan ------------------------------------------------------------------------------------
 
 @dataclass(frozen=True)
@@ -197,11 +205,8 @@ def _execute(client, task: Task, cap: Decimal, data_dir: Path, classify, seen: s
     path.parent.mkdir(parents=True, exist_ok=True)
     n = 0
     try:
-        with path.with_suffix(".tmp").open("w", encoding="utf-8") as f:
-            for item in client.dataset(run.default_dataset_id).iterate_items():
-                if actor.is_item is not None and not actor.is_item(item):
-                    continue
-                clean = scrub({k: v for k, v in item.items() if k not in actor.drop}, keep=actor.keep)
+        with path.with_suffix(".tmp").open("w", encoding="utf-8", newline="\n") as f:
+            for clean in clean_rows(task.marketplace, client.dataset(run.default_dataset_id).iterate_items()):
                 f.write(jsonl.dumps(clean) + "\n")
                 n += 1
                 if classify is None:
@@ -234,6 +239,15 @@ def finished_queries(past: list[dict]) -> set:
     return done | {key for key, n in empties.items() if n >= 2}
 
 
+def quota_rows(past: list[dict]) -> Counter:
+    """Raw rows per marketplace that count toward its quota: those of successful runs that were not judged bad."""
+    rows = Counter()
+    for r in past:
+        if r["status"] == OK and r.get("verdict", "ok") not in H.BAD:
+            rows[r["marketplace"]] += r["items"]
+    return rows
+
+
 def say(message: str) -> None:
     """Progress line. Flushed, so a log file fills as the run goes (stdout is buffered when redirected)."""
     print(message, flush=True)
@@ -244,21 +258,20 @@ def _now() -> datetime:
 
 
 def run_plan(client, plan, quotas, data_dir, max_spend: Decimal | None = None, log=say, classify=None,
-             stop_all_on_block: bool = False, now=_now) -> R.Summary:
+             stop_all_on_block: bool = False, now=_now, write_report: bool = True, past: list[dict] | None = None) -> R.Summary:
     """Run the plan. After every run the outcome is judged (health.py): a bad run raises an ALERT line at once (and a
     line in alerts.jsonl); a hard block or junk data stops that marketplace immediately, a second empty or failed run
     in a row stops it too. `classify(task, raw) -> (kind, reason, normalized)` judges single rows; without it every row
-    counts as good. Create <data_dir>/STOP to halt before the next run. Writes run_report.md/.json and returns the Summary."""
+    counts as good. Create <data_dir>/STOP to halt before the next run. Writes run_report.md/.json (unless write_report is
+    False: a batch runs one lane per marketplace and writes one report for all of them) and returns the Summary.
+    `past`: the earlier runs to resume from (default: runs.jsonl); a batch gives every lane the same snapshot."""
     data_dir = Path(data_dir)
     runs_path, alerts_path, stop_path = data_dir / "runs.jsonl", data_dir / "alerts.jsonl", data_dir / "STOP"
-    past = jsonl.load(runs_path)
+    past = jsonl.load(runs_path) if past is None else past
     done = finished_queries(past)
     summary = R.Summary(started=now(), max_spend=max_spend)
     spent = sum((Decimal(str(r["est_charge_usd"])) for r in past), Decimal(0))
-    rows, streak, seen = Counter(), Counter(), defaultdict(set)
-    for r in past:
-        if r["status"] == OK and r.get("verdict", "ok") not in H.BAD:
-            rows[r["marketplace"]] += r["items"]
+    rows, streak, seen = quota_rows(past), Counter(), defaultdict(set)
 
     def alert(mp, task, entry, verdict, action, text):
         url = f"{R.CONSOLE}{entry['run_id']}" if entry["run_id"] else "no run id"
@@ -266,9 +279,7 @@ def run_plan(client, plan, quotas, data_dir, max_spend: Decimal | None = None, l
         record = dict(at=now().isoformat(timespec="seconds"), marketplace=mp, category=task.category, query=task.query,
                       verdict=verdict.kind, reasons=verdict.reasons, notes=verdict.notes, run_id=entry["run_id"], action=action)
         summary.alerts.append(record)
-        alerts_path.parent.mkdir(parents=True, exist_ok=True)
-        with alerts_path.open("a", encoding="utf-8") as f:
-            f.write(jsonl.dumps(record) + "\n")
+        jsonl.append(alerts_path, record)
 
     try:
         for task in plan:
@@ -295,9 +306,7 @@ def run_plan(client, plan, quotas, data_dir, max_spend: Decimal | None = None, l
                                expects_description=ACTORS[mp].expects_description and classify is not None)
             entry.update(verdict=verdict.kind, reasons=verdict.reasons, notes=verdict.notes, rows_good=c.good,
                          rows_duplicate=c.duplicates, rows_filtered=sum(c.filtered.values()), rows_bad=sum(c.bad.values()))
-            runs_path.parent.mkdir(parents=True, exist_ok=True)
-            with runs_path.open("a", encoding="utf-8") as f:
-                f.write(jsonl.dumps(entry) + "\n")
+            jsonl.append(runs_path, entry)
             est = Decimal(str(entry["est_charge_usd"]))
             spent += est
             st.est_spend += est
@@ -333,5 +342,6 @@ def run_plan(client, plan, quotas, data_dir, max_spend: Decimal | None = None, l
         summary.interrupted = True
         log("interrupted (Ctrl-C): writing the report for what was collected so far.")
     summary.finished, summary.spent_total = now(), spent
-    R.write(summary, data_dir)
+    if write_report:
+        R.write(summary, data_dir)
     return summary

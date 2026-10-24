@@ -14,10 +14,9 @@ from listing import Normalized
 from normalize.common import Drop, clean_text
 
 
-def normalize_all(data_dir, mappers) -> Counter:
+def normalize_runs(data_dir, runs, mappers) -> tuple[dict[str, Normalized], Counter]:
+    """The newest row per listing id from these runs' raw files, and the drop counts. Writes nothing."""
     data_dir = Path(data_dir)
-    runs_path = data_dir / "runs.jsonl"
-    runs = jsonl.load(runs_path)
     stats, best = Counter(), {}
     for run in runs:
         raw_path = data_dir / "raw" / run["marketplace"] / f"{run['run_id']}.jsonl"
@@ -42,8 +41,14 @@ def normalize_all(data_dir, mappers) -> Counter:
                     stats["duplicates"] += 1
                 if n.id not in best or n.scraped_at >= best[n.id].scraped_at:
                     best[n.id] = n
+    return best, stats
+
+
+def normalize_all(data_dir, mappers) -> Counter:
+    data_dir = Path(data_dir)
+    best, stats = normalize_runs(data_dir, jsonl.load(data_dir / "runs.jsonl"), mappers)
     out = data_dir / "normalized.jsonl"
-    out.with_suffix(".tmp").write_text("".join(jsonl.dumps(best[i].model_dump(mode="json")) + "\n" for i in sorted(best)), encoding="utf-8")
+    out.with_suffix(".tmp").write_text("".join(jsonl.dumps(best[i].model_dump(mode="json")) + "\n" for i in sorted(best)), encoding="utf-8", newline="\n")
     out.with_suffix(".tmp").replace(out)
     stats["kept"] = len(best)
     return stats

@@ -1,0 +1,80 @@
+/* Shared by the app (globals.css) and the design-system bundle (design-system/bundle.entry.css).
+   Token values live in tokens.css; this file only maps them to Tailwind. */
+
+@import "./type.css";
+@import "./sift.css";
+
+/* Dark mode follows the manual toggle (.dark) or the design-system page (data-theme), never the OS. */
+@custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-tint: var(--primary-tint);
+  --color-primary-tint-foreground: var(--primary-tint-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-verified: var(--verified);
+  --color-claimed: var(--claimed);
+  --color-unknown: var(--unknown);
+  --color-fiber-plant: var(--fiber-plant);
+  --color-fiber-animal: var(--fiber-animal);
+  --color-fiber-regenerated: var(--fiber-regenerated);
+  --color-fiber-synthetic: var(--fiber-synthetic);
+  --color-receipt-paper: var(--receipt-paper);
+  --color-receipt-ink: var(--receipt-ink);
+  --color-stage: var(--stage);
+  --color-stage-foreground: var(--stage-foreground);
+  --color-camera: var(--camera);
+  --color-camera-foreground: var(--camera-foreground);
+  --color-camera-muted: var(--camera-muted);
+  --color-camera-control: var(--camera-control);
+  --color-camera-scrim: var(--camera-scrim);
+  --color-trace-line: var(--trace-line);
+  --color-trace-halo: var(--trace-halo);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-tag: var(--radius-tag);
+  --radius-image: var(--radius-image);
+  --radius-card: var(--radius-card);
+  --radius-sheet: var(--radius-sheet);
+  --radius-pill: var(--radius-pill);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-float: var(--shadow-float);
+  --shadow-lift: var(--shadow-lift);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

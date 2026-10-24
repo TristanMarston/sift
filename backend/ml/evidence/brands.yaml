@@ -1,0 +1,12 @@
+# Hand-curated brand facts. Every claim needs a `url` that a teammate opened and checked (`verified_by`).
+# A row with no working URL is dropped, not guessed. Brand names match listings case- and punctuation-insensitively,
+# via `name` and `aliases`.
+#
+# - name: Patagonia
+#   aliases: [patagonia inc]
+#   repair_program: {value: "Worn Wear repairs", url: "https://..."}
+#   guarantee:      {value: "Ironclad Guarantee", url: "https://..."}
+#   certifications: [{name: fair_trade, url: "https://..."}]
+#   as_of: 2026-10-24
+#   verified_by: Haram
+brands: []

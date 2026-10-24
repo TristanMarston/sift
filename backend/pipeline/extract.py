@@ -217,7 +217,7 @@ def extract_file(src, dst) -> Counter:
             out.append(jsonl.dumps(extract(Normalized.model_validate_json(line)).model_dump(mode="json")) + "\n")
         except ValidationError:
             stats["invalid"] += 1
-    Path(dst).with_suffix(".tmp").write_text("".join(out), encoding="utf-8")
+    Path(dst).with_suffix(".tmp").write_text("".join(out), encoding="utf-8", newline="\n")
     Path(dst).with_suffix(".tmp").replace(dst)
     stats["kept"] = len(out)
     return stats

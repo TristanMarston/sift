@@ -1,0 +1,57 @@
+# Expected wears per category before any evidence: the baseline of every cost-per-wear number.
+# Each category shows its `source` (falls back to the top-level one) on every receipt; a source containing
+# "assumption" is labeled "(assumption)" on the receipt.
+#
+# Source: EU Product Environmental Footprint Category Rules (PEFCR) for Apparel and Footwear, v3.1, 29 April 2025
+# (EU, approved by the European Commission 14 May 2025). Copy hosted at:
+#   https://www.carbonfact.com/hubfs/A&FW_PEFCR_v3.1.pdf
+# Section 3.3.2.2, printed p. 23 (PDF p. 51), "Table 6 - Default product duration of service per product
+# sub-category": "Table 6 below lists the number of uses per product sub-category based on Cascale (2020) for
+# apparel, and expert judgement for footwear." Units are uses (wears) over the product's whole life, across all
+# users: footnote 8, "The number of uses per duration of service includes all kinds of reuses such as consumer to
+# consumer donation, reuse at end of life or reuse of donated unsold consumer products". The PEFCR itself warns
+# (p. 24): "the numbers included in Table 6 have a high uncertainty."
+# Which Sift category maps to which sub-category: Table 4, printed p. 16 (PDF p. 44), quoted per category below.
+#
+# How low and high are set: Table 6 gives one default per sub-category. The PEFCR bounds the product-specific
+# value with its own multipliers (Section 3.3.2.2, Equation 2, printed p. 24): "maximum: Default DoS x 1.45 x 1.15
+# = Default DoS x 1.6675" and "minimum: Default DoS x 0.67 x 1 = Default DoS x 0.67".
+# So low = default x 0.67 and high = default x 1.6675, rounded half up. The midpoint therefore sits about 17%
+# above the PEFCR default.
+#
+# Not used, and why: WRAP "Valuing our clothes" reports lifetimes in years, not wears; Ellen MacArthur Foundation
+# "A New Textiles Economy" reports a change in utilisation, not wears per garment type; Laitala & Klepp (SIFO,
+# OsloMet) report wears across all garments, not per Sift category in a source we could open.
+as_of: 2026-10-23
+source: "EU PEFCR Apparel & Footwear v3.1 (2025), Table 6 default uses, based on Cascale Higg PM (2020)"
+source_url: https://www.carbonfact.com/hubfs/A&FW_PEFCR_v3.1.pdf
+categories:
+  # Table 6: "1 T-shirts Average 45" (printed as "459"; 9 is a footnote marker). Also p. 22: "by default, a t-shirt
+  # will be used 45 times in its lifetime". Table 4: "T-shirts Singlets, t-shirts, polo shirts, other
+  # short-sleeved shirts". 45 x 0.67 = 30, 45 x 1.6675 = 75.
+  tshirts:             {low: 30,  high: 75}
+  # Table 6: "3 Sweaters and midlayers Average 85". Table 4: "Sweaters and midlayers Pullovers, cardigans,
+  # hoodies, jerseys, sweatshirts, knitted and wool sweaters, vests". 85 x 0.67 = 57, 85 x 1.6675 = 142.
+  hoodies_sweatshirts: {low: 57,  high: 142}
+  # Table 6: "2 Shirts and blouses Average 40". Table 4: "Shirts and blouses Long-sleeved shirts, blouses,
+  # tunics, base layers" (short-sleeved shirts fall under T-shirts). 40 x 0.67 = 27, 40 x 1.6675 = 67.
+  shirts:              {low: 27,  high: 67}
+  # Same sub-category as hoodies: Table 6 "3 Sweaters and midlayers Average 85". 85 x 0.67 = 57, 85 x 1.6675 = 142.
+  sweaters_knitwear:   {low: 57,  high: 142}
+  # Table 6: "5 Pants and shorts Average 70". Table 4: "Pants and shorts Casual pants, outdoor pants, dress pants,
+  # jeans, sports pants, capri pants, shorts". 70 x 0.67 = 47, 70 x 1.6675 = 117.
+  jeans_pants:         {low: 47,  high: 117}
+  # Table 6: "4 Jackets and coats Average 100". Table 4: "Jackets and coats Blazers, suit jackets, overcoats,
+  # other light jackets, rain jackets, outdoor winter jackets, parkas, down jackets, ...". 100 x 0.67 = 67,
+  # 100 x 1.6675 = 167.
+  jackets_outerwear:   {low: 67,  high: 167}
+  # Table 6: "12 Closed-toed shoes Average 100". Table 4: "Closed-toed shoes Slippers, tennis shoes, moccasins,
+  # espadrilles, sneakers, ...". Footwear defaults are "expert judgement", not consumer data, hence its own source.
+  # 100 x 0.67 = 67, 100 x 1.6675 = 167.
+  sneakers:
+    low: 67
+    high: 167
+    source: "EU PEFCR Apparel & Footwear v3.1 (2025), Table 6 default uses for closed-toed shoes (expert judgement)"
+  # Table 6: "6 Dresses, skirts and jumpsuits Average 70". Table 4: "Dresses, skirts and jumpsuits Short- and
+  # long-sleeved, strapless, wrap, long and short, one-piece suits". 70 x 0.67 = 47, 70 x 1.6675 = 117.
+  dresses_skirts:      {low: 47,  high: 117}
