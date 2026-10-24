@@ -22,7 +22,7 @@ CERT_LABEL = {"gots": "GOTS", "oeko_tex": "OEKO-TEX", "bluesign": "bluesign", "f
 DURABLE = {
     "sweaters_knitwear": ({"wool", "cashmere", "alpaca", "mohair"}, 80),
     "jeans_pants": ({"cotton"}, 95),
-    "jackets_outerwear": ({"cotton", "wool", "leather"}, 80),
+    "jackets_outerwear": ({"cotton", "wool", "leather", "nylon"}, 80),   # nylon: abrasion-resistant technical shells
     "tshirts": ({"cotton", "linen", "hemp"}, 95),
     "hoodies_sweatshirts": ({"cotton"}, 80),
     "shirts": ({"cotton", "linen", "hemp", "wool"}, 95),
