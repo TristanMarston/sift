@@ -110,8 +110,10 @@ def test_certifications_count_at_most_twice_including_the_brands(row):
 
 
 def test_animal_materials_are_a_neutral_fact(row):
-    e = M.eco(row(materials=fibers(("wool", 100))), {})
-    assert "animal_materials" in kinds(e) and e["level"] == "unknown"
+    # shown, but worth nothing on their own: a wool item scores exactly like a cotton one (both natural fibers)
+    wool, cotton = M.eco(row(materials=fibers(("wool", 100))), {}), M.eco(row(materials=fibers(("cotton", 100))), {})
+    assert "animal_materials" in kinds(wool) and "animal_materials" not in kinds(cotton)
+    assert wool["score"] == cotton["score"]
 
 
 # --- confidence ------------------------------------------------------------------------
@@ -196,3 +198,20 @@ def test_dresses_and_skirts_in_wool_linen_or_silk_count_as_durable(row):
     for fabric in (fibers(("cotton", 100)), fibers(("polyester", 100), synthetic_share=100), fibers(("wool", 60), ("polyester", 40))):
         q, _ = M.quality(row(category="dresses_skirts", materials=fabric, evidence=[ev("materials.fibers")]), {})
         assert q["level"] == "unknown"
+
+
+# --- eco: natural fibers ------------------------------------------------------------------------
+
+def test_mostly_natural_fibers_are_an_eco_fact_that_states_the_fibers(row):
+    e = M.eco(row(materials=fibers(("cotton", 100), synthetic_share=0)), {})
+    f = next(f for f in e["facts"] if f["kind"] == "natural_fibers")
+    assert e["level"] == "medium" and f["value"] == "100% cotton"
+    named = M.eco(row(materials=fibers(("wool", None), ("cashmere", None))), {})   # natural names, no percentages
+    assert "natural_fibers" in kinds(named)
+
+
+def test_blends_viscose_and_synthetics_are_not_natural(row):
+    for fabric in (fibers(("cotton", 90), ("polyester", 10), synthetic_share=10),
+                   fibers(("viscose", 100), synthetic_share=0),
+                   fibers(("cotton", None), ("polyester", None))):
+        assert "natural_fibers" not in kinds(M.eco(row(materials=fabric), {}))
