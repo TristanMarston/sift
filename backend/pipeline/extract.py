@@ -157,13 +157,16 @@ def extract(n: Normalized, lines: list[ProductLine] = PRODUCT_LINES) -> Listing:
     if not fibers or (all(f.pct is None for f in fibers) and any(f.pct is not None for f in in_text)
                       and {f.fiber for f in fibers} <= {f.fiber for f in in_text}):
         fibers, snippet, source = in_text, text_snippet, "listing_text"
+    line = match_product_line(n.brand, f"{n.title} {spec.get('product line', '')} {spec.get('model', '')}", lines)
     if fibers:
         note("materials.fibers", "claimed", source, snippet)
-    elif line := match_product_line(n.brand, f"{n.title} {spec.get('product line', '')} {spec.get('model', '')}", lines):
+    elif line:
         fibers = line.fibers
         note("materials.fibers", "inferred", "product_line", line.note)
     else:
         note("materials.fibers", "unknown", "listing_text")
+    if line:  # a known line is its own evidence (the quality marker credits it), whatever the seller stated
+        note("product_line", "inferred", "product_line", line.note)
 
     certs = {}
     for source, where in (("specifics", " ".join(spec.values())), ("listing_text", text)):

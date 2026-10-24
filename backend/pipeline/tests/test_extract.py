@@ -317,6 +317,16 @@ def test_product_line_fills_in_only_when_nothing_is_stated():
     assert [f.fiber for f in stated.materials.fibers] == ["wool"]
 
 
+def test_a_known_product_line_is_evidence_even_when_the_material_is_stated():
+    # the quality marker credits a known durable line; a seller who also states "100% cotton" must not lose that
+    out = X.extract(norm(brand="Carhartt", title="Carhartt Detroit Jacket", category="jackets_outerwear",
+                         description="100% cotton duck, blanket lined"))
+    assert [f.fiber for f in out.materials.fibers] == ["cotton"]
+    lines = [e for e in out.evidence if e.field == "product_line"]
+    assert [(e.status, e.source, e.snippet) for e in lines] == [("inferred", "product_line", "Carhartt Detroit → cotton duck")]
+    assert [e for e in X.extract(norm(title="Plain tee", description="100% cotton")).evidence if e.field == "product_line"] == []
+
+
 def test_missing_material_is_null_with_unknown_evidence():
     out = X.extract(norm(title="Black tee", description=None))
     assert out.materials.fibers == [] and out.materials.synthetic_share is None
