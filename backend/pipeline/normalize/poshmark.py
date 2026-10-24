@@ -1,8 +1,14 @@
 """Poshmark (123webdata/poshmark-scraper, detail mode) record -> Normalized. Poshmark is US-only and the actor
 returns no condition or location: condition comes from the seller's own words ("NWT", "good used condition") when they
-state one, else stays unknown, and the region is "US". Poshmark's "Original Price"
+state one, else stays unknown, and the region is "US". Shipping is Poshmark's own flat rate, the same for every order up
+to 5 lb, so it is a marketplace rule rather than a per-listing figure (a seller's optional shipping discount is not
+visible to us and is not applied). Poshmark's "Original Price"
 (`regular_price`) is what the seller says the item cost new, so it is the retail price, not a markdown."""
 from listing import Normalized
+
+# "Starting September 12, Posh Post drops from $8.27 to just $6.49" ... "One label for anything up to 5 pounds"
+# https://blog.poshmark.com/2025/09/08/lower-shipping-starting-september-12th/ (fetched 2026-10-24); buyer-paid.
+POSH_POST = "6.49"
 from normalize.common import (Drop, clean_images, condition_from_text, is_kids, make_cost, normalize_brand, require,
                                resolve_category)
 
@@ -23,5 +29,5 @@ def map_item(raw: dict, category: str, scraped_at) -> Normalized:
         category=resolve_category(" > ".join([*crumbs, raw.get("category") or ""]), category),
         subcategory=raw.get("category"), size=raw.get("size") or None, color=raw.get("color") or None,
         image_urls=require(clean_images(raw.get("images")), "no_image"),
-        cost=make_cost(raw.get("price"), raw.get("currency"), retail=raw.get("regular_price")),
+        cost=make_cost(raw.get("price"), raw.get("currency"), shipping=POSH_POST, retail=raw.get("regular_price")),
         seller=dict(region="US"))

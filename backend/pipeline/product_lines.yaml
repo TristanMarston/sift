@@ -3,36 +3,45 @@
 # `title_has`: words that must all appear in the title. `fibers` carry no percentages on purpose.
 # `categories`: the garments the line covers, as sellers file them. A line's name can also be on other products
 # (The North Face sells "Nuptse Traction Booties"), and those must not inherit the garment's material.
+# `durable: true` marks a known long-lived line (quality +2); without it a line only supplies its fabric, which the
+# fabric rules then score. Sneaker materials vary by colorway for most models (Nike Dunk Low and Air Force 1 come in
+# synthetic leather too; New Balance 550 kids' pairs are synthetic), so only lines whose maker states one fabric qualify.
 - brand: Carhartt
   title_has: [detroit]
   categories: [jackets_outerwear]
   note: Carhartt Detroit → cotton duck
   fibers: [{fiber: cotton}]
+  durable: true
 - brand: Carhartt
   title_has: [chore, coat]
   categories: [jackets_outerwear]
   note: Carhartt Chore Coat → cotton duck
   fibers: [{fiber: cotton}]
+  durable: true
 - brand: Patagonia
   title_has: [better, sweater]
   categories: [jackets_outerwear, sweaters_knitwear, hoodies_sweatshirts]   # jackets, vests and 1/4-zips
   note: Patagonia Better Sweater → recycled polyester
   fibers: [{fiber: polyester, recycled: true}]
+  durable: true
 - brand: Patagonia
   title_has: [nano, puff]
   categories: [jackets_outerwear, hoodies_sweatshirts]                      # the Nano Puff Hoody is a jacket
   note: Patagonia Nano Puff → recycled polyester
   fibers: [{fiber: polyester, recycled: true}]
+  durable: true
 - brand: Patagonia
   title_has: [synchilla]
   categories: [jackets_outerwear, hoodies_sweatshirts, sweaters_knitwear]   # jackets, vests and Snap-T pullovers
   note: Patagonia Synchilla → polyester fleece
   fibers: [{fiber: polyester}]
+  durable: true
 - brand: The North Face
   title_has: [nuptse]
   categories: [jackets_outerwear]
   note: The North Face Nuptse → nylon shell, down fill
   fibers: [{fiber: nylon}, {fiber: down}]
+  durable: true
 # "The versatile medium weight, 100% virgin wool, plain weave is perfect for indoor and outdoor adventures."
 #   https://www.pendleton-usa.com/men/mens-featured/the-board-shirt/ (line page, fetched 2026-10-24)
 - brand: Pendleton
@@ -40,3 +49,13 @@
   categories: [shirts, jackets_outerwear]                                   # worn and listed as a shirt jacket too
   note: Pendleton Board Shirt → 100% virgin wool
   fibers: [{fiber: wool, pct: 100}]
+  durable: true
+
+# "Full grain leather upper with gritty suede and gold foil details" / "Synthetic leather lining; Gum rubber cupsole"
+#   https://www.adidas.com/us/samba-og-shoes/B75807.html (read 2026-10-24); other OG colorways list leather uppers
+#   too (soft, cracked or patent). "OG" only: Samba Jane, ADV, XLG and Indoor are other models.
+- brand: Adidas
+  title_has: [samba, og]
+  categories: [sneakers]
+  note: adidas Samba OG → leather upper
+  fibers: [{fiber: leather}]

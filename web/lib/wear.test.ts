@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { breakEven, byPerWear, byPrice, cheapestDropsTo, perWear, spentAt, timesBought, wearSteps } from './wear.ts';
+import { breakEven, breakEvenVerdict, byPerWear, byPrice, cheapestDropsTo, perWear, spentAt, timesBought, wearSteps } from './wear.ts';
 
 test('perWear divides price by wears, in whole cents', () => {
     assert.equal(perWear(4000, 100), 40);
@@ -74,4 +74,11 @@ test('wearSteps walks from one wear to all of them in readable jumps', () => {
     assert.deepEqual(wearSteps(50), [1, 5, 20, 50]);
     assert.deepEqual(wearSteps(12), [1, 5, 12]);
     assert.deepEqual(wearSteps(1), [1]);
+});
+
+test('breakEvenVerdict: cheaper up front, wins within its expected life, or would need more wears than it lasts', () => {
+    assert.equal(breakEvenVerdict(null, 167), 'cheaper');
+    assert.equal(breakEvenVerdict(72, 167), 'wins');
+    assert.equal(breakEvenVerdict(167, 167), 'wins');
+    assert.equal(breakEvenVerdict(2105, 167), 'never');   // a $1,999 jacket vs a typical $45 one
 });

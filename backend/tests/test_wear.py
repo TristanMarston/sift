@@ -71,3 +71,24 @@ def test_unknown_condition_is_said_out_loud():
 @pytest.mark.parametrize("cond,factor", [("new_with_tags", 1.0), ("like_new", 0.95), ("good", 0.8), ("fair", 0.6), (None, 0.85)])
 def test_condition_factors(cond, factor):
     assert W.CONDITION[cond] == factor
+
+
+def test_a_published_typical_figure_is_the_mid_not_the_middle_of_the_range():
+    # EU PEFCR jackets: default 100 uses, bounds x0.67 and x1.6675 -> 67-167, whose middle (117) overstates wears by 17%
+    pefcr = {"low": 67, "high": 167, "mid": 100}
+    assert W.expected_wears(pefcr, "unknown", "new_with_tags") == {"low": 67, "high": 167, "mid": 100}
+    assert W.expected_wears(pefcr, "high", "good")["mid"] == 120       # x1.5 x0.8
+
+
+def test_every_repo_category_carries_its_published_figure():
+    from backend import ranker
+    cats = ranker.load_config().baselines["categories"]
+    assert {c: b["mid"] for c, b in cats.items()} == {
+        "tshirts": 45, "hoodies_sweatshirts": 85, "shirts": 40, "sweaters_knitwear": 85, "jeans_pants": 70,
+        "jackets_outerwear": 100, "sneakers": 100, "dresses_skirts": 70}
+    assert all(b["low"] <= b["mid"] <= b["high"] for b in cats.values())
+
+
+def test_the_receipt_says_the_typical_figure():
+    base = {"as_of": "2026-10-23", "source": "EU PEFCR", "categories": {"jackets_outerwear": {"low": 67, "high": 167, "mid": 100}}}
+    assert W.wear_facts("jackets_outerwear", base, "good", "Good")[0]["value"] == "67–167 wears for jackets & outerwear, typically 100"

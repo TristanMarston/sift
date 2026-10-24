@@ -57,8 +57,8 @@ _CERTS = {
 }
 _FLAGS = {
     "is_vintage": r"\b(?:vintage|vtg)\b(?![\s-]*(?:wash|style|inspired|fit|look|fade|effect))",
-    "is_deadstock": r"\bdead[\s-]?stock\b|\bnew old stock\b",
-    "is_upcycled": r"\bup[\s-]?cycl(?:ed|e)\b",
+    "is_deadstock": r"\bdead[\s-]?stock\b|\bnew old stock\b|\b(?-i:NOS)\b",        # NOS: capitals only ("Nos Amis")
+    "is_upcycled": r"\bup[\s-]?cycl(?:ed|e)\b|(?<!not )\breworked\b",           # reworked: remade from a garment
 }
 _RETAIL = re.compile(r"\b(?:retail(?:s|ed)?(?:\s+(?:price|value))?(?:\s+(?:for|at))?|msrp)\s*[:\-]?\s*"
                      r"\$\s*(\d[\d,]*(?:\.\d{1,2})?)", re.I)
@@ -90,6 +90,7 @@ class ProductLine(BaseModel):
     categories: list[Category]   # the garments the line covers: a name can also be a shoe ("Nuptse Traction Booties")
     note: str
     fibers: list[Fiber]
+    durable: bool = False  # True: a known long-lived line (quality +2); False: the line only tells us its fabric
 
 
 PRODUCT_LINES = [ProductLine(**p) for p in yaml.safe_load(Path(__file__).with_name("product_lines.yaml").read_text(encoding="utf-8"))]
@@ -173,7 +174,7 @@ def extract(n: Normalized, lines: list[ProductLine] = PRODUCT_LINES) -> Listing:
         note("materials.fibers", "inferred", "product_line", line.note)
     else:
         note("materials.fibers", "unknown", "listing_text")
-    if line:  # a known line is its own evidence (the quality marker credits it), whatever the seller stated
+    if line and line.durable:  # a known durable line is its own evidence (quality credits it), whatever the seller stated
         note("product_line", "inferred", "product_line", line.note)
 
     certs = {}

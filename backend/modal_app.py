@@ -8,7 +8,8 @@ speed, and only listings.jsonl / a photo / the results cross our own connection.
   SIFT_INDEX_NAME=full uv run modal deploy modal_app.py          # the HTTP API (backend.app) at a public URL
 
 Deploy settings come from your shell: SIFT_INDEX_NAME (default full), SIFT_CORS_ORIGINS, SIFT_CORS_ORIGIN_REGEX
-(default: the team's Vercel URLs) and SIFT_MIN_CONTAINERS (1 keeps one warm for a demo; it bills while idle).
+(default: the team's Vercel URLs), SIFT_MIN_CONTAINERS (1 keeps one warm for a demo; it bills while idle) and
+SIFT_HAIKU=1 (Claude Haiku in /detect; needs the `sift-anthropic` Modal secret).
 
 The index lives on the `sift-index` volume at /vol/<name>/ (name = test | full | ...)."""
 import importlib
@@ -49,6 +50,7 @@ api_image = (
                  "python-multipart", "anthropic")
     .run_function(_download_api_models)                                  # baked in: cold starts skip 500 MB of downloads
     .env({"SIFT_INDEX": f"/vol/{os.getenv('SIFT_INDEX_NAME', 'full')}/index",
+          "SIFT_HAIKU": os.getenv("SIFT_HAIKU", "0"),   # baked in: the container must attach the same secrets as the deploy
           "SIFT_CORS_ORIGINS": os.getenv("SIFT_CORS_ORIGINS", "http://localhost:3000"),
           "SIFT_CORS_ORIGIN_REGEX": os.getenv("SIFT_CORS_ORIGIN_REGEX", "https://sift(-[a-z0-9-]+)?[.]vercel[.]app")})
     .add_local_python_source("backend", ignore=["**/__pycache__"])     # the default ignore would drop category_text.npy
@@ -120,7 +122,10 @@ def query(photo: str, name: str = "test", k: int = 10, category: str = ""):
 
 
 @app.function(image=api_image, volumes={"/vol": vol}, cpu=2, memory=4096, timeout=60, scaledown_window=600,
-              min_containers=int(os.getenv("SIFT_MIN_CONTAINERS", "0")))
+              min_containers=int(os.getenv("SIFT_MIN_CONTAINERS", "0")),
+              # SIFT_HAIKU=1: /detect names and splits garments with Claude Haiku. Needs the Modal secret once:
+              #   modal secret create sift-anthropic ANTHROPIC_API_KEY=...
+              secrets=[modal.Secret.from_name("sift-anthropic")] if os.getenv("SIFT_HAIKU") == "1" else [])
 @modal.concurrent(max_inputs=8)
 @modal.asgi_app()
 def api():

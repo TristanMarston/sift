@@ -9,4 +9,119 @@
 #   certifications: [{name: fair_trade, url: "https://..."}]
 #   as_of: 2026-10-24
 #   verified_by: Haram
-brands: []
+#
+# bluesign rows cite bluesign's own "System Partner list (Brands)" PDF dated September 1, 2026: each name below
+# appears there as its own line (e.g. "PATAGONIA USA").
+# Rule (2026-10-24): only promises that reach a secondhand buyer count. Time-limited guarantees for the original buyer
+# (Nike 2-year warranty, Smartwool 2-year, KUHL 18-month, L.L.Bean 1-year satisfaction) were sourced but left out: they
+# almost never apply to a resold item, and a guarantee here adds +2 quality to every item of the brand.
+brands:
+  - name: Carhartt
+    # "We know that well-worn, passed-down Carhartts can hold a lot of sentimental value, so we'll always treat your
+    # gear with great care while we make repairs" / "this repair service is available only within the United States" /
+    # "For normal wear and tear, a reasonable and transparent charge may be applied for our repair services."
+    # (read 2026-10-24 in a browser; carhartt.com blocks automated fetches). Counts: it reaches passed-down gear.
+    # Left out: "repair, replacement, or credit" if a product fails expectations, which excludes normal wear and does
+    # not say whether a second owner is covered. Carhartt WIP is a separate licensee and is not an alias.
+    repair_program: {value: "Repairs zippers, buttons, straps, patches (US; fee for normal wear)", url: "https://www.carhartt.com/our-commitment"}
+    as_of: 2026-10-24
+    verified_by: "Anthony + Claude (page read in Anthony's browser)"
+
+  - name: Patagonia
+    aliases: [patagonia inc]
+    # "Customers can return items to the store you bought it from or to Patagonia for a repair, replacement, or refund." /
+    # "submit a repair assessment" (fetched 2026-10-24)
+    repair_program: {value: "Repairs gear via repair assessment", url: "https://www.patagonia.com.au/pages/ironclad-guarantee"}
+    # "We guarantee everything we make." (fetched 2026-10-24)
+    guarantee: {value: "Ironclad Guarantee on everything it makes", url: "https://www.patagonia.com.au/pages/ironclad-guarantee"}
+    certifications:
+      # B Lab's directory lists Patagonia, Inc. as a Certified B Corporation (active): opened by Anthony on 2026-10-24;
+      # bcorporation.net blocks automated fetches, so the page was read by hand.
+      - {name: b_corp, url: "https://www.bcorporation.net/en-us/find-a-b-corp/company/patagonia-inc/"}
+      # "PATAGONIA USA" (fetched 2026-10-24)
+      - {name: bluesign, url: "https://www.bluesign.com/wp-content/uploads/2026/09/bluesign-System-Partner-list-Brands_2026.09.01.pdf"}
+    as_of: 2026-10-24
+    verified_by: "agent-sourced, needs teammate check"
+
+  - name: The North Face
+    aliases: [tnf, north face, the north face vintage]
+    certifications:
+      # "THE NORTH FACE USA" (fetched 2026-10-24)
+      - {name: bluesign, url: "https://www.bluesign.com/wp-content/uploads/2026/09/bluesign-System-Partner-list-Brands_2026.09.01.pdf"}
+    as_of: 2026-10-24
+    verified_by: "agent-sourced, needs teammate check"
+
+  - name: Levi's
+    aliases: [levi strauss, levi strauss co]
+    # "Today, the Levi's® Tailor Shop continues that legacy through customization, alteration and repair." (fetched 2026-10-24)
+    repair_program: {value: "Levi's Tailor Shop repairs", url: "https://www.levi.com/US/en_US/features/tailor-shop"}
+    as_of: 2026-10-24
+    verified_by: "agent-sourced, needs teammate check"
+
+  - name: Arc'teryx
+    aliases: [arcteryx veilance]
+    # "Through our ReBIRD™ program, we will repair your gear for as long as it is repairable." (fetched 2026-10-24)
+    repair_program: {value: "ReBIRD repairs gear while repairable", url: "https://arcteryx.com/us/en/rebird/repair"}
+    # "warrants the following Arc'teryx products against non-conformance with Arc'teryx material and workmanship
+    # specifications" ... apparel, packs and accessories: "Practical Product Lifespan" (fetched 2026-10-24)
+    guarantee: {value: "Limited warranty for practical lifespan (apparel, packs)", url: "https://arcteryx.com/us/en/help/limited-warranty"}
+    certifications:
+      # "Arc'teryx Canada" (fetched 2026-10-24)
+      - {name: bluesign, url: "https://www.bluesign.com/wp-content/uploads/2026/09/bluesign-System-Partner-list-Brands_2026.09.01.pdf"}
+    as_of: 2026-10-24
+    verified_by: "agent-sourced, needs teammate check"
+
+  - name: adidas
+    aliases: [adidas originals]
+    certifications:
+      # "adidas Germany" (fetched 2026-10-24)
+      - {name: bluesign, url: "https://www.bluesign.com/wp-content/uploads/2026/09/bluesign-System-Partner-list-Brands_2026.09.01.pdf"}
+    as_of: 2026-10-24
+    verified_by: "agent-sourced, needs teammate check"
+
+  - name: Veja
+    # "In July 2022, Berlin became the first VEJA store to offer in-store shoe repairs." (fetched 2026-10-24)
+    repair_program: {value: "In-store sneaker repair (select stores)", url: "https://project.veja-store.com/en/single/cleanrepaircollect"}
+    certifications:
+      # "Initiated in 2017, we were B Corp certified in December 2018." (fetched 2026-10-24)
+      - {name: b_corp, url: "https://project.veja-store.com/en/single/transparency"}
+    as_of: 2026-10-24
+    verified_by: "agent-sourced, needs teammate check"
+
+  - name: Allbirds
+    certifications:
+      # "As a certified B Corp, we use a data-driven approach to invest in projects, systems, and tools" (fetched 2026-10-24)
+      - {name: b_corp, url: "https://www.allbirds.com/pages/our-story"}
+    as_of: 2026-10-24
+    verified_by: "agent-sourced, needs teammate check"
+
+  - name: Salomon
+    certifications:
+      # "Salomon France" (fetched 2026-10-24)
+      - {name: bluesign, url: "https://www.bluesign.com/wp-content/uploads/2026/09/bluesign-System-Partner-list-Brands_2026.09.01.pdf"}
+    as_of: 2026-10-24
+    verified_by: "agent-sourced, needs teammate check"
+
+  - name: Asics
+    aliases: [asics tiger]
+    certifications:
+      # "ASICS Japan" (fetched 2026-10-24)
+      - {name: bluesign, url: "https://www.bluesign.com/wp-content/uploads/2026/09/bluesign-System-Partner-list-Brands_2026.09.01.pdf"}
+    as_of: 2026-10-24
+    verified_by: "agent-sourced, needs teammate check"
+
+  - name: Filson
+    aliases: [cc filson, cc filson co]
+    # "If a button gets torn off, or you get snagged crossing a barbed-wire fence, we can often repair it." (fetched 2026-10-24)
+    repair_program: {value: "Repairs damaged Filson items", url: "https://www.filson.com/pages/repairs"}
+    # "Filson guarantees every item for the lifetime of the item against failure of materials, workmanship..." (fetched 2026-10-24)
+    guarantee: {value: "Lifetime guarantee against materials and workmanship failure", url: "https://www.filson.com/pages/repairs"}
+    as_of: 2026-10-24
+    verified_by: "agent-sourced, needs teammate check"
+
+  - name: L.L.Bean
+    certifications:
+      # "LL BEAN USA" (fetched 2026-10-24)
+      - {name: bluesign, url: "https://www.bluesign.com/wp-content/uploads/2026/09/bluesign-System-Partner-list-Brands_2026.09.01.pdf"}
+    as_of: 2026-10-24
+    verified_by: "agent-sourced, needs teammate check"

@@ -185,6 +185,10 @@ def test_certifications(text, expected):
     ("Vtg Carhartt Detroit Jacket", True, False, False),
     ("VTG J.Crew merino sweater", True, False, False),
     ("upcycled flannel", False, False, True),
+    ("Reworked Carhartt Detroit Jacket", False, False, True),        # "reworked" = remade from an existing garment
+    ("Carhartt J001 NWT NOS Size M", False, True, False),           # NOS = new old stock
+    ("Nos Amis graphic tee", False, False, False),                    # a word, not the acronym: only all-caps NOS counts
+    ("work jacket, not reworked", False, False, False),
     ("Up-cycled patchwork", False, False, True),
     ("plain tee", False, False, False),
 ])
@@ -386,3 +390,17 @@ def test_certification_evidence_and_other_fields_untouched():
     assert out.materials.certifications == ["gots", "oeko_tex"]
     assert (out.brand, out.size, out.url, out.id) == ("Pact", "M", n.url, n.id)
     assert "materials.certifications" in {e.field for e in out.evidence}
+
+
+def test_a_material_only_line_fills_the_fabric_but_is_not_a_durable_line():
+    # adidas: "Full grain leather upper with gritty suede and gold foil details" (Samba OG page)
+    out = X.extract(norm(brand="Adidas", title="Adidas Samba OG black white gum size 10", category="sneakers"))
+    assert [f.fiber for f in out.materials.fibers] == ["leather"]
+    assert [(e.field, e.status, e.source) for e in out.evidence if e.source == "product_line"] == [
+        ("materials.fibers", "inferred", "product_line")]          # no separate "known durable line" evidence
+    other = X.extract(norm(brand="Adidas", title="Adidas Samba Jane white", category="sneakers"))
+    assert other.materials.fibers == []                            # only the OG is the leather line
+
+
+def test_the_existing_lines_stay_durable():
+    assert all(p.durable for p in X.PRODUCT_LINES if p.brand in {"Carhartt", "Patagonia", "The North Face", "Pendleton"})
