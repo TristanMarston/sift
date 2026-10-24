@@ -5,7 +5,7 @@ the contract; `CLAUDE.md` rules still apply (branch per feature, PR, TDD for dat
 
 ## TL;DR
 
-- The backend is **built, merged and live**: <https://lu-anthony-73--sift-api.us-east.modal.run> serves
+- The backend is **built, merged and live**: <https://lu-anthony-73--sift-api.us-west.modal.run> serves
   `GET /health`, `POST /detect`, `POST /search` over **51,101 real listings** (5 marketplaces), with Claude Haiku in
   `/detect`. PRs #4–#39 are merged; 885 backend tests pass; backend CI runs on every PR touching `backend/` or `schema/`.
 - **The overnight jobs finished** (Oct 24): 51,131 listings, shipping known for 100%, index rebuilt and redeployed.
@@ -34,7 +34,7 @@ keeps serving the old index.
 
 ## Live API (what the frontend calls)
 
-Base URL: `https://lu-anthony-73--sift-api.us-east.modal.run` · Contract: `schema/api.schema.json` · Code: `backend/src/backend/app.py`
+Base URL: `https://lu-anthony-73--sift-api.us-west.modal.run` · Contract: `schema/api.schema.json` · Code: `backend/src/backend/app.py`
 
 | Endpoint | Behaviour worth knowing |
 | --- | --- |
@@ -105,7 +105,7 @@ Get the data on your machine: `backend/DATA.md` (snapshot zip from the Modal vol
 ## What you (or your agent) can do now
 
 **Tristan — web**
-- Set `NEXT_PUBLIC_API_URL=https://lu-anthony-73--sift-api.us-east.modal.run` in Vercel (all envs).
+- Set `NEXT_PUBLIC_API_URL=https://lu-anthony-73--sift-api.us-west.modal.run` in Vercel (all envs).
 - Show `query.category` when the backend inferred it ("Searching jackets").
 - Loading state for `/detect` up to ~10 s on a cold start (or rely on the 8 s whole-photo fallback).
 - Check the receipt renders `construction`, `survival`, `natural_fibers`, and `tag_image`/`verified` facts nicely.
@@ -122,7 +122,7 @@ Get the data on your machine: `backend/DATA.md` (snapshot zip from the Modal vol
 - Photograph the demo props (worn and flat) for a live test through the deployed API.
 
 **Anyone**
-- Live phone-photo test: `curl -F image=@photo.jpg https://lu-anthony-73--sift-api.us-east.modal.run/detect`, then
+- Live phone-photo test: `curl -F image=@photo.jpg https://lu-anthony-73--sift-api.us-west.modal.run/detect`, then
   `/search` with a crop. Report misses as issues with the photo.
 - Repo owner: install the Claude GitHub app on `TristanMarston/sift` so cloud agents can push and open PRs.
 
