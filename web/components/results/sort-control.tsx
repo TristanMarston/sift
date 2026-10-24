@@ -7,15 +7,13 @@ import { cn } from '@/lib/utils';
 
 const SORTS: { id: Sort; label: string }[] = [
     { id: 'cpw', label: 'Cost per wear' },
-    { id: 'price', label: 'Price' },
-    { id: 'match', label: 'Look match' },
     { id: 'eco', label: 'Eco' },
 ];
 
-/** The four sorts as one segmented control. The selected pill slides; the list reshuffles under it. */
+/** Cost per wear (with the match slider under it) or eco, as one segmented control. The selected pill slides; the list reshuffles under it. */
 export function SortControl({ value, onChange, className }: { value: Sort; onChange: (s: Sort) => void; className?: string }) {
     return (
-        <div role='radiogroup' aria-label='Sort results' className={cn('grid grid-cols-[1.35fr_0.8fr_1.1fr_0.75fr] gap-0.5 rounded-pill bg-secondary p-1', className)}>
+        <div role='radiogroup' aria-label='Sort results' className={cn('grid grid-cols-2 gap-0.5 rounded-pill bg-secondary p-1', className)}>
             {SORTS.map((s) => {
                 const on = s.id === value;
                 return (

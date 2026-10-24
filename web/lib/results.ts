@@ -2,10 +2,35 @@
 // these only pick and format. Free of runtime imports so `node --test` can run it directly.
 import type { Level, Result, SearchResponse, Sort } from './search';
 
+const CATEGORY: Record<string, string> = {
+    jackets_outerwear: 'Jackets',
+    hoodies_sweatshirts: 'Hoodies',
+    tshirts: 'T-shirts',
+    sneakers: 'Sneakers',
+    jeans_pants: 'Jeans and pants',
+    sweaters_knitwear: 'Sweaters',
+    shirts: 'Shirts',
+    dresses_skirts: 'Dresses and skirts',
+};
+
+/** "Jackets" for a title, "jackets" for "Searching jackets". null when the category is missing or not one of the 8. */
+export function categoryLabel(category: string | null | undefined, form: 'title' | 'lower' = 'title') {
+    const label = category ? CATEGORY[category] : undefined;
+    if (!label) return null;
+    return form === 'lower' ? label.charAt(0).toLowerCase() + label.slice(1) : label;
+}
+
 /** The results in the order the backend sent for this sort. */
 export function ordered(resp: SearchResponse, sort: Sort): Result[] {
     const byId = new Map(resp.results.map((r) => [r.id, r]));
     return resp.orders[sort].flatMap((id) => byId.get(id) ?? []);
+}
+
+/** The closer-match-to-better-value slider: one of the backend's 11 lists (0 = best value, 10 = closest match). */
+export function sliderOrder(resp: SearchResponse, position: number): Result[] {
+    const i = Math.min(resp.slider.length - 1, Math.max(0, Math.round(position)));
+    const byId = new Map(resp.results.map((r) => [r.id, r]));
+    return resp.slider[i].flatMap((id) => byId.get(id) ?? []);
 }
 
 export type Headline = { kind: 'drops'; rank: number } | { kind: 'best' } | null;

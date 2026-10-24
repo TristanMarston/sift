@@ -10,12 +10,13 @@ import { Notice } from '@/components/sift/notice';
 import { ThemeToggle } from '@/components/sift/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { ease, spring } from '@/lib/motion';
-import { headline, ordered, perWearText, priceText } from '@/lib/results';
+import { categoryLabel, headline, ordered, perWearText, priceText, sliderOrder } from '@/lib/results';
 import type { Sort } from '@/lib/search';
 import type { Garment } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { ReceiptSheet } from './receipt-sheet';
 import { ResultRow, RowSkeleton } from './result-row';
+import { MatchSlider } from './match-slider';
 import { SortControl } from './sort-control';
 
 type Props = {
@@ -26,6 +27,7 @@ type Props = {
     onSelect: (id: string) => void;
     onBack: () => void;
     onRetry: (id: string) => void;
+    onDrawBox: () => void; // "Wrong garment? Draw a box"
 };
 
 const fade = (delay = 0) => ({ initial: { opacity: 0 }, animate: { opacity: 1, transition: { delay, duration: 0.35, ease: ease.out } } });
@@ -35,15 +37,20 @@ const rows = { show: { transition: { staggerChildren: 0.04, delayChildren: 0.15 
  * Look-alikes for one garment, ranked by cost per wear. The backend sends every order; switching sorts only
  * picks another list, so the rows reshuffle instantly. Tap a row for its Wear Receipt.
  */
-export function ResultsScreen({ shot, garments, searches, selected, onSelect, onBack, onRetry }: Props) {
+export function ResultsScreen({ shot, garments, searches, selected, onSelect, onBack, onRetry, onDrawBox }: Props) {
     const [sort, setSort] = useState<Sort>('cpw');
+    const [mix, setMix] = useState(0); // the match-to-value slider, 0 = best value
     const [openId, setOpenId] = useState<string | null>(null);
     const garment = garments.find((g) => g.id === selected) ?? garments[0];
     const current = searches[garment.id];
     const resp = current?.status === 'done' ? current.resp : null;
-    const list = resp ? ordered(resp, sort) : [];
-    const head = resp && sort === 'cpw' ? headline(resp) : null;
+    const leaning = sort === 'cpw' && mix > 0; // the slider has moved off pure cost per wear
+    const list = resp ? (leaning ? sliderOrder(resp, mix) : ordered(resp, sort)) : [];
+    // The headline describes the cost-per-wear order, so it only shows there.
+    const head = resp && sort === 'cpw' && !leaning ? headline(resp) : null;
     const open = resp?.results.find((r) => r.id === openId) ?? null;
+    // A whole-photo search is titled by the category the backend read from it ("Jackets"), not "Your photo".
+    const title = (!garment.category && categoryLabel(resp?.query.category)) || garment.label;
 
     const status = !current || current.status === 'loading' ? 'Searching…' : current.status === 'error' ? "The search didn't finish" : `${list.length} look-${list.length === 1 ? 'alike' : 'alikes'}`;
 
@@ -83,9 +90,13 @@ export function ResultsScreen({ shot, garments, searches, selected, onSelect, on
                                 </motion.div>
                             )}
                             <motion.div {...fade(0.15)} className='min-w-0'>
-                                <h1 className='truncate type-title-1'>{garment.label}</h1>
+                                <h1 className='truncate type-title-1'>{title}</h1>
                                 <p className='type-footnote text-muted-foreground' aria-live='polite'>
                                     {status}
+                                    <span aria-hidden> · </span>
+                                    <button type='button' onClick={onDrawBox} className='rounded-sm text-foreground underline decoration-current/30 underline-offset-2 outline-none hover:decoration-current focus-visible:ring-2 focus-visible:ring-ring'>
+                                        Wrong garment? Draw a box
+                                    </button>
                                 </p>
                             </motion.div>
                         </div>
@@ -95,6 +106,13 @@ export function ResultsScreen({ shot, garments, searches, selected, onSelect, on
                         <>
                             <motion.div {...fade(0.2)} className='sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-10 -mx-4 bg-background/85 px-4 py-2 backdrop-blur-md lg:-mx-8 lg:px-8'>
                                 <SortControl value={sort} onChange={setSort} className='lg:max-w-xl' />
+                                <AnimatePresence initial={false}>
+                                    {sort === 'cpw' && (
+                                        <motion.div key='slider' className='overflow-hidden lg:max-w-xl' initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={spring.ui}>
+                                            <MatchSlider value={mix} onChange={setMix} className='px-1 pt-2' />
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             </motion.div>
 
                             <AnimatePresence initial={false} mode='popLayout'>

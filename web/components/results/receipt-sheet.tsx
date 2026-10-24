@@ -24,8 +24,8 @@ const CONFIDENCE: Record<Level, string> = {
 type Props = { r: Result; typical: SearchResponse['typical']; onClose: () => void };
 
 /**
- * The Wear Receipt: everything behind one result, line by line, on receipt paper. Every line opens to its source,
- * status and date; anything we don't know says unknown. Phone: a sheet from the bottom (drag the handle down to
+ * The Wear Receipt: everything behind one result, line by line, on receipt paper. The link to buy sits right under
+ * the item. Every line opens to its source, status and date; anything we don't know says unknown. Phone: a sheet from the bottom (drag the handle down to
  * close). Desktop: a panel from the right. The photo grows out of the row it came from.
  */
 export function ReceiptSheet({ r, typical, onClose }: Props) {
@@ -99,14 +99,17 @@ export function ReceiptSheet({ r, typical, onClose }: Props) {
                         </div>
                     </div>
 
-                    {/* The receipt */}
-                    <div className='mt-5 bg-receipt-paper px-4 pt-4 pb-6 text-receipt-ink receipt-edge-bottom'>
-                        <p className='flex items-baseline justify-between type-label text-receipt-ink/70'>
-                            <span>SIFT · WEAR RECEIPT</span>
-                            <span>{MARKET[r.marketplace].toUpperCase()}</span>
-                        </p>
+                    <Button size='lg' className='mt-4 w-full' render={<a href={r.url} target='_blank' rel='noreferrer' />} nativeButton={false}>
+                        View on {MARKET[r.marketplace]}
+                        <ExternalLink data-icon='inline-end' strokeWidth={1.75} />
+                    </Button>
 
-                        <Section label='COST' value={priceText(c.total_cents)}>
+                    {/* The receipt */}
+                    <div className='mt-5 bg-receipt-paper px-4 pt-4 pb-7 text-receipt-ink receipt-edge-bottom'>
+                        <h3 className='font-serif text-xl leading-7'>Wear Receipt</h3>
+                        <p className='type-footnote text-pretty text-muted-foreground'>How it works out to {perWearText(w.cpw_cents.at_mid)} a wear. Tap a line for its source.</p>
+
+                        <Section title='Cost' value={priceText(c.total_cents)}>
                             <Lines
                                 lines={[
                                     c.original_price_cents && c.original_price_cents > c.price_cents ? `Seller marked it down from ${priceText(c.original_price_cents)}` : null,
@@ -117,21 +120,21 @@ export function ReceiptSheet({ r, typical, onClose }: Props) {
                             />
                         </Section>
 
-                        <Section label='QUALITY' value={<LevelValue level={r.quality.level} />}>
-                            {noEvidence(r) ? <p className='py-1.5 type-receipt'>Not enough evidence yet. It stays in the list, with no boost.</p> : <Facts facts={r.quality.facts} />}
+                        <Section title='Quality' value={<LevelValue level={r.quality.level} />}>
+                            {noEvidence(r) ? <Lines lines={['Not enough evidence yet. It stays in the list, with no boost.']} /> : <Facts facts={r.quality.facts} />}
                         </Section>
 
-                        <Section label='ECO' value={<LevelValue level={r.eco.level} />}>
-                            {r.eco.facts.length ? <Facts facts={r.eco.facts} /> : <p className='py-1.5 type-receipt'>No eco facts stated.</p>}
+                        <Section title='Eco' value={<LevelValue level={r.eco.level} />}>
+                            {r.eco.facts.length ? <Facts facts={r.eco.facts} /> : <Lines lines={['No eco facts stated.']} />}
                         </Section>
 
-                        <Section label='EXPECTED WEARS' value={`${w.expected_wears.low}–${w.expected_wears.high}`} estimate>
+                        <Section title='Expected wears' value={`${w.expected_wears.low}–${w.expected_wears.high}`} estimate>
                             <Lines lines={[w.basis === 'category_baseline' ? 'No quality evidence, so this is the typical lifespan for the category.' : `About ${w.expected_wears.mid} in the middle of the range.`]} />
                             <Facts facts={w.facts} />
                         </Section>
 
-                        <Section label='COST PER WEAR' estimate>
-                            <div className='grid grid-cols-4 gap-1 pt-2 text-center'>
+                        <Section title='Cost per wear' estimate>
+                            <div className='mt-2 grid grid-cols-4 gap-1 text-center'>
                                 {(
                                     [
                                         ['30 wears', w.cpw_cents.at_30],
@@ -140,75 +143,63 @@ export function ReceiptSheet({ r, typical, onClose }: Props) {
                                         [`${w.expected_wears.mid} expected`, w.cpw_cents.at_mid],
                                     ] as const
                                 ).map(([label, cents], i) => (
-                                    <div key={label} className={cn('rounded-md py-1.5', i === 3 && 'bg-receipt-ink/[0.06]')}>
-                                        <p className='type-receipt font-semibold tabular'>{perWearText(cents)}</p>
-                                        <p className='type-footnote text-receipt-ink/70'>{label}</p>
+                                    <div key={label} className={cn('rounded-md px-0.5 py-2', i === 3 && 'bg-receipt-ink/[0.07]')}>
+                                        <p className='font-mono text-[15px] leading-5 font-medium tabular'>{perWearText(cents)}</p>
+                                        <p className='mt-0.5 type-footnote text-muted-foreground'>{label}</p>
                                     </div>
                                 ))}
                             </div>
                         </Section>
 
                         {typical && (
-                            <Section label='VS. TYPICAL MATCH'>
+                            <Section title='Against the typical match'>
                                 <Lines lines={[`The typical match costs ${priceText(typical.price_cents)}, about ${perWearText(typical.cpw_cents)} a wear.`]} />
                                 {{
-                                    cheaper: <p className='pt-1 type-receipt font-semibold'>It costs less than the typical match up front.</p>,
-                                    wins: (
-                                        <>
-                                            <p className='pt-1 type-receipt font-semibold'>Break-even: wear this {w.break_even_wears}+ times to win.</p>
-                                            <p className='pt-0.5 type-footnote text-receipt-ink/70'>If you won&apos;t wear it that often, the cheaper one is the better buy.</p>
-                                        </>
-                                    ),
+                                    cheaper: <Verdict head='It costs less than the typical match up front.' />,
+                                    wins: <Verdict head={`Break-even: wear this ${w.break_even_wears}+ times to win.`} note="If you won't wear it that often, the cheaper one is the better buy." />,
                                     never: (
-                                        <>
-                                            <p className='pt-1 type-receipt font-semibold'>Unlikely to beat the typical match on cost per wear.</p>
-                                            <p className='pt-0.5 type-footnote text-receipt-ink/70'>
-                                                It would take {w.break_even_wears}+ wears, more than the {w.expected_wears.high} it&apos;s expected to last.
-                                            </p>
-                                        </>
+                                        <Verdict
+                                            head='Unlikely to beat the typical match on cost per wear.'
+                                            note={`It would take ${w.break_even_wears}+ wears, more than the ${w.expected_wears.high} it's expected to last.`}
+                                        />
                                     ),
                                 }[breakEvenVerdict(w.break_even_wears, w.expected_wears.high)]}
                             </Section>
                         )}
 
-                        <Section label='CONFIDENCE' value={<LevelValue level={r.confidence} />}>
+                        <Section title='Confidence' value={<LevelValue level={r.confidence} />}>
                             <Lines lines={[CONFIDENCE[r.confidence]]} />
                         </Section>
                     </div>
-
-                    <Button size='lg' className='mt-5 w-full' render={<a href={r.url} target='_blank' rel='noreferrer' />} nativeButton={false}>
-                        View on {MARKET[r.marketplace]}
-                        <ExternalLink data-icon='inline-end' strokeWidth={1.75} />
-                    </Button>
-                    <p className='mt-3 text-center type-footnote text-pretty text-muted-foreground'>Evidence suggests, it doesn&apos;t promise. Tap any line for its source.</p>
                 </div>
             </motion.div>
         </>
     );
 }
 
-function Section({ label, value, estimate, children }: { label: string; value?: React.ReactNode; estimate?: boolean; children: React.ReactNode }) {
+/** A receipt section: its title, a dot leader, and the total it adds up to. */
+function Section({ title, value, estimate, children }: { title: string; value?: React.ReactNode; estimate?: boolean; children: React.ReactNode }) {
     return (
-        <section className='border-t border-dashed border-receipt-ink/30 pt-3 mt-3 first-of-type:mt-3'>
-            <p className='flex items-end type-label text-receipt-ink/70'>
-                <span className='flex items-center gap-1.5'>
-                    {label}
-                    {estimate && <EstTag className='text-receipt-ink/70' />}
-                </span>
+        <section className='mt-4 border-t border-dashed border-receipt-ink/25 pt-4'>
+            <div className='flex items-baseline'>
+                <h4 className='flex items-center gap-1.5 type-headline'>
+                    {title}
+                    {estimate && <EstTag className='self-center' />}
+                </h4>
                 {value !== undefined && (
                     <>
                         <span className='leader' />
-                        <span className='type-receipt font-semibold text-receipt-ink normal-case tracking-normal'>{value}</span>
+                        <span className='font-mono text-[15px] font-medium tabular'>{value}</span>
                     </>
                 )}
-            </p>
+            </div>
             {children}
         </section>
     );
 }
 
 const LevelValue = ({ level }: { level: Level }) => (
-    <span className='inline-flex items-center gap-2'>
+    <span className='inline-flex items-center gap-2 font-sans font-semibold'>
         {levelText(level)}
         {level !== 'unknown' && <LevelDots level={level} />}
     </span>
@@ -217,15 +208,22 @@ const LevelValue = ({ level }: { level: Level }) => (
 const Lines = ({ lines }: { lines: (string | null)[] }) => (
     <>
         {lines.filter(Boolean).map((l) => (
-            <p key={l} className='pt-1.5 type-receipt text-pretty'>
+            <p key={l} className='mt-1.5 type-callout text-pretty text-muted-foreground'>
                 {l}
             </p>
         ))}
     </>
 );
 
+const Verdict = ({ head, note }: { head: string; note?: string }) => (
+    <>
+        <p className='mt-2 type-callout font-semibold text-pretty'>{head}</p>
+        {note && <p className='mt-0.5 type-footnote text-pretty text-muted-foreground'>{note}</p>}
+    </>
+);
+
 const Facts = ({ facts }: { facts: Fact[] }) => (
-    <ul className='pt-1'>
+    <ul className='mt-1'>
         {facts.map((f, i) => (
             <FactLine key={`${f.kind}-${i}`} fact={f} />
         ))}
