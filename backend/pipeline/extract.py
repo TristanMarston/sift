@@ -182,7 +182,9 @@ def extract(n: Normalized, lines: list[ProductLine] = PRODUCT_LINES) -> Listing:
         note("flags.is_vintage", "claimed", "specifics", "Vintage: Yes")
 
     cost = n.cost.model_dump()
-    if cost["retail_price_cents"] is None and (m := _RETAIL.search(text)):
+    if cost["retail_price_cents"] is not None:   # an actor field (Poshmark's "Original Price")
+        note("cost.retail_price_cents", "claimed", "specifics", f"${cost['retail_price_cents'] / 100:.2f}")
+    elif m := _RETAIL.search(text):
         cost["retail_price_cents"] = int(Decimal(m[1].replace(",", "")) * 100)
         note("cost.retail_price_cents", "claimed", "listing_text", m[0])
 

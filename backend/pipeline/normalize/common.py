@@ -139,7 +139,8 @@ def normalize_brand(raw: str | None) -> str | None:
 
 def make_cost(price, currency=None, shipping=None, free_shipping=None, original=None, retail=None) -> dict:
     """The `cost` block. Raises Drop for a missing price or a non-USD currency (no FX conversion).
-    An unstated currency is taken as USD. `original` only counts when it is above the price (a markdown)."""
+    An unstated currency is taken as USD. `original` only counts when it is above the price (a markdown); a zero
+    `retail` price means none was given."""
     if currency and str(currency).upper() != "USD":
         raise Drop("non_usd")
     cents = to_cents(price)
@@ -150,7 +151,7 @@ def make_cost(price, currency=None, shipping=None, free_shipping=None, original=
         free_shipping = ship == 0
     return dict(price_cents=cents, currency="USD", shipping_cents=ship, free_shipping=free_shipping,
                 total_cents=cents + (ship or 0), original_price_cents=orig if orig and orig > cents else None,
-                retail_price_cents=to_cents(retail))
+                retail_price_cents=to_cents(retail) or None)
 
 
 def clean_images(urls) -> list[str]:

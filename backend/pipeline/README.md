@@ -120,7 +120,8 @@ Shared rules (`normalize/common.py`): prices become integer cents; brands get on
 `sneakers`; the leaf of a path like `Men > Sweats & hoodies > Track jacket` wins; blazers and suits count as jackets);
 a missing label falls back to the query's category. Titles and descriptions lose invisible characters (zero-width
 spaces, soft hyphens) and non-breaking spaces, because a zero-width space inside `100%cotton` defeats the composition
-regex.
+regex. Depop's own title is just the first few words of the description, cut mid-phrase, so the title is the first line
+of the description without hashtags (at most 120 characters, cut at a word), falling back to the actor's title.
 
 ### 03 · Extract — `03_extract.py` (logic in `extract.py`)
 
@@ -132,7 +133,7 @@ Adds the evidence. It never invents: if the listing does not say, the field is e
 | Composition | `60% cotton / 40% polyester`, `100% organic cotton`; bare words (`cotton tee`) give a fiber with no percentage | `claimed` |
 | Certifications | GOTS, OEKO-TEX, bluesign, Fair Trade, RWS, RDS, B Corp | `claimed` |
 | Vintage / deadstock / upcycled | **title** (`vintage`, `vtg`, `deadstock`, ...) and structured style fields only (descriptions carry shop boilerplate) | `claimed` |
-| Retail price | `retails for $120`, `MSRP $75` in the title or description | `claimed` |
+| Retail price | Poshmark's `Original Price` field, else `retails for $120`, `MSRP $75` in the title or description | `claimed` |
 | Country of manufacture | the structured country field, else `made in X` where X is on a known-country list | `claimed` |
 
 Countries get one name each (`U.S.A.`, `United States`, `America` → `USA`; `Korea` → `South Korea`), and eBay's
@@ -269,7 +270,8 @@ Measured in the test runs. This decides which facts are empty for which marketpl
 | Photos (average) | 4 | 7 | 8 | 8 | 7 |
 | Condition | yes | **no** | yes | yes | yes |
 | Shipping | no | no | seller's US rate | yes (free when the seller pays) | yes |
-| Markdown (`original_price_cents`) | yes | yes | from earlier prices | yes | no |
+| Markdown (`original_price_cents`) | yes | no | from earlier prices | yes | no |
+| Retail price field (`retail_price_cents`) | no | yes (`Original Price`, seller-entered) | no | no | no |
 | Seller type / rating | no | no | yes | yes | yes |
 | Structured materials | no | no | no | no | yes (`Outer Shell Material`) |
 | Color | yes | yes | yes | **never** | yes |

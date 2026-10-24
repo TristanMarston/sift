@@ -6,6 +6,16 @@ from normalize.common import (Drop, clean_images, make_cost, map_condition, norm
                               resolve_category)
 
 
+def _title(raw: dict) -> str | None:
+    """Depop's own title is the first few words of the description, cut mid-phrase ("The North Face White Fuzzy").
+    The seller's real title is the first line of the description without its hashtags (at most 120 characters)."""
+    for line in (raw.get("description") or "").split("\n"):
+        line = " ".join(re.sub(r"#\S*", " ", line).split())
+        if line:
+            return line if len(line) <= 120 else line[:121].rsplit(" ", 1)[0][:120]
+    return raw.get("title")
+
+
 def map_item(raw: dict, category: str, scraped_at) -> Normalized:
     price, original = raw.get("price") or {}, raw.get("originalPrice") or {}
     label = " ".join(str(raw.get(k) or "") for k in ("category", "productType", "group"))
@@ -16,7 +26,7 @@ def map_item(raw: dict, category: str, scraped_at) -> Normalized:
     external_id = str(require(raw.get("id"), "no_id"))
     return Normalized(
         id=f"depop:{external_id}", marketplace="depop", external_id=external_id,
-        url=require(raw.get("url"), "no_url"), title=require(raw.get("title"), "no_title"),
+        url=require(raw.get("url"), "no_url"), title=require(_title(raw), "no_title"),
         description=raw.get("description") or None, status="sold" if raw.get("isSold") else "active",
         scraped_at=scraped_at, brand=normalize_brand(raw.get("brand")), category=resolve_category(label, category),
         subcategory=raw.get("productType"), size=size,

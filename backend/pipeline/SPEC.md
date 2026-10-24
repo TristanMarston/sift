@@ -250,7 +250,9 @@ items, charge, timestamp.
 | --- | --- | --- | --- | --- | --- |
 | external id | `id` | `product_id` | `id` | `listingId` | `itemId` (url rebuilt as `ebay.com/itm/<id>`) |
 | price | `price.amount`, `.currency` | `price`, `currency` | `price` (USD) | `price`, `currency` | `priceValue`, `currency` |
-| original price | `originalPrice.amount`, if above the price | `regular_price` | highest earlier price in `priceDrops` | `originalPrice`, if above the price | none |
+| title | first line of `description` without hashtags (≤ 120 chars), else `title` | `name` | `title` | `title` | `title` |
+| original price | `originalPrice.amount`, if above the price | none | highest earlier price in `priceDrops` | `originalPrice`, if above the price | none |
+| retail price | none (text regex) | `regular_price` ("Original Price"; 0 = none) | none (text regex) | none (text regex) | none (text regex) |
 | shipping | none | none | seller's US rate `shipping.us`, if enabled | `shippingFee` only when `shippingPayer` is `buyer` (seller pays = free) | `shippingCost` (`shippingType: free` = free) |
 | description | `description` | `description` | `description` | `description` | `description` (HTML entities decoded) |
 | images | `pictureUrls` | `images` | `photos`, else `coverPhoto` | `photoUrls`, else `imageUrl` | `images` |
