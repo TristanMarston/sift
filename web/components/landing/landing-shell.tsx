@@ -14,7 +14,8 @@ export type OpenCamera = (el: HTMLElement | null, shape?: 'rect' | 'circle', pho
 const WRAP_URL = 'https://sustainablebrands.com/read/behavior-change/trending-while-wrap-scottish-designers-tout-merits-of-durable-fashion-mango-has-a-different-idea';
 const MARKETS = ['Depop', 'Poshmark', 'Grailed', 'Mercari', 'eBay'];
 const SCAN = '/scan';
-const atScan = () => window.location.pathname === SCAN;
+// The camera, and the results it opens, live over this page at /scan and /results.
+const atScan = () => [SCAN, '/results'].includes(window.location.pathname);
 
 type Props = {
     variant: Variant;

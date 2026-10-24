@@ -14,7 +14,7 @@ export type ReceiptSide = {
     badges: { value: string; status: BadgeStatus; note?: string }[];
 };
 
-const LABEL: Record<BadgeStatus, string> = { verified: 'Verified', claimed: 'Claimed', unknown: 'Unknown' };
+const LABEL: Record<BadgeStatus, string> = { verified: 'Verified', claimed: 'Claimed', inferred: 'Likely', unknown: 'Unknown' };
 
 function Row({ label, a, b, estimate }: { label: string; a: React.ReactNode; b: React.ReactNode; estimate?: boolean }) {
     return (

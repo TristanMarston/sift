@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion } from 'motion/react';
-import { CameraScreen } from '@/components/camera/camera-screen';
+import { ScanFlow } from '@/components/scan/scan-flow';
 
 export type HandoffFrom = { x: number; y: number; w: number; h: number; shape: 'rect' | 'circle'; radius?: number };
 
@@ -39,7 +39,7 @@ export function CameraHandoff({ from, file, onClose }: Props) {
                         animate={{ opacity: 1, transition: { delay: 0.25, duration: 0.3 } }}
                         exit={{ opacity: 0, transition: { duration: 0.12 } }}
                     >
-                        <CameraScreen onClose={onClose} initialFile={file} />
+                        <ScanFlow onClose={onClose} initialFile={file} />
                     </motion.div>
                 </motion.div>
             )}

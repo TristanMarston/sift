@@ -35,7 +35,7 @@ export type Listing = {
     seller_type?: 'individual' | 'small_shop' | 'large_reseller';
 };
 
-export type BadgeStatus = 'verified' | 'claimed' | 'unknown';
+export type BadgeStatus = 'verified' | 'claimed' | 'inferred' | 'unknown'; // inferred = "likely"
 export type Badge = { value: string; status: BadgeStatus };
 
 export type Receipt = {
