@@ -1,33 +1,42 @@
 # Known product lines -> material. Used only when a listing states no material; recorded as "inferred".
 # Hand-curated: add a line only when the maker's own page states the material.
 # `title_has`: words that must all appear in the title. `fibers` carry no percentages on purpose.
+# `categories`: the garments the line covers, as sellers file them. A line's name can also be on other products
+# (The North Face sells "Nuptse Traction Booties"), and those must not inherit the garment's material.
 - brand: Carhartt
   title_has: [detroit]
+  categories: [jackets_outerwear]
   note: Carhartt Detroit → cotton duck
   fibers: [{fiber: cotton}]
 - brand: Carhartt
   title_has: [chore, coat]
+  categories: [jackets_outerwear]
   note: Carhartt Chore Coat → cotton duck
   fibers: [{fiber: cotton}]
 - brand: Patagonia
   title_has: [better, sweater]
+  categories: [jackets_outerwear, sweaters_knitwear, hoodies_sweatshirts]   # jackets, vests and 1/4-zips
   note: Patagonia Better Sweater → recycled polyester
   fibers: [{fiber: polyester, recycled: true}]
 - brand: Patagonia
   title_has: [nano, puff]
+  categories: [jackets_outerwear, hoodies_sweatshirts]                      # the Nano Puff Hoody is a jacket
   note: Patagonia Nano Puff → recycled polyester
   fibers: [{fiber: polyester, recycled: true}]
 - brand: Patagonia
   title_has: [synchilla]
+  categories: [jackets_outerwear, hoodies_sweatshirts, sweaters_knitwear]   # jackets, vests and Snap-T pullovers
   note: Patagonia Synchilla → polyester fleece
   fibers: [{fiber: polyester}]
 - brand: The North Face
   title_has: [nuptse]
+  categories: [jackets_outerwear]
   note: The North Face Nuptse → nylon shell, down fill
   fibers: [{fiber: nylon}, {fiber: down}]
 # "The versatile medium weight, 100% virgin wool, plain weave is perfect for indoor and outdoor adventures."
 #   https://www.pendleton-usa.com/men/mens-featured/the-board-shirt/ (line page, fetched 2026-10-24)
 - brand: Pendleton
   title_has: [board, shirt]
+  categories: [shirts, jackets_outerwear]                                   # worn and listed as a shirt jacket too
   note: Pendleton Board Shirt → 100% virgin wool
   fibers: [{fiber: wool, pct: 100}]

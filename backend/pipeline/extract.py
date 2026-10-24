@@ -10,7 +10,7 @@ import yaml
 from pydantic import BaseModel, ValidationError
 
 import jsonl
-from listing import Evidence, Fiber, Listing, Materials, Normalized
+from listing import Category, Evidence, Fiber, Listing, Materials, Normalized
 from normalize.common import slug
 
 _LAMBSWOOL = "lamb(?:['’]?s|s['’])?\\s?wool"   # lambswool, lambs wool, lamb's wool
@@ -81,6 +81,7 @@ _MADE_IN = re.compile(r"\bmade\s+in\s*:?\s*(?:the\s+)?("
 class ProductLine(BaseModel):
     brand: str
     title_has: list[str]
+    categories: list[Category]   # the garments the line covers: a name can also be a shoe ("Nuptse Traction Booties")
     note: str
     fibers: list[Fiber]
 
@@ -130,10 +131,10 @@ def to_materials(fibers: list[Fiber], certifications: list[str]) -> Materials:
     return Materials(fibers=fibers, synthetic_share=share, certifications=certifications, composition_suspect=suspect)
 
 
-def match_product_line(brand: str | None, title: str, lines: list[ProductLine]) -> ProductLine | None:
+def match_product_line(brand: str | None, title: str, category: str, lines: list[ProductLine]) -> ProductLine | None:
     for p in lines:
         brand_ok = slug(p.brand) == slug(brand) if brand else slug(p.brand) in slug(title)
-        if brand_ok and all(re.search(rf"\b{re.escape(w)}\b", title, re.I) for w in p.title_has):
+        if brand_ok and category in p.categories and all(re.search(rf"\b{re.escape(w)}\b", title, re.I) for w in p.title_has):
             return p
 
 
@@ -157,7 +158,7 @@ def extract(n: Normalized, lines: list[ProductLine] = PRODUCT_LINES) -> Listing:
     if not fibers or (all(f.pct is None for f in fibers) and any(f.pct is not None for f in in_text)
                       and {f.fiber for f in fibers} <= {f.fiber for f in in_text}):
         fibers, snippet, source = in_text, text_snippet, "listing_text"
-    line = match_product_line(n.brand, f"{n.title} {spec.get('product line', '')} {spec.get('model', '')}", lines)
+    line = match_product_line(n.brand, f"{n.title} {spec.get('product line', '')} {spec.get('model', '')}", n.category, lines)
     if fibers:
         note("materials.fibers", "claimed", source, snippet)
     elif line:

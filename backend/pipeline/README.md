@@ -206,8 +206,9 @@ queries:
       - {query: carhartt detroit jacket, max_items: 400}   # or set a cap (keep it ≤ 500)
 ```
 
-**`product_lines.yaml`:** each entry has a `brand`, the words that must all appear in the title (`title_has`), a
-`note` shown as the evidence snippet, and the `fibers`. The title is also matched together with eBay's `Product Line` and `Model`.
+**`product_lines.yaml`:** each entry has a `brand`, the words that must all appear in the title (`title_has`), the
+`categories` it covers (a name can also be on another product: The North Face sells Nuptse *booties*), a `note` shown
+as the evidence snippet, and the `fibers`. The title is also matched together with eBay's `Product Line` and `Model`.
 Add a line only when the maker's own page states the material.
 
 ## Outputs
