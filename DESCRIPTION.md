@@ -49,7 +49,7 @@ Make **"how long will this last?"** as easy to see as **"how much does it cost?"
 | Curated "buy it for life" shops | BuyMeOnce | Hand-picked durable items | A small catalog, not a search over everything |
 | Wardrobe apps | Whering, Indyx | Tracking cost per wear of things you already own | Nothing at the moment of buying |
 
-**Our difference:** we search by photo across five secondhand marketplaces and rank by *cost per wear*, not price. Every number traces to evidence we can show: declared materials (with how sure we are of them), known product lines, and sourced brand facts such as repair programs and certifications. We show that evidence in a receipt, and we say "unknown" when we do not have it. Owner reviews and community evidence are the next layer (stretch).
+**Our difference:** we search by photo across four secondhand marketplaces and rank by *cost per wear*, not price. Every number traces to evidence we can show: declared materials (with how sure we are of them), known product lines, and sourced brand facts such as repair programs and certifications. We show that evidence in a receipt, and we say "unknown" when we do not have it. Owner reviews and community evidence are the next layer (stretch).
 
 ---
 
@@ -58,7 +58,7 @@ Make **"how long will this last?"** as easy to see as **"how much does it cost?"
 1. **Open the website.** No sign-up, no typing. The camera is the front page.
 2. **Take a photo** of a piece of clothing or a whole outfit. (Upload also works.)
 3. **We find the garments** in the photo. For an outfit, each garment gets its own tab. The user can draw a box if detection struggles.
-4. **We show look-alikes**, ranked by cost per wear, from a pre-collected catalog of secondhand listings (Depop, Poshmark, Grailed, Mercari, eBay).
+4. **We show look-alikes**, ranked by cost per wear, from a pre-collected catalog of secondhand listings (Depop, Poshmark, Grailed, eBay).
 5. **Each result has a Wear Receipt**: what it costs, how it rates on quality and eco, its cost per wear, and why we think so.
 6. **The user can explore.** Sort by *cost per wear*, *price*, *look match*, or *eco*. Slide between *closer match* and *better value*. Open any receipt to see sources.
 
@@ -146,7 +146,7 @@ Every line is clickable for its source, status, and date. Anything we could not 
 
 ### 8.1 Two kinds of data
 
-1. **The Catalog.** 20,000 listings at first, growing to ~50,000, from five US secondhand marketplaces (Depop, Poshmark, Grailed, Mercari, eBay) across 8 categories: jackets and outerwear, hoodies and sweatshirts, t-shirts, sneakers, jeans and pants, sweaters and knitwear, shirts, dresses and skirts. Each listing has: photos, title, brand, category, size, condition, price, link, marketplace, the full description, and materials when the listing states them. Details are in `backend/pipeline/SCRAPING.md`.
+1. **The Catalog.** 20,000 listings at first, growing to ~50,000, from four secondhand marketplaces (Depop, Poshmark, Grailed, eBay), counting any listing priced in USD across 8 categories: jackets and outerwear, hoodies and sweatshirts, t-shirts, sneakers, jeans and pants, sweaters and knitwear, shirts, dresses and skirts. Each listing has: photos, title, brand, category, size, condition, price, link, marketplace, the full description, and materials when the listing states them. Details are in `backend/pipeline/SCRAPING.md`.
 2. **The Evidence Tables.** Small and hand-curated:
    - a `brands` table of ~40 brands (repair program, published supplier list, material commitments, certifications), where every claim has a source URL;
    - `product_lines.yaml` (for example Carhartt Detroit → cotton duck);
@@ -171,7 +171,7 @@ Every line is clickable for its source, status, and date. Anything we could not 
 ### 8.3 Scale
 - **Catalog:** 20,000 → ~50,000 listings. Variety across categories matters more than raw size.
 - **Evidence:** ~40 brands × 8 categories, plus the product-line table.
-- **Budget:** ~$67 of Apify credits for 20k listings, ~$150 for 50k (SCRAPING.md §1).
+- **Budget:** ~$97 of Apify credits for 20k listings (26k raw rows with over-scrape), ~$240 for 50k (`backend/pipeline/SPEC.md` §6).
 
 ### 8.4 Timing
 - **Friday evening:** a 20-item test run per marketplace. Go or no-go on each source.
@@ -192,7 +192,7 @@ Every line is clickable for its source, status, and date. Anything we could not 
  COLLECT              CLEAN & ORGANIZE          BUILD EVIDENCE
  ───────              ───────────────           ──────────────
  Secondhand       ─┐   Normalize brand,          Extract materials,
- listings (5 mkts) ├─▶ category, price,      ─▶  certifications, flags
+ listings (4 mkts) ├─▶ category, price,      ─▶  certifications, flags
  Brand facts      ─┘   condition. Dedupe.        Brand table, product lines
  (hand-curated)        Thumbs + embeddings.      Wear baselines
                                 │                       │
@@ -345,7 +345,7 @@ Work in separate areas. Build the website against sample data in the schema's sh
 ## 17. Decisions
 
 ### Made
-- [x] Markets: Depop, Poshmark, Grailed, Mercari, eBay, US only (subject to the Friday test).
+- [x] Markets: Depop, Poshmark, Grailed, eBay. Any listing priced in USD counts, wherever it ships from (Mercari was tried and dropped: no description, one photo).
 - [x] 8 categories and ~40 curated brands.
 - [x] Three markers (cost, quality, eco) + cost per wear. Eco is facts, not a grade.
 - [x] v1 evidence = materials, product lines, brand facts. Reviews and community are stretch.

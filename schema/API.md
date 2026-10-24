@@ -20,7 +20,7 @@ Decided in the interview on Fri Oct 23, 2026.
 | Result set | A fixed top 50 with no paging. Items below the similarity cutoff are dropped, so the list may be empty. |
 | Receipt | Embedded in each search result. There is no per-item endpoint. |
 | Evidence in v1 | Listing materials (backend/pipeline/SCRAPING.md §4) and brand facts (the curated `brands` table). There are no owner reviews or community counts yet. |
-| Money | Integer cents, USD only (the index is US-only, secondhand marketplaces only). |
+| Money | Integer cents, USD only. The index holds any secondhand listing priced in USD, wherever it ships from; `seller.region` records the country. |
 | Not in v1 | Resale, owner reviews, community evidence, "what you have" input. Reviews/community will arrive as new `fact.kind`s with no schema change. |
 | Backend models | Pydantic models are hand-written in `backend/src/backend/`. A pytest validates real responses against `api.schema.json`. Python 3.12. |
 
@@ -212,7 +212,7 @@ The "cheapest match drops to #N" headline is computed by the client.
 
 ## 4. Enums
 
-- `marketplace`: `depop poshmark grailed mercari ebay`
+- `marketplace`: `depop poshmark grailed mercari ebay` (`mercari` is reserved: the v1 pipeline does not collect it)
 - `category`: `jackets_outerwear hoodies_sweatshirts tshirts sneakers jeans_pants
   sweaters_knitwear shirts dresses_skirts` (the 8 categories in backend/pipeline/SCRAPING.md §2)
 - `condition`: `new_with_tags like_new good fair` (`null` if it can't be mapped)

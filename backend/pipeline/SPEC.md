@@ -12,8 +12,8 @@ Sources read: `DESCRIPTION.md`, `backend/pipeline/SCRAPING.md`, `schema/API.md`,
 
 ## 1. Goal
 
-Produce **large JSONL files of clean secondhand clothing listings** from five US marketplaces
-(Depop, Poshmark, Grailed, Mercari, eBay). Each row carries what the ranker and the frontend later need
+Produce **large JSONL files of clean secondhand clothing listings** from four marketplaces
+(Depop, Poshmark, Grailed, eBay). Any listing priced in USD counts, wherever it ships from. Each row carries what the ranker and the frontend later need
 for three markers (cost, quality, eco): price, full description, all images, condition, brand, size,
 materials, certifications, flags, and a coarse seller profile.
 
@@ -49,13 +49,13 @@ Targets:
 | 4 | Ranker fields (`match`, `quality`, `eco`, `wear`, `confidence`, `thumb_url`) are not emitted | They are computed downstream |
 | 5 | Extraction = regex + structured fields + product lines | Deterministic, free, fits TDD |
 | 6 | The user adds `APIFY_TOKEN` to `/workspace/.env`; Claude runs the scrapes after the user approves the spend | Apify guidance: get a go-ahead before the first paid run |
-| 7 | Targets are 20k, then 50k, over-scraping ~30% | Covers the US filter, dedup, and rows with no images |
+| 7 | Targets are 20k, then 50k, over-scraping ~30% | Covers dedup, non-USD rows and rows with no images |
 | 8 | Python 3.12 (the repo's pin: `.python-version`, `pyproject.toml`, README, API.md) | The repo moved from 3.14 to 3.12 in commit 0523172, after this spec was drafted. All dependencies install on 3.12 |
 | 9 | Raw files have seller identity keys scrubbed at write time | SCRAPING.md says "keep raw" and "store no seller identity", which conflict |
 | 10 | Pipeline steps renumbered 01–04 | Steps for thumbs, embed, and upsert are dropped |
 | 11 | Time estimates are ignored; build in the order in §14 | User instruction |
-| 12 | **No location filter.** USD is the only hard filter; the seller's country is stored in `seller.region` on every row | `api.schema.json` requires USD, not US. In the test run only 4 of 20 Grailed items were US-located, so a filter would waste ~80% of that spend. A US-only view is a one-line filter on `seller.region` later. SCRAPING.md §2 and API.md §0 ("the index is US-only") still say US-only: the team should reconcile |
-| 13 | Mercari failed the go/no-go and has no mapper (§13a) | No description, one image, no size/location/shipping. Needs a decision (§16) |
+| 12 | **USD only.** Any listing priced in USD counts, wherever the seller is. There is no location filter; the seller's country is stored in `seller.region` | `api.schema.json` requires USD, not US. In the test run only 4 of 20 Grailed items were US-located, so a location filter would waste ~80% of that spend. A US-only view is a one-line filter on `seller.region` later. DESCRIPTION.md, SCRAPING.md and API.md were updated to say USD only |
+| 13 | **Mercari is dropped.** It failed the go/no-go (§13a) and has no mapper; its quota went to Poshmark and eBay | No description, one image per listing, no size/location/shipping, and $0.04 per search. `mercari` stays in the API enum, which belongs to the schema |
 | 14 | Seller blocks are scrubbed by **allowlist** (rating/count/location only); eBay records keep a top-level key whitelist | The test run showed Grailed `sellerProfile` (account id, PayPal id) and eBay page modules (seller handle, buyer feedback) slipping past a denylist |
 | 15 | Category: the marketplace label wins; a present label that maps to none of the 8 drops the record instead of using the query's category; eBay's root "Clothing, **Shoes** & Accessories" is ignored; kids' labels are dropped | A hat must not inherit "jackets"; the root made every eBay item "sneakers"; children's clothes are outgrown, not worn out |
 | 16 | `is_vintage` / `is_deadstock` / `is_upcycled` come from the **title** and structured style fields, never the description | Shop-wide boilerplate ("especially for pre-owned or vintage goods") made most Grailed items look vintage |
@@ -67,23 +67,22 @@ At the start of this work `backend/` was an empty uv scaffold: Python 3.12, no d
 the frontend↔backend API contract (it is **not** a row schema for scraped data). SCRAPING.md's `supabase/`
 and `contract/` paths do not exist.
 
-Planned files, all under `backend/pipeline/` unless noted:
+Files, all under `backend/pipeline/` (see `README.md` there for how to use them):
 
 ```
-listing.py              Pydantic Listing + Evidence; enums mirror schema/api.schema.json
-normalize/common.py     price -> cents, condition map, category fallback, seller_type, US filter
-normalize/depop.py      one mapper per marketplace: raw dict -> Listing | None
+listing.py              Pydantic Listing, Normalized (Listing + specifics), Evidence; enums mirror schema/api.schema.json
+scrape.py               actors, charge caps, scrubbing, plan, run loop, cost estimate (01_scrape.py is the CLI)
+normalize/common.py     price -> cents, condition map, category rules, brand names, region, cost block, Drop
+normalize/depop.py      one mapper per marketplace: raw dict -> Normalized, or raises Drop(reason)
 normalize/poshmark.py
 normalize/grailed.py
-normalize/mercari.py
 normalize/ebay.py
-extract.py              regex composition, certifications, flags, structured specifics, product lines
+normalize/run.py        applies the mappers to the raw files, counts drop reasons, dedupes
+extract.py              composition, certifications, flags, retail price, origin, product lines, evidence
+report.py               per-marketplace stats and the acceptance checklist
 product_lines.yaml      brand/line -> material table (status "inferred")
-queries.yaml            category -> marketplace -> [{query, max_items}] + per-marketplace quotas
-01_scrape.py            run actors, write data/raw/<marketplace>/<run_id>.jsonl, log runs
-02_normalize.py         raw -> data/normalized.jsonl
-03_extract.py           normalized -> data/listings.jsonl   (the final output)
-04_report.py            stats per marketplace -> REPORT.md
+queries.yaml            category -> marketplace -> queries, per-marketplace quotas and caps
+01_scrape.py ... 04_report.py   the four steps; data/ and REPORT.md are their outputs
 tests/                  pytest; tests/fixtures/<marketplace>.json (sanitized real samples)
 ```
 
@@ -104,45 +103,43 @@ SCRAPING.md.
 | Depop | `jongoose/depop-scraper` | `query`, `maxItems`, `startUrls`, `proxyConfiguration` | $0.001/result | In the full field list but **absent from the sample record** | `123webdata/depop-scraper` (detail mode) |
 | Poshmark | `123webdata/poshmark-scraper` | `categoryUrls`, `maxResultsPerScrape`, `usePagination`, `scrapeProductDetails: true` | $0.00199/detail, **$0.02 per run start** | Yes, in detail mode only | `xtracto/poshmark-detail-scraper` (has `condition`) |
 | Grailed | `piotrv1001/grailed-listings-scraper` | `searchQuery`, `department`, `minPrice`, `maxPrice`, `scrapeDetails: true`, `maxItems` (default 50) | $0.003 standard, **$0.012 with details**, $0.00005 start | Detail mode only | `lulzasaur/grailed-scraper` |
-| Mercari US | `getascraper/mercari-us-scraper` | `keyword`, `sort`, `status`, `priceMin/Max`, `condition`, `limit` (default 25) | **"from $2.05–$2.99 per 1,000"; no per-search fee shown** | Yes | none cheap |
 | eBay | `memo23/ebay-search-scraper-ppe` | `searchQueries` (≤500), `marketplace`, `mode`, `detailedItems`, `includeDescription`, `maxItems` (per search, default 1000) | **$5 per 1,000 detailed items** | Only with `includeDescription: true` (one extra request per item) | eBay Browse API |
 
-Do not use `markdolanmoore/depop-scraper` (no description) or `parsebird/mercari-us-scraper` (30%
-non-success in 30 days).
+Do not use `markdolanmoore/depop-scraper` (no description). Mercari US (`getascraper/mercari-us-scraper`) was
+evaluated in the test run and dropped (decision 13).
 
 Known risks per actor:
 - **Depop**: the input schema defaults to a *residential* proxy while SCRAPING.md says *datacenter*. Only
   7 monthly users. Keyword-less URLs return a single page. `description`, `originalPrice` and `country`
   must be confirmed in the test run.
 - **Poshmark (123webdata)**: no `condition` and no location field in the sample. List-level records omit
-  `description`, `category`, `color`. Poshmark is US-only, so the US filter is satisfied by construction.
+  `description`, `category`, `color`. Poshmark's region is recorded as `US`.
 - **Grailed**: a single search shows at most 1,000 results, so split by brand. Records contain
   `seller.username` and `avatarUrl`, which must be dropped.
-- **Mercari**: needs a US residential proxy. Large batches may get blocked.
 - **eBay**: the connection country follows `marketplace`. Near-match rows are returned and billed. If
   `max_total_charge_usd` is hit, some rows may not be delivered. `Material` comes from
   `itemSpecifics` in detail mode.
-- **Terms of service**: Poshmark's terms prohibit automated collection; Depop and Mercari sit behind
+- **Terms of service**: Poshmark's terms prohibit automated collection; Depop sits behind
   Cloudflare. We use public listing data only, store no seller identity, link out, and state this in the
   Trust section.
 
 ## 6. Cost model
 
-Per-record prices from the pages: Depop $0.001; Poshmark $0.00199 (+ $0.02/run); Grailed $0.012;
-Mercari ~$0.003; eBay $0.005 (+ start fee).
+Per-record prices, confirmed against the test-run bills (§13a): Depop $0.001; Poshmark $0.00199 (+ $0.02 per run);
+Grailed $0.012 with details; eBay $0.005 detail rows (+ $0.02 per run). Quotas count **raw rows**, 30% above the
+20k target to cover duplicates and dropped records.
 
-| Marketplace | Rows at 20k | Estimate |
-| --- | --- | --- |
-| Depop | 8,000 | ~$8 |
-| Poshmark | 4,000 | ~$8 |
-| Grailed | 3,000 | ~$36 |
-| Mercari | 3,000 | ~$9 |
-| eBay | 2,000 | ~$10 |
-| **Total** | 20,000 | **~$71** (~$92 with 30% over-scrape) |
+| Marketplace | Raw rows (quota) | Runs | Best-case cost |
+| --- | --- | --- | --- |
+| Depop | 10,400 | 52 | ~$10 |
+| Poshmark | 7,200 | 36 | ~$15 |
+| Grailed | 4,000 | 20 | ~$48 |
+| eBay | 4,650 | 31 | ~$24 |
+| **Total** | 26,000 | 139 | **~$97** (~$122 if every run hit its charge cap) |
 
-At 50k the estimate is ~$180 (~$230 with over-scrape), which can exceed the ~$200 credit budget. The main
-cost lever is Grailed detail mode. Options if needed: fewer Grailed rows, or shift volume to Depop and
-Poshmark. The per-marketplace quotas in `queries.yaml` are where this is tuned.
+`01_scrape.py --dry-run` prints this table from the live config. At 50k (about 2.5× the rows) the estimate is
+~$240, which can exceed the ~$200 credit budget. The main cost lever is Grailed detail mode. Options if needed:
+fewer Grailed rows, or shift volume to Depop and Poshmark. The quotas in `queries.yaml` are where this is tuned.
 
 Cost controls (Apify's guidance):
 - Every `.call()` passes `max_total_charge_usd` **as a call option, never inside `run_input`**.
@@ -157,10 +154,9 @@ Cost controls (Apify's guidance):
 Categories (exactly the API enum): `jackets_outerwear`, `hoodies_sweatshirts`, `tshirts`, `sneakers`,
 `jeans_pants`, `sweaters_knitwear`, `shirts`, `dresses_skirts`.
 
-No location filter (decision 12). Drop a record only when its currency is not USD (no FX conversion);
-store the seller's country as `seller.region` (`US` for any US place; otherwise the country or region the
-actor reports). Where the actor reports no location, Poshmark is `US` by construction and the field stays null
-elsewhere.
+USD only (decision 12). Keep any listing priced in USD and drop the rest (no FX conversion). Store the seller's
+country as `seller.region` (`US` for any US place; otherwise the country the actor reports, as a code or a name).
+Poshmark is `US`; the field stays null where the actor reports no location.
 
 Per category, up to ~25 queries per marketplace, mixing:
 - Brands judges wear: Carhartt, Patagonia, The North Face, Nike, New Balance, Levi's, Uniqlo, Arc'teryx,
@@ -173,7 +169,7 @@ Per category, up to ~25 queries per marketplace, mixing:
 
 `queries.yaml` structure: category → marketplace → list of `{query, max_items}`, plus a top-level
 `quotas` map (rows per marketplace). `max_items` is 200–500 per query so one long tail cannot eat the
-budget. Mercari uses fewer, broader queries (cost per search is unverified). Grailed queries are split by
+budget. Grailed queries are split by
 brand because of the 1,000-result cap. Poshmark queries are search URLs for `categoryUrls`.
 
 ## 8. Row schema: `Listing`
@@ -184,7 +180,7 @@ One JSON object per line in `data/listings.jsonl`. Names and enums mirror
 | Field | Type | Notes |
 | --- | --- | --- |
 | `id` | string | `<marketplace>:<external_id>`; matches `^(depop\|poshmark\|grailed\|mercari\|ebay):.+$` |
-| `marketplace` | enum | `depop poshmark grailed mercari ebay` |
+| `marketplace` | enum | `depop poshmark grailed mercari ebay` (the schema enum; `mercari` is not collected) |
 | `external_id` | string | actor id field, else last path segment of `url` |
 | `url` | string | link-out |
 | `title` | string | |
@@ -231,31 +227,28 @@ Rules:
 ### Raw files
 `data/raw/<marketplace>/<run_id>.jsonl` holds the actor records as returned, joinable to `listings` by
 `id`, with **seller identity keys removed at write time** (for example Depop `sellerUsername`/`sellerUrl`,
-Grailed `seller.username`/`avatarUrl`, Mercari `seller_username`, Poshmark `seller_name`/`seller_url`).
+Grailed `seller.username`/`avatarUrl`, Poshmark `seller_name`/`seller_url`).
 `data/` is gitignored. `data/runs.jsonl` logs one line per actor run: marketplace, query, run id, status,
 items, charge, timestamp.
 
-## 9. Field mapping (from the actor pages; confirm in the test run)
+## 9. Field mapping (real field names, from the test run; the code is `normalize/<marketplace>.py`)
 
-| Listing field | Depop | Poshmark | Grailed | Mercari | eBay |
-| --- | --- | --- | --- | --- | --- |
-| external id | `id` | `product_id` | `id` | `listing_id` | item id / URL |
-| price | `price.amount` | `price` | `price` | `price` | numeric price + currency |
-| original price | `originalPrice` | `regular_price` | none (price drops) | `original_price` | none |
-| description | `description`? | `description` (detail) | `description` (details) | `description` | description (opt-in) |
-| images | `pictureUrls` | `images` | `photos` (details), `coverPhoto` | `media.image_urls` | `images` |
-| brand | `brand` | `brand` | `designer` | `brand` | `brand` / specifics |
-| size / color | `size`, `colours` | `size`, `color` | `size`, `color` | `size`, `color` | specifics |
-| condition | `condition` | none | `condition` | `condition_id` | condition label |
-| category | `category`, `categoryPath` | `category` | `category`, `categoryPath` | `category_path` | category fields |
-| shipping | ? | ? | per-region rates (US) | `shipping_fee`, `shipping_payer` | shipping cost |
-| status | `isSold`/`status` | `listing_status` | `sold` | `listing_status` | `listingStatus` |
-| seller rating | ? | none | `ratingAverage` | `seller_rating_score` | feedback % |
-| seller listing count | ? | none | `totalBoughtAndSold` | `sales_count` | ? |
-| region | `country`/`location` | US | `location` | `item_location` | `itemLocation` |
-
-"?" means not seen in the page. Resolve in the test run. Each marketplace gets one mapper and one test
-built on a real sample.
+| Listing field | Depop | Poshmark | Grailed | eBay |
+| --- | --- | --- | --- | --- |
+| external id | `id` | `product_id` | `id` | `itemId` (url rebuilt as `ebay.com/itm/<id>`) |
+| price | `price.amount`, `.currency` | `price`, `currency` | `price` (USD) | `priceValue`, `currency` |
+| original price | `originalPrice.amount`, if above the price | `regular_price` | highest earlier price in `priceDrops` | none |
+| shipping | none | none | seller's US rate `shipping.us`, if enabled | `shippingCost` (`shippingType: free` = free) |
+| description | `description` | `description` | `description` | `description` (HTML entities decoded) |
+| images | `pictureUrls` | `images` | `photos`, else `coverPhoto` | `images` |
+| brand | `brand` | `brand` | `designer` | `brand`, else specifics `Brand` |
+| size / color | `sizes[0]`, `colours` | `size`, `color` | `size`, `color` | specifics `Size`, `Color` |
+| condition | `condition` | none | `condition` | specifics `Condition`, the label before the seller's prose |
+| category label | `category` `productType` `group` | breadcrumbs + `category` | `category` `categoryPath` | `categoryPath` (root ignored) |
+| status | `isSold` | `listing_status`, `in_stock` | `sold` | `listingStatus` |
+| seller type / rating | none | none | listing count (`sellerProfile.listings_for_sale_count`), `seller.ratingAverage` | account type + feedback score; `sellerFeedbackPercentage` ÷ 20 |
+| region | `country` | `US` | `sellerProfile.country_code`, else `location` | `itemLocation` |
+| specifics (for 03) | none | none | `styles` | every `itemSpecifics` entry |
 
 Normalization rules (`02_normalize.py`):
 - Drop records missing `url`, `title`, `price`, or at least one image.
@@ -297,7 +290,7 @@ All steps are rerunnable and idempotent.
    in §9.
 3. **`03_extract.py`**: normalized → `data/listings.jsonl` using §10.
 4. **`04_report.py`**: per marketplace, print rows, % with description, % with any material, % with
-   composition percentages, % with certification, % US, median price. Write to `pipeline/REPORT.md`.
+   composition percentages, % with certification, % with a region, median price. Write to `pipeline/REPORT.md`.
 
 ## 12. Testing (red/green TDD)
 
@@ -307,7 +300,7 @@ Every piece of computational code gets a failing test first.
 - `extract.py`: composition cases (percent, synonyms, organic/recycled), certifications, flags, "vegan
   leather" vs "genuine leather", structured-over-text, product-line inference, the 90–110 rule.
 - Mappers: one test per marketplace on sanitized real samples in `tests/fixtures/`, covering price→cents,
-  condition, category, US filter, drop rules.
+  condition, category, region, drop rules.
 - Runner (`01_scrape.py`): with a fake Apify client, test quota stop, resume, charge-cap argument, failed
   run handling, and identity scrubbing.
 - Privacy: a test that scans normalized and raw output for identity keys.
@@ -326,7 +319,7 @@ Pass criteria:
 - Total charge under $1.
 
 Also record: whether Depop returns `description`, `originalPrice`, `country`; how Poshmark exposes
-condition and location; whether eBay and Mercari expose shipping; the real seller-count fields; and which
+condition and location; whether eBay exposes shipping; the real seller-count fields; and which
 fields carry seller identity (for scrubbing).
 
 If Depop and Poshmark both fail, switch to `123webdata/depop-scraper` (detail mode) and
@@ -337,7 +330,7 @@ If Depop and Poshmark both fail, switch to `123webdata/depop-scraper` (detail mo
 | Actor | Core fields | Description > 40 chars | Images avg | Location | Cost | Verdict |
 | --- | --- | --- | --- | --- | --- | --- |
 | Depop | 20/20 | 18/20 | 4.0 | `country` US 20/20 | $0.020 | pass |
-| Poshmark | 20/20 | 15/20 (at the threshold) | 6.8 | none (US only) | $0.060 | pass |
+| Poshmark | 20/20 | 15/20 (at the threshold) | 6.8 | none (recorded as US) | $0.060 | pass |
 | Grailed | 20/20 | 20/20 | 8.2 | listing location US 4/20, seller country US 6/20 | $0.240 | pass |
 | eBay | 20/20 | 20/20 | 7.3 | US 20/20 | $0.120 | pass |
 | Mercari | 20/20 | **0/20** | **1.0** | none | $0.095 | **fail** |
@@ -380,12 +373,11 @@ If Depop and Poshmark both fail, switch to `123webdata/depop-scraper` (detail mo
 
 ## 16. Open items and risks
 
-- **Mercari** (§13a): fails the go/no-go. Options: drop it and move its quota to Depop/Poshmark/eBay (the
-  other four marketplaces satisfy "≥ 4, none above 50%"), or probe whether pasting listing URLs into
-  `startUrls` returns details (each URL may bill as a $0.04 search request, so this is likely too expensive).
+- Mercari was dropped (decision 13). A second attempt would need a different actor, or a way to fetch item pages at a
+  sane price (each listing URL probably bills as a $0.04 search request).
 - Grailed costs $0.012 per row and is the biggest line; its quota is where to trim.
 - Depop returned US items 20/20 in the test run; check the country spread on the full run.
-- 50k may exceed the ~$200 credits (§6). Decide quotas after the 20k run.
+- 50k (~$240) may exceed the ~$200 credits (§6). Decide quotas after the 20k run.
 - `seller.type`: Grailed and Depop have no common scale. Grailed uses the seller's listing count (≤20 / ≤200 / more); eBay uses
   account type and feedback score (business with ≥ 5000 feedback is a large reseller); Depop and Poshmark give none (null). All guesses.
 - Material coverage may fall short of the 25% / 10% targets; the fix is more material-rich queries.
