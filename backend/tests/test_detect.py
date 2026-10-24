@@ -233,3 +233,10 @@ def test_a_crop_split_into_many_garments_never_gets_a_negative_confidence():
     out = D.relabel(IMG, [TOP], many, pad=0)
     assert len(out) == 12 and all(0 < g["confidence"] <= 1 for g in out)
     validate(D.response(IMG, out))
+
+
+def test_the_haiku_schema_uses_a_form_structured_outputs_accept():
+    # {"type": ["string", "null"], "enum": [..., None]} is rejected with a 400 ("Enum value ... does not match
+    # declared type"), which the fallback hid: a nullable enum must be anyOf [string enum, null]
+    cat = D.SCHEMA["properties"]["garments"]["items"]["properties"]["category"]
+    assert cat == {"anyOf": [{"type": "string", "enum": D.CATEGORIES}, {"type": "null"}]}
