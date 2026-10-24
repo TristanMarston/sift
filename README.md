@@ -9,6 +9,9 @@ Cal Hacks 13.0.
 | Doc | What it covers | Owner |
 | --- | --- | --- |
 | [`DESCRIPTION.md`](DESCRIPTION.md) | Why, product intent, scope, demo, decisions | Everyone |
+| [`backend/pipeline/README.md`](backend/pipeline/README.md) | How to run the data pipeline: steps, inputs, outputs | Andy |
+| [`backend/pipeline/BLOCKING.md`](backend/pipeline/BLOCKING.md) | What happens when a marketplace blocks the scraper: detection, alerts, stopping, the end-of-run report | Andy |
+| [`backend/pipeline/SPEC.md`](backend/pipeline/SPEC.md) | Pipeline decisions, costs, test-run results (newer than SCRAPING.md where they differ) | Andy |
 | [`backend/pipeline/SCRAPING.md`](backend/pipeline/SCRAPING.md) | Marketplaces, fields per listing, extraction, pipeline steps | Andy |
 | [`schema/API.md`](schema/API.md) | Frontend ↔ backend endpoints, payloads, sort rules | Anthony + Tristan |
 | [`schema/api.schema.json`](schema/api.schema.json) | Machine-readable API contract (JSON Schema) | Anthony + Tristan |

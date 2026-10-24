@@ -4,7 +4,12 @@ version = "0.1.0"
 description = "Sift backend: pipeline, ranking, API"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "apify-client>=3.3",
+    "pydantic>=2.14.1",
+    "python-dotenv>=1.2.4",
+    "pyyaml>=6.0.3",
+]
 
 [project.scripts]
 backend = "backend:main"
@@ -12,3 +17,12 @@ backend = "backend:main"
 [build-system]
 requires = ["uv_build>=0.13.5,<0.14.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["pipeline"]
+testpaths = ["pipeline/tests"]

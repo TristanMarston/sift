@@ -146,7 +146,7 @@ Every line is clickable for its source, status, and date. Anything we could not 
 
 ### 8.1 Two kinds of data
 
-1. **The Catalog.** 20,000 listings at first, growing to ~50,000, from five US secondhand marketplaces (Depop, Poshmark, Grailed, Mercari, eBay) across 8 categories: jackets and outerwear, hoodies and sweatshirts, t-shirts, sneakers, jeans and pants, sweaters and knitwear, shirts, dresses and skirts. Each listing has: photos, title, brand, category, size, condition, price, link, marketplace, the full description, and materials when the listing states them. Details are in `backend/pipeline/SCRAPING.md`.
+1. **The Catalog.** 20,000 listings at first, growing to ~50,000, from five secondhand marketplaces (Depop, Poshmark, Grailed, Mercari, eBay), counting any listing priced in USD across 8 categories: jackets and outerwear, hoodies and sweatshirts, t-shirts, sneakers, jeans and pants, sweaters and knitwear, shirts, dresses and skirts. Each listing has: photos, title, brand, category, size, condition, price, link, marketplace, the full description, and materials when the listing states them. Details are in `backend/pipeline/SCRAPING.md`.
 2. **The Evidence Tables.** Small and hand-curated:
    - a `brands` table of ~40 brands (repair program, published supplier list, material commitments, certifications), where every claim has a source URL;
    - `product_lines.yaml` (for example Carhartt Detroit → cotton duck);
@@ -171,7 +171,7 @@ Every line is clickable for its source, status, and date. Anything we could not 
 ### 8.3 Scale
 - **Catalog:** 20,000 → ~50,000 listings. Variety across categories matters more than raw size.
 - **Evidence:** ~40 brands × 8 categories, plus the product-line table.
-- **Budget:** ~$67 of Apify credits for 20k listings, ~$150 for 50k (SCRAPING.md §1).
+- **Budget:** ~$94 of Apify credits for 20k listings (26k raw rows with over-scrape), ~$235 for 50k (`backend/pipeline/SPEC.md` §6).
 
 ### 8.4 Timing
 - **Friday evening:** a 20-item test run per marketplace. Go or no-go on each source.
@@ -345,7 +345,7 @@ Work in separate areas. Build the website against sample data in the schema's sh
 ## 17. Decisions
 
 ### Made
-- [x] Markets: Depop, Poshmark, Grailed, Mercari, eBay, US only (subject to the Friday test).
+- [x] Markets: Depop, Poshmark, Grailed, Mercari, eBay. Any listing priced in USD counts, wherever it ships from.
 - [x] 8 categories and ~40 curated brands.
 - [x] Three markers (cost, quality, eco) + cost per wear. Eco is facts, not a grade.
 - [x] v1 evidence = materials, product lines, brand facts. Reviews and community are stretch.

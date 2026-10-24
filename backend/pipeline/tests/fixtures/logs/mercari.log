@@ -1,0 +1,12 @@
+ACTOR: Pulling container image of build wl8nVwkYUdGSOOPr9 from registry.
+ACTOR: Creating container.
+ACTOR: Starting container.
+ACTOR: Running under "LIMITED_PERMISSIONS".
+INFO  System info {"apifyVersion":"3.7.2","apifyClientVersion":"2.25.0","crawleeVersion":"3.18.2","osType":"Linux","nodeVersion":"v22.23.3"}
+INFO  Mercari Scraper starting: markets us, 1 search(es), max 20 listings, 10 page(s) per search, sort newest, statuses on_sale, details on.
+WARN  Mercari US refused this run's address (HTTP 403 (Cloudflare), 5903 bytes); the next request leaves through a fresh one (1 of 6).
+WARN  Mercari US refused this run's address (HTTP 403 (Cloudflare), 9907 bytes); the next request leaves through a fresh one (2 of 6).
+INFO  [Status message]: 10 listing row(s) delivered.
+INFO  [Status message]: 20 listing row(s) delivered.
+INFO  20 listing(s), 20 with details, 2 free row(s) (status and coverage), stopped: maxItems.
+INFO  [Status message]: 20 listing(s), 20 with details, 2 free row(s) (status and coverage), stopped: maxItems.

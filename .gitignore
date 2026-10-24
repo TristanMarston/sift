@@ -15,6 +15,14 @@ node_modules/
 !.yarn/releases
 !.yarn/versions
 
+# python (backend)
+.venv
+__pycache__
+.pytest_cache
+
+# pipeline output (scraped data stays local)
+data/
+
 # testing
 coverage/
 
