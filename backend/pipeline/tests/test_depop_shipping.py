@@ -48,9 +48,11 @@ def test_answers_are_cached_with_no_seller_identity_and_never_paid_twice(tmp_pat
 
 
 def test_listings_the_actor_no_longer_finds_are_remembered_as_unknown(tmp_path):
-    stats, out = run(tmp_path, [depop(1)], lambda urls: [])          # sold or removed since the scrape
-    assert stats["not_found"] == 1 and out[0]["cost"]["shipping_cents"] is None
-    assert run(tmp_path, [depop(1)], lambda urls: 1 / 0)[0]["cached"] == 1   # not asked again
+    rows = [depop(i) for i in range(4)]
+    found = lambda urls: [answer(i) for i in range(3)]                  # noqa: E731  listing 3 sold since the scrape
+    stats, out = run(tmp_path, rows, found)
+    assert stats["not_found"] == 1 and out[3]["cost"]["shipping_cents"] is None
+    assert run(tmp_path, rows, lambda urls: 1 / 0)[0]["cached"] == 4     # none asked again
 
 
 def test_only_depop_listings_without_shipping_are_asked_and_chunks_are_capped(tmp_path):
@@ -89,3 +91,29 @@ def test_chunks_can_run_side_by_side(tmp_path):
     stats, out = run(tmp_path, [depop(i) for i in range(8)], fetch, chunk=2, workers=4)
     assert stats["fetched"] == 8 and peak[0] > 1 and all(r["cost"]["shipping_cents"] == 199 for r in out)
     assert len(jsonl.load(tmp_path / "depop_shipping.jsonl")) == 8
+
+
+def test_the_actor_is_told_to_return_every_url_it_was_given(monkeypatch):
+    # in URL mode the actor stops at maxListings (default 20): 18 chunks of 500 once returned 360 listings in total
+    import sys
+    import types
+    sent = {}
+
+    class Client:
+        def __init__(self, token): pass
+        def actor(self, name):
+            return types.SimpleNamespace(call=lambda run_input, max_total_charge_usd: sent.update(run_input) or
+                                         {"status": "SUCCEEDED", "defaultDatasetId": "ds"})
+        def dataset(self, ds):
+            return types.SimpleNamespace(list_items=lambda: types.SimpleNamespace(items=[]))
+
+    monkeypatch.setitem(sys.modules, "apify_client", types.SimpleNamespace(ApifyClient=Client))
+    monkeypatch.setenv("APIFY_TOKEN", "test")
+    D.fetch_apify([f"https://www.depop.com/products/s-{i}/" for i in range(500)])
+    assert sent["mode"] == "url" and sent["maxListings"] >= 500
+
+
+def test_a_run_that_returns_under_half_its_urls_is_retried_not_remembered_as_sold(tmp_path):
+    stats, _ = run(tmp_path, [depop(i) for i in range(4)], lambda urls: [answer(0)], chunk=4)
+    assert stats["error"] == 4 and stats.get("not_found", 0) == 0
+    assert not (tmp_path / "depop_shipping.jsonl").exists()
