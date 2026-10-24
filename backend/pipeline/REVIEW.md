@@ -5,69 +5,63 @@ Two reviews of `backend/pipeline/`, the code that scrapes secondhand listings an
 
 ## Second review (2026-10-24, branch `pipeline-review-2`, macOS)
 
-**Result:** the pipeline is sound. I found 6 problems: 1 that could silently cut a marketplace out of an overnight run,
-3 that filed or described listings wrongly, and 2 small ones. All 6 are fixed, each with a test that failed first. The
-673 pipeline tests pass, plus the 58 ranker and API tests that run without the ML runtime. **No live scrape was
-possible:** this computer has no Apify token (the docs pointed to a path that does not exist, now fixed), so the $20 test
-budget is unspent. See "Live check" below.
+**Result:** the pipeline is sound, and its live data is now correct enough to build on. I found 11 problems: 4 that
+changed what listings say or which category they are in, 2 that cost money for rows we throw away, 3 in how it runs,
+and 2 small ones. All 11 are fixed, each with a test that failed first. 698 pipeline tests pass (15 runs in a row),
+plus the 69 ranker and API tests that run without the ML runtime.
+
+**Live testing:** 59 actor runs (2,540 raw rows, 2,242 listings after cleaning) on all five marketplaces, for **$11.14**
+of the $20 budget. Every actor works, Apify's bill matched our estimate to the cent on every checked batch, no seller
+identity reached a file, and all acceptance checks pass on the sample (all three demo props are in it). The data is in
+`pipeline/data/review2/` on this Mac (git ignores it).
 
 ### What I did
 
-1. Read `DESCRIPTION.md`, the API contract, and every file in `backend/pipeline` (code, docs, tests, fixtures, logs).
-2. Checked all five actors against Apify's public API: price per row and per run, memory (the start fee is per GB),
-   timeouts, the input fields we send, and the latest build. All match `scrape.py`, and every build predates our test
-   runs, so the fixtures show what the actors return today.
-3. Opened the fixtures' real listings on Mercari, Grailed, eBay and Poshmark and compared each field (price,
-   shipping, condition, size, original price, material).
-4. Probed every rule (condition, category, brand, country, retail price, Depop title) with real marketplace labels,
-   and checked the labels I doubted on the marketplaces' own sites.
-5. Pushed the fixtures through steps 02–03 and the ranker: all 20 rows become valid API results.
+1. Read `DESCRIPTION.md`, the API contract and every file in `backend/pipeline`; merged the latest `main` (its own
+   Ctrl-C fix for `run_lanes`, PR #19, replaced mine).
+2. Checked the five actors on Apify's public API (prices, memory, timeouts, inputs, builds): all match `scrape.py`.
+3. Live: the go/no-go run, a sweep of every category on every marketplace through the real lanes and batch checks
+   (with Grailed at 200 rows for the first time), targeted probes, and a final run of the fixed code at full size.
+4. Opened 13 scraped listings on their marketplaces and compared every field: all match, except the fees and
+   shipping noted below.
+5. Probed every rule with real labels, checked doubtful ones on the marketplaces' own sites, and diffed the extraction
+   on all live rows before and after each change.
 
 ### Fixed
 
 | Problem | Effect | Fix |
 | --- | --- | --- |
-| Crawlee (the crawler inside the eBay, Poshmark and Depop actors) logs `Request failed and reached maximum retries` for **each** page that fails for good, and `health.py` read that as "the actor gave up" | One dead detail page in a healthy 150-row run made the run **blocked**: its rows were quarantined and the marketplace was stopped for the rest of the command, overnight too | That line is now a note. The request statistics ("most requests failed") still catch real blocks |
-| The North Face sells **Nuptse Traction Booties** (checked on thenorthface.com) | A sneaker titled "Nuptse" got the jacket's "nylon shell, down fill" and a "known durable line" (+2 quality points in the ranker) | Each product line names its categories |
-| Depop is British: its tops group files tank tops as **`vests-tanks-camis`** (checked on depop.com) | Depop tank tops became **jackets** | A Depop vest under tops is a tank top, and is dropped like other tank tops |
-| Poshmark files rompers under **`Women > Pants & Jumpsuits > Jumpsuits & Rompers`** (checked on poshmark.com) | Rompers became **pants** | A label part that names a garment outside the 8 (romper, tank top, cami, crop top) ends the search. Tank tops under Mercari's `Tops & blouses` and Poshmark's `Shirts` are now dropped too, like eBay's already were |
-| The docs and `01_scrape.py` said the token goes in `/workspace/.env` | That path is from another computer; the code reads `.env` at the repo root | Docs fixed; the error message prints the real path |
-| A Depop description that starts with a line of emoji (`✨✨✨`) | That line became the title | Lines without a letter or digit are skipped |
+| **eBay's actor sometimes browses as a buyer abroad** (1 of 9 live runs) | 16 of 18 results were foreign sellers, and even US items were quoted international shipping ($29.60, $34.80 instead of ~$8), so `total_cents` and cost per wear were wrong | The search is a URL shipped to a US buyer (`_fcid=1`, a US ZIP): 150 of 150 good, 148 US-located, shipping $0–18. No location filter, so decision 12 stands |
+| **Grailed resellers paste eBay's item specifics into descriptions** ("Outer Shell Material: Cotton … Lining Material: Nylon … Insulation Material: Polyester") and hashtag every field | 14% of live Grailed rows, many of them the Carhartt Detroit demo prop, read as cotton + nylon/polyester: the lining shown as the material, and the ranker's durable-fiber point lost | Text labeled as lining or insulation is skipped, as eBay's own lining fields already were; hashtags are not material claims. Labeled shell + lining tags are no longer `composition_suspect`. 37 live rows corrected, none worse |
+| The North Face sells **Nuptse booties** (checked on thenorthface.com) | A "Nuptse" boot got the jacket's "nylon shell, down fill" and a "known durable line" (+2 quality) | Each product line names its categories. Live: 11 Nuptse boots, none credited |
+| Depop is British: its tops group files tank tops as **`vests-tanks-camis`** (checked on depop.com) | Depop tank tops became **jackets** | A Depop vest under tops is a tank top, dropped like every tank top |
+| Poshmark files rompers under **`Pants & Jumpsuits > Jumpsuits & Rompers`** | Rompers became **pants** (live: 20 of 20 in a probe) | A label part naming a garment outside the 8 (romper, tank top, cami, crop top) ends the search; Mercari's and Poshmark's tank tops under a shirts parent are dropped too |
+| **Mercari searches included kids' items** | 7 of 20 rows of a plain search were kids', paid for and dropped | The search is limited to Women and Men (`usCategoryIds`): 300 of 300 adult rows |
+| **eBay auctions were paid for, then dropped** | 4.5% of live eBay rows | Buy It Now only (`LH_BIN=1`) |
+| **Grailed's dress queries return dress shirts** | "100% cotton dress": 1 dress in 20 rows, at $0.012 a row | Grailed runs no dress queries; its quota goes to the 7 categories it has |
+| Crawlee logs `Request failed and reached maximum retries` for each page that fails for good, and `health.py` read it as "the actor gave up" | One dead page would make a healthy run **blocked**: rows quarantined, marketplace stopped for the night. Not seen in the 59 live runs (eBay retries each page up to 20 times), but certain once a page fails for good | That line is a note; "most requests failed" still catches real blocks |
+| apify-client streams every actor's log into ours by default | 1,480 of 1,517 lines of a live batch's output, five actors interleaved, `ALERT` lines buried | Not streamed (the runner still reads each log once): a 5-run test now prints 26 lines |
+| Small: the docs put the token in `/workspace/.env` (it is the repo root); a Depop description starting with emoji became the title; "100% 2-Ply Cashmere" lost its percentage | | Fixed |
 
 ### Found, not changed (decisions for the team)
 
 | Finding | Why it matters | Suggestion |
 | --- | --- | --- |
-| **Poshmark shows condition and shipping on every listing page** (e.g. "Condition: Good", "Shipping $6.49"); our actor returns neither | Every Poshmark row has an unknown condition (the ranker assumes 85% of life left) and no shipping | Probe `xtracto/poshmark-detail-scraper` (has condition) in the live check |
-| **Listings sell fast.** 1 of 3 Mercari fixtures was gone (HTTP 410) within a day of the scrape | A link-out to a sold item in the demo looks broken | Re-scrape or re-check the demo props' results the night before the demo |
-| The same item is often cross-listed on several marketplaces | A search can show one jacket three times | Image-based dedupe across marketplaces (beyond Grailed's cross-listing, already noted) |
-| eBay's shipping is calculated for the buyer's location (the record said $6.66; from this browser $10.15) | `shipping_cents` on eBay is an estimate for the actor's US proxy location | Fine as is; worth knowing |
-| eBay auctions are paid for, then dropped (3.5% of eBay rows) | About $1.40 of the plan | The actor accepts `listingType: "bin"`; try it in the live check before switching |
-| Mercari's and Poshmark's actors each had 1 user in the last 30 days (probably us); Mercari's changed its pricing text on Oct 19 | If either breaks, nobody else will notice first | The fallbacks are listed in `BLOCKING.md` |
-| Brand prefix rule: "Jordan Craig" becomes Jordan, "Columbia University" becomes Columbia | Wrong brand facts once `ml/evidence/brands.yaml` has rows (it is empty today) | Add exceptions when the brand table is filled |
-| Sizes are raw strings (`M`, `M (38-40)`, `US L / EU 52-54`) | The API's size filter is an exact match (`API.md`), so it misses Mercari's `M (38-40)` | A decision for the API owners |
-| Every fixture description of 400+ characters is cut at exactly 400 (four different actors), so the fixtures were trimmed when saved | Tests never see composition text that sits late in a long description | Keep one untrimmed record per marketplace in the fixtures |
+| **Buyer fees are not in `cost`**: Depop now shows "$47.95 incl. marketplace fee" for a $45 listing, Mercari adds a buyer-protection fee (~3.5%) | The receipt's price is below what the user sees after clicking through | Decide whether `total_cents` should include them (a known rate per marketplace) |
+| **Poshmark's actor returns no condition** (poshmark.com shows one on every listing); main's text rule now finds one on 37% of rows | 63% of Poshmark rows use the "condition not stated" assumption | Probe `xtracto/poshmark-detail-scraper` if this matters for the demo |
+| **Listings sell fast**: 1 of 3 Mercari fixtures was gone within a day | A link-out to a sold item looks broken in the demo | Re-scrape or re-check the demo props' results the night before |
+| 34% of live Grailed rows come from sellers abroad (Malaysia 11%), shipping $20+ from Asia | Decision 12 keeps them; their shipping is real | Fine; a US-only view is one filter on `seller.region` |
+| Depop shows a structured material ("Wool") the actor does not return; a Depop brand of "Other" is null even when the title names the brand | Depop materials come from text only (68% stated, fine) | Leave |
+| Mercari's and Poshmark's actors each had 1 user in 30 days (probably us) | If one breaks, nobody else will notice first | Fallbacks in `BLOCKING.md` |
+| Brand prefix rule: "Jordan Craig" → Jordan, "Columbia University" → Columbia | Wrong brand facts once `ml/evidence/brands.yaml` has rows (empty today) | Add exceptions with the brand table |
+| Sizes are raw strings (`M`, `M (38-40)`) | The API's size filter is exact (`API.md`), so it misses Mercari's | A decision for the API owners |
+| The fixtures were trimmed at 400 characters when saved (live descriptions are complete) | Tests never see text late in a long description | Keep one untrimmed record per marketplace |
+| Cross-listed duplicates across marketplaces | One jacket shown several times | Already handled at search time on `main` (PR #21) |
 
-Checked and fine: prices, start fees and memory of all five actors; the input fields we send; the Apify client
-signatures (v3.3.0); Mercari's shipping payer and free shipping; Grailed's price drops and US shipping; eBay's material
-specifics; that US sellers write `100% cotton` rather than `Cotton 100%` (19 to 0 in 260 eBay titles, so no new rule);
-the money, quota and resume logic; the ledger and snapshot code; privacy scrubbing.
+### Next
 
-### Live check (when a token is in `.env` at the repo root)
-
-About $6 of the $20. From `backend/`:
-
-```bash
-uv run python pipeline/01_scrape.py --test                       # ~$0.55: every actor answers, 20 rows each, in data/test/
-uv run python pipeline/02_normalize.py --test
-uv run python pipeline/03_extract.py --test
-uv run python pipeline/04_report.py --test --min-rows 80
-uv run python pipeline/run/cli.py batch --rows 1000 --max-spend 8  # the real plan's first checked batch, ~$5
-```
-
-The batch is real work, not a throwaway: its runs count toward the quotas and are shared through the team ledger.
-Read `data/batches/<id>/CHECKS.md`, look for `ALERT` lines and `request(s) failed after every retry` notes, and check
-that no Depop tank top or Poshmark romper is in `data/listings.jsonl`.
+The plan is ready for the real batches (see `run/README.md`): with a token in `.env`, `sync` first if teammates have
+already scraped with this account, then `uv run python pipeline/run/cli.py batch --rows 5000 --batches all`.
 
 ## First review (2026-10-24, branch `pipeline-review`)
 

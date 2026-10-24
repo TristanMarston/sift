@@ -356,7 +356,8 @@ that is not mirrored in `listing.py` fails a test.
 
 - `seller.region` mixes formats: `US` for any US place, otherwise whatever the marketplace reports (a code like `CN`
   from Grailed, a name like `China` from eBay).
-- Poshmark's actor gives no condition and no shipping, so both are null (poshmark.com shows both on the listing page).
+- Poshmark's actor gives no condition and no shipping (poshmark.com shows both). Condition comes from the seller's
+  own words when they state one (37% of live rows); shipping is null.
   Depop gives no shipping and no seller details. Mercari gives no color.
 - Sellers sometimes put the wrong category on an item; a mislabeled item passes through (a tee filed as `Blouses`
   is a shirt). Tank tops, camis, crop tops, jumpsuits and rompers are dropped on every marketplace, also when their
@@ -374,7 +375,7 @@ that is not mirrored in `listing.py` fails a test.
   percentages; material-rich queries lifted Mercari to 70% and 50%. Check `REPORT.md` after the run.
 - Tags with several parts add up past 100%, so they are kept but marked `composition_suspect` and get no
   `synthetic_share`. A labeled lining is skipped (see 03), so what is left is mostly body + trim or an unlabeled lining:
-  1.3% of the rows in the second review's live sample.
+  1.1% of the rows in the second review's live sample.
 - The Mercari actor is new; it worked up to 300 items per run (three results pages) in the review scrape.
   `tortuga/mercari-scraper` is the fallback.
 - Not built yet: hosted thumbnails, the Supabase upload, care-tag OCR, the LLM fallback for odd material
