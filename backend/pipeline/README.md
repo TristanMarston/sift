@@ -58,13 +58,15 @@ uv run python pipeline/04_report.py --test --min-rows 80
 uv run python pipeline/05_embed.py --test           # needs the model weights; downloads one small photo per row
 uv run python pipeline/06_query.py some_photo.jpg --test   # eyeball the top matches
 
-# the real run (spends money; start it in the background, it takes a while; progress goes to scrape.log)
-uv run python pipeline/01_scrape.py --max-spend 120 > scrape.log 2>&1 &   # the plan costs ~$94, ~$118 at the caps
-uv run python pipeline/02_normalize.py
-uv run python pipeline/03_extract.py
-uv run python pipeline/04_report.py                # writes pipeline/REPORT.md
-uv run python pipeline/05_embed.py                 # resumable; rerun after a crash
+# the real run, in batches that are checked one by one (spends money): see run/README.md
+uv run python pipeline/run/cli.py batch --rows 5000 --dry-run                        # next batch and its cost
+uv run python pipeline/run/cli.py batch --rows 5000 --batches all > batch.log 2>&1 &  # until money or queries run out
+uv run python pipeline/04_report.py                # writes pipeline/REPORT.md (the batch runner already ran 02 and 03)
+uv run python pipeline/05_embed.py                 # image vectors for search; resumable, rerun after a crash
 ```
+
+`01_scrape.py` still runs a single unbatched scrape; `run/` drives the same engine in checked batches, shares the runs
+with the team (Apify ledger, zip snapshots) and keeps one marketplace's trouble from stopping the others.
 
 `--test` makes every step work in `pipeline/data/test/` instead of `pipeline/data/`, so a test run never mixes
 with real data. Every step also takes `--data-dir PATH` for any other folder.
@@ -193,8 +195,8 @@ embeds the photos with `backend.embed` (Marqo-FashionSigLIP, 768-d unit vectors)
 **`queries.yaml`:**
 
 ```yaml
-quotas:            # raw rows to collect per marketplace (20k target + ~30% over-scrape)
-  depop: 10400
+quotas:            # raw rows to collect per marketplace, in total (run/ splits each batch in this ratio)
+  depop: 32800
 max_items:         # default cap per query
   depop: 200
 queries:
@@ -357,7 +359,7 @@ that is not mirrored in `listing.py` fails a test.
 - Grailed resellers cross-list one item as several listings (same title and price, different ids). Deduping by id
   cannot catch this; it needs image-based dedupe later.
 - The duplicate counts in `run_report.md` ignore rows from earlier invocations of step 01 (step 02 still dedupes
-  everything).
+  everything; a batch's "new listings" check in `run/` counts against every earlier run).
 - `seller.type` thresholds are guesses (Grailed: ≤ 20 / ≤ 200 listings; eBay: business accounts with ≥ 5,000
   feedback are large resellers). An eBay seller with 0% positive feedback has no feedback in eBay's 12-month window,
   so `seller.rating` is null, as it is for a Mercari seller with no reviews.
