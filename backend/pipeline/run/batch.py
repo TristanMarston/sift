@@ -1,6 +1,7 @@
 """Scrape in batches. A batch takes `rows` raw rows, split across marketplaces in the ratio of their quotas, from the
-queries nobody has run yet (breadth first, as scrape.build_plan orders them). It runs one lane per marketplace, all at
-once, then checks what came back (checks.py) before the next batch starts."""
+queries nobody has run yet (breadth first, as scrape.build_plan orders them). The quotas are only the split: `rows`,
+`batches` and the money decide how much. It runs one lane per marketplace, all at once, then checks what came back
+(checks.py) before the next batch starts."""
 import json
 import threading
 from dataclasses import dataclass
@@ -33,19 +34,22 @@ class Lane:
 
 
 def plan_batch(cfg: S.Config, past: list[dict], rows: int, only=None, categories=None, skip=()) -> dict[str, Lane]:
-    """The next batch per marketplace. `past` is every run known (runs.jsonl): its finished queries are skipped and its
-    rows count toward the quotas. `only` / `categories` choose what to scrape, `skip` leaves marketplaces out."""
+    """The next batch per marketplace: `rows` raw rows, split in the quota ratio among the marketplaces that still have
+    queries to run. The quotas are only that split, never a cap: `rows` (and the money) decide how much; a quota of 0
+    keeps a marketplace out. `past` is every run known (runs.jsonl): its finished queries are skipped. `only` /
+    `categories` choose what to scrape, `skip` leaves marketplaces out."""
     done, have = S.finished_queries(past), S.quota_rows(past)
-    mps = [mp for mp in cfg.quotas if (only is None or mp in only) and mp not in skip]
-    total = sum(cfg.quotas[mp] for mp in mps)
+    tasks = {mp: [t for t in S.build_plan(cfg.queries) if t.marketplace == mp and (mp, t.category, t.query) not in done
+                  and (categories is None or t.category in categories)]
+             for mp in cfg.quotas if cfg.quotas[mp] > 0 and (only is None or mp in only) and mp not in skip}
+    tasks = {mp: ts for mp, ts in tasks.items() if ts}
+    total = sum(cfg.quotas[mp] for mp in tasks)
     lanes = {}
-    for mp in mps:
-        target = min(round(rows * cfg.quotas[mp] / total), cfg.quotas[mp] - have[mp])
-        tasks = [t for t in S.build_plan(cfg.queries) if t.marketplace == mp and (mp, t.category, t.query) not in done
-                 and (categories is None or t.category in categories)]
-        if target > 0 and tasks:
-            e = S.estimate(tasks, {mp: target})[mp]
-            lanes[mp] = Lane(mp, tasks, target, have[mp] + target, e["runs"], e["est_usd"], e["cap_usd"])
+    for mp, ts in tasks.items():
+        target = round(rows * cfg.quotas[mp] / total)
+        if target > 0:
+            e = S.estimate(ts, {mp: target})[mp]
+            lanes[mp] = Lane(mp, ts, target, have[mp] + target, e["runs"], e["est_usd"], e["cap_usd"])
     return lanes
 
 
@@ -172,7 +176,7 @@ def recheck(client, data_dir, batch_id, mappers=MAPPERS) -> list:
 
 def run_batches(client, cfg: S.Config, data_dir, rows=5000, batches=1, only=None, categories=None, max_spend=None,
                 who="me", force=False, mappers=MAPPERS, make_client=None, log=S.say, now=S._now) -> int:
-    """Up to `batches` batches (None: until quotas, queries or money run out). Each batch: sync with the team ledger,
+    """Up to `batches` batches (None: until the queries or the money run out; cli.py asks for --max-spend then). Each batch: sync with the team ledger,
     check the account, plan, run the lanes, share the new runs, judge them. A marketplace that fails a check sits out
     the rest of this command. Returns the exit code (scrape_report's, or EXIT_BUSY)."""
     data_dir = Path(data_dir)
@@ -204,7 +208,7 @@ def run_batches(client, cfg: S.Config, data_dir, rows=5000, batches=1, only=None
                     f"(account balance ${balance + MARGIN:.2f} minus a ${MARGIN} margin, or --max-spend).")
                 code = R.EXIT_BUDGET
             else:
-                log("nothing left to scrape: every chosen quota is full or every query has run"
+                log("nothing left to scrape: every chosen query has run"
                     + (f" (stopped in this command: {', '.join(stopped)})." if stopped else "."))
             break
         n += 1

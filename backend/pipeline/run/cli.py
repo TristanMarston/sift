@@ -61,7 +61,7 @@ def dry_run(cfg, data_dir, rows, filters) -> None:
     print(f"{'total':12} {sum(l.rows for l in lanes.values()):>6} {sum(l.runs for l in lanes.values()):>5} "
           f"{sum(l.est_usd for l in lanes.values()):>8.2f} {sum(l.cap_usd for l in lanes.values()):>8.2f}")
     if not lanes:
-        print("nothing left to scrape: every chosen quota is full or every query has run.")
+        print("nothing left to scrape: every chosen query has run.")
     if token(required=False):
         lim = ApifyClient(token()).user().limits()
         print(f"account: ${lim.limits.max_monthly_usage_usd - lim.current.monthly_usage_usd:.2f} left this month, "
