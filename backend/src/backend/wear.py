@@ -22,7 +22,8 @@ def _round(x: float) -> int:
 def expected_wears(baseline: dict, level: str, condition: str | None) -> dict:
     f = QUALITY_MULT[level] * CONDITION[condition]
     w = lambda n: max(1, _round(n * f))  # noqa: E731
-    return {"low": w(baseline["low"]), "high": w(baseline["high"]), "mid": w((baseline["low"] + baseline["high"]) / 2)}
+    mid = baseline.get("mid", (baseline["low"] + baseline["high"]) / 2)  # a published typical figure beats the middle
+    return {"low": w(baseline["low"]), "high": w(baseline["high"]), "mid": w(mid)}
 
 
 def cpw(total_cents: int, wears: int) -> int:
@@ -58,7 +59,8 @@ def wear_facts(category: str, baselines: dict, condition: str | None, condition_
     life = f"about {round(CONDITION[condition] * 100)}% of its life left"
     tag = " (assumption)" if "assumption" in src.lower() else ""  # only uncited baselines say so
     return [
-        fact("baseline", "Typical lifespan", f"{b['low']}–{b['high']} wears for {CATEGORY_LABEL[category]}{tag}", src, url),
+        fact("baseline", "Typical lifespan", f"{b['low']}–{b['high']} wears for {CATEGORY_LABEL[category]}"
+             + (f", typically {b['mid']}" if "mid" in b else "") + tag, src, url),
         fact("condition", "Condition", f"{CONDITION_LABEL[condition]}: {life} (assumption)" if condition
              else f"Condition not stated: assume {life}", condition_raw),
     ]
