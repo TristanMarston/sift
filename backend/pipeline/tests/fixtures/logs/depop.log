@@ -1,0 +1,11 @@
+ACTOR: Pulling container image of build rLHxHOGqzqtKhTKab from registry.
+ACTOR: Creating container.
+ACTOR: Starting container.
+ACTOR: Running under "LIMITED_PERMISSIONS".
+Actor is running on the Apify platform, `disable_browser_sandbox` was changed to True.
+[apify] INFO  Initializing Actor...
+[apify] INFO  System info ({"apify_sdk_version": "2.7.3", "apify_client_version": "1.12.2", "crawlee_version": "0.6.12", "python_version": "3.12.13", "os": "linux"})
+[apify] INFO  Starting with 1 search task(s); target 20 listings.
+[apify] INFO  Progress: 20/20 ('the north face jacket', +20 new).
+[apify] INFO  Finished. Pushed 20 listings to the dataset.
+[apify] INFO  Exiting Actor ({"exit_code": 0})
