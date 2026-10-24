@@ -60,9 +60,15 @@ _CATEGORY_RULES = [
 
 
 def category_from_label(label: str | None) -> str | None:
-    """A marketplace category label or path ("Men > Coats & Jackets") -> one of the 8 categories, else None."""
-    text = re.sub(r"[._]", " ", re.sub(r"clothing, shoes (?:&|and) accessories", "", (label or "").lower()))  # eBay's root
-    return next((cat for cat, pattern in _CATEGORY_RULES if re.search(pattern, text)), None)
+    """A marketplace category label or path ("Men > Coats & Jackets") -> one of the 8 categories, else None.
+    The leaf of a path is the most specific part, so it is tried first ("Sweats & hoodies > Track jacket" is a jacket)."""
+    text = re.sub(r"clothing, shoes (?:&|and) accessories", "", (label or "").lower())  # eBay's root category
+    for part in reversed(text.split(">")):
+        part = re.sub(r"[._]", " ", part)
+        for category, pattern in _CATEGORY_RULES:
+            if re.search(pattern, part):
+                return category
+    return None
 
 
 def resolve_category(label: str | None, fallback: str) -> str:

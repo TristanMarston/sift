@@ -81,6 +81,7 @@ def test_estimate_simulates_the_quota_stop_and_sums_best_case_cost_and_worst_cas
     ("grailed", {"searchQuery": "carhartt jacket", "maxItems": 50, "scrapeDetails": True}),
     ("poshmark", {"categoryUrls": ["https://poshmark.com/search?query=carhartt+jacket&type=listings&src=dir"],
                   "maxResultsPerScrape": 50, "usePagination": True, "scrapeProductDetails": True}),
+    ("mercari", {"keywords": ["carhartt jacket"], "statuses": ["on_sale"], "includeDetails": True, "maxItems": 50}),
     ("ebay", {"searchQueries": ["carhartt jacket"], "maxItems": 50, "marketplace": "ebay.com", "mode": "active",
               "condition": "used", "detailedItems": True, "includeDescription": True, "includeSummary": False}),
 ])
@@ -246,11 +247,20 @@ def test_queries_cover_exactly_the_api_categories_and_marketplaces(cfg):
         assert set(by_mp) == set(S.ACTORS)
 
 
-def test_mercari_is_not_collected_but_stays_in_the_api_enum():
-    """It failed the go/no-go (no description, one image). The enum belongs to the API schema, so it stays there."""
-    from typing import get_args
-    import listing
-    assert "mercari" not in S.ACTORS and "mercari" in get_args(listing.Marketplace)
+def test_mercari_uses_the_actor_that_returns_listing_details():
+    """getascraper/mercari-us-scraper returned card data only (no description, one photo) and was dropped."""
+    assert S.ACTORS["mercari"].id == "automation_craft/mercari-us-scraper"
+    assert S.charge_cap("mercari", 100) == Decimal("0.35")      # (100 * 0.00273 + 0.006) * 1.25, rounded up
+
+
+def test_free_summary_rows_are_neither_written_nor_counted(tmp_path):
+    listing = {"type": "listing", "listingId": "m1", "title": "x"}
+    rows = [{"type": "search"}, listing, {"type": "status"}, {**listing, "listingId": "m2"}, {"type": "summary"}]
+    S.run_plan(FakeClient(rows=rows), [t("mercari")], None, tmp_path)
+    (path,) = (tmp_path / "raw" / "mercari").glob("*.jsonl")
+    assert [json.loads(line)["listingId"] for line in path.read_text().splitlines()] == ["m1", "m2"]
+    (log,) = read_jsonl(tmp_path / "runs.jsonl")
+    assert log["items"] == 2 and log["est_charge_usd"] == pytest.approx(2 * 0.00273 + 0.006)
 
 
 def test_no_marketplace_is_more_than_half_of_the_planned_rows(cfg):

@@ -90,6 +90,18 @@ def test_ebay_root_category_does_not_make_everything_footwear(label, expected):
     assert C.category_from_label(label) == expected
 
 
+@pytest.mark.parametrize("label, expected", [
+    ("Men > Sweats & hoodies > Track jacket", "jackets_outerwear"),     # Mercari files track jackets under hoodies
+    ("Women > Sweats & hoodies > Hoodie", "hoodies_sweatshirts"),
+    ("Men > Sweats & hoodies > Other", "hoodies_sweatshirts"),          # unmapped leaf: the parent decides
+    ("Women > Coats & jackets > Puffer", "jackets_outerwear"),
+    ("Men > Athletic apparel > Jackets", "jackets_outerwear"),
+    ("Women > Accessories > Hats", None),
+])
+def test_the_leaf_of_a_category_path_wins_over_its_parents(label, expected):
+    assert C.category_from_label(label) == expected
+
+
 def test_resolve_category_prefers_the_label_and_never_lets_a_hat_inherit_the_query_category():
     assert C.resolve_category("Jackets & Coats", "tshirts") == "jackets_outerwear"
     assert C.resolve_category("", "tshirts") == "tshirts" and C.resolve_category(None, "sneakers") == "sneakers"

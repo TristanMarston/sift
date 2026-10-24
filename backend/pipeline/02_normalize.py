@@ -5,11 +5,12 @@
 import argparse
 from pathlib import Path
 
-from normalize import depop, ebay, grailed, poshmark
+from normalize import depop, ebay, grailed, mercari, poshmark
 from normalize.run import normalize_all
 
 HERE = Path(__file__).resolve().parent
-MAPPERS = {"depop": depop.map_item, "poshmark": poshmark.map_item, "grailed": grailed.map_item, "ebay": ebay.map_item}
+MAPPERS = {"depop": depop.map_item, "poshmark": poshmark.map_item, "grailed": grailed.map_item,
+           "mercari": mercari.map_item, "ebay": ebay.map_item}
 
 
 def main():

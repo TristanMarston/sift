@@ -25,6 +25,7 @@ class Actor:
     start_usd: Decimal         # price per run start
     build_input: Callable[[str, int], dict]
     keep: frozenset | None = None   # if set, only these top-level keys of a record are written
+    is_item: Callable[[dict], bool] | None = None   # if set, other rows (free summary rows) are not written or counted
 
 
 # eBay's default output includes ~60 KB of raw page modules per item, and they contain the seller's handle
@@ -46,6 +47,11 @@ ACTORS = {
                                     "maxResultsPerScrape": n, "usePagination": True, "scrapeProductDetails": True}),
     "grailed": Actor("piotrv1001/grailed-listings-scraper", Decimal("0.012"), Decimal("0.00005"),
                      lambda q, n: {"searchQuery": q, "maxItems": n, "scrapeDetails": True}),
+    # Details mode returns description, all photos, size, shipping and seller counts. The first Mercari actor we
+    # tried (getascraper) returned card data only. The dataset also holds free search/status/summary rows.
+    "mercari": Actor("automation_craft/mercari-us-scraper", Decimal("0.00273"), Decimal("0.006"),
+                     lambda q, n: {"keywords": [q], "statuses": ["on_sale"], "includeDetails": True, "maxItems": n},
+                     is_item=lambda row: row.get("type") == "listing"),
     "ebay": Actor("memo23/ebay-search-scraper-ppe", Decimal("0.005"), Decimal("0.02"),
                   lambda q, n: {"searchQueries": [q], "maxItems": n, "marketplace": "ebay.com", "mode": "active",
                                 "condition": "used", "detailedItems": True, "includeDescription": True,
@@ -164,8 +170,10 @@ def _execute(client, task: Task, cap: Decimal, data_dir: Path) -> dict:
     n = 0
     try:
         with path.with_suffix(".tmp").open("w") as f:
-            for n, item in enumerate(client.dataset(run.default_dataset_id).iterate_items(), 1):
-                f.write(json.dumps(scrub(item, keep=actor.keep), ensure_ascii=False) + "\n")
+            for item in client.dataset(run.default_dataset_id).iterate_items():
+                if actor.is_item is None or actor.is_item(item):
+                    f.write(json.dumps(scrub(item, keep=actor.keep), ensure_ascii=False) + "\n")
+                    n += 1
         path.with_suffix(".tmp").replace(path)
     except Exception as e:
         return {**entry, "status": "ERROR", "status_message": f"dataset fetch failed: {type(e).__name__}: {e}"}

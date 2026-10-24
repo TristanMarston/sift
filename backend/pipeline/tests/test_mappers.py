@@ -7,12 +7,13 @@ from pathlib import Path
 import pytest
 
 from listing import Normalized
-from normalize import depop, ebay, grailed, poshmark
+from normalize import depop, ebay, grailed, mercari, poshmark
 from normalize.common import Drop
 
 FIX = Path(__file__).parent / "fixtures"
 NOW = datetime(2026, 10, 24, tzinfo=timezone.utc)
-MAPPERS = {"depop": depop.map_item, "poshmark": poshmark.map_item, "grailed": grailed.map_item, "ebay": ebay.map_item}
+MAPPERS = {"depop": depop.map_item, "poshmark": poshmark.map_item, "grailed": grailed.map_item, "mercari": mercari.map_item,
+           "ebay": ebay.map_item}
 
 
 def fx(mp):
@@ -37,7 +38,8 @@ def test_every_real_sample_maps_to_a_valid_row_and_the_label_beats_the_query_cat
 @pytest.mark.parametrize("mp", MAPPERS)
 def test_a_missing_label_falls_back_to_the_query_category(mp):
     labels = {"depop": dict(category=None, productType=None, group=None), "poshmark": dict(category=None, breadcrumbs=[]),
-              "grailed": dict(category=None, categoryPath=None), "ebay": dict(categoryPath=None)}[mp]
+              "grailed": dict(category=None, categoryPath=None), "mercari": dict(category=None, categoryPath=None),
+              "ebay": dict(categoryPath=None)}[mp]
     assert mapped(mp, query_category="sneakers", **labels).category == "sneakers"
 
 
@@ -45,6 +47,7 @@ def test_a_missing_label_falls_back_to_the_query_category(mp):
     ("depop", dict(category="Accessories", productType="hats", group="hats")),
     ("poshmark", dict(category="Hats", breadcrumbs=["Women", "Accessories", "Hats"])),
     ("grailed", dict(category="accessories", categoryPath="accessories.hats")),
+    ("mercari", dict(category="Hats", categoryPath="Women > Accessories > Hats")),
     ("ebay", dict(categoryPath="Clothing, Shoes & Accessories > Men > Men's Accessories > Hats")),
 ])
 def test_a_hat_is_dropped_not_filed_under_the_query_category(mp, label):
@@ -61,6 +64,11 @@ def test_a_hat_is_dropped_not_filed_under_the_query_category(mp, label):
     ("poshmark", dict(currency="CAD"), "non_usd"),
     ("poshmark", dict(images=[], main_image=None), "no_image"),
     ("poshmark", dict(breadcrumbs=["Kids", "Boys", "Jackets & Coats"]), "kids"),
+    ("mercari", dict(price=None), "no_price"),
+    ("mercari", dict(currency="CAD"), "non_usd"),
+    ("mercari", dict(photoUrls=[], imageUrl=None), "no_image"),
+    ("mercari", dict(categoryPath="Kids > Boys coats & jackets > Boys (4+)"), "kids"),
+    ("mercari", dict(type="search"), "not_listing"),
     ("grailed", dict(price=None), "no_price"),
     ("grailed", dict(photos=[], coverPhoto=None), "no_image"),
     ("ebay", dict(priceValue=None), "no_price"),
@@ -174,3 +182,44 @@ def test_ebay_condition_uses_only_the_label_before_the_seller_prose_and_html_ent
 def test_ebay_foreign_item_location_is_kept_with_its_country_and_ended_listings_are_sold():
     n = mapped("ebay", 0, itemLocation="Located in China", listingStatus="ENDED")
     assert n.seller.region == "China" and n.status == "sold"
+
+
+# --- Mercari (automation_craft/mercari-us-scraper, details on) -------------------------------
+
+def test_mercari_fields():
+    n = mapped("mercari", 0)
+    assert (n.id, n.external_id, n.brand, n.size, n.color, n.subcategory) == \
+           ("mercari:m48783721469", "m48783721469", "The North Face", "XS (0-2)", None, "Puffer Coats & Jackets")
+    assert (n.condition, n.condition_raw, n.status, n.url) == ("like_new", "Like new", "active", "https://www.mercari.com/us/item/m48783721469/")
+    assert n.seller.region == "US" and len(n.image_urls) == 3 and n.description
+
+
+def test_mercari_buyer_pays_shipping_and_a_brand_new_seller_has_no_rating():
+    n = mapped("mercari", 0)
+    assert (n.cost.price_cents, n.cost.shipping_cents, n.cost.free_shipping, n.cost.total_cents) == (3100, 849, False, 3949)
+    assert (n.seller.rating, n.seller.listing_count, n.seller.type) == (None, 26, "small_shop")   # rating 0 from 0 reviews = unknown
+
+
+def test_mercari_seller_pays_shipping_so_it_is_free_for_the_buyer_whatever_fee_the_actor_lists():
+    n = mapped("mercari", 1)
+    assert (n.cost.shipping_cents, n.cost.free_shipping, n.cost.total_cents) == (0, True, 26000)
+    assert (n.brand, n.seller.rating, n.seller.listing_count, n.seller.type) == (None, 5.0, 13, "individual")
+
+
+def test_mercari_zero_fee_and_a_big_seller():
+    n = mapped("mercari", 2)
+    assert (n.cost.shipping_cents, n.cost.free_shipping, n.cost.total_cents) == (0, True, 8500)
+    assert (n.seller.type, n.condition, n.subcategory) == ("large_reseller", "good", 'Active Jackets for Men')
+
+
+def test_mercari_markdowns_are_real_prices_in_cents():
+    cut = mapped("mercari", 3)     # Mercari shows 23.94, was 27.94: both actors we tried agree
+    assert (cut.cost.price_cents, cut.cost.original_price_cents, cut.cost.total_cents) == (2394, 2794, 3243)
+    assert mapped("mercari", 4).cost.original_price_cents == 9000
+
+
+def test_mercari_status_and_the_track_jacket_category():
+    assert mapped("mercari", 0, status="sold_out").status == "sold" and mapped("mercari", 0, sold=True).status == "sold"
+    assert mapped("mercari", 1).category == "jackets_outerwear"   # "Men > Coats & jackets > Fleece jacket"
+    track = mapped("mercari", 0, categoryPath="Men > Sweats & hoodies > Track jacket", category="Track Jackets")
+    assert track.category == "jackets_outerwear"
