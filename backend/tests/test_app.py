@@ -166,3 +166,11 @@ def test_search_shows_a_cross_posted_item_once_at_its_lowest_price():
                                 categorize=lambda v: "jackets_outerwear"))
     body = valid("SearchResponse", search(c, {"category": "jackets_outerwear"}).json())
     assert [r["id"] for r in body["results"]] == ["poshmark:b"]
+
+
+def test_vercel_preview_urls_can_be_allowed_by_pattern():
+    index = Index(np.zeros((0, 3), np.float32), [])
+    c = TestClient(A.create_app(index=index, cfg=CFG, origin_regex=r"https://sift(-[a-z0-9-]+)?\.vercel\.app"))
+    ok = c.get("/health", headers={"Origin": "https://sift-git-main-tristan.vercel.app"})
+    assert ok.headers["access-control-allow-origin"] == "https://sift-git-main-tristan.vercel.app"
+    assert "access-control-allow-origin" not in c.get("/health", headers={"Origin": "https://evil.vercel.app"}).headers
