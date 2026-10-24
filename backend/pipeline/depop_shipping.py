@@ -25,7 +25,8 @@ def needs_shipping(row: dict) -> bool:
 def fetch_apify(urls: list[str]) -> list[dict]:
     from apify_client import ApifyClient
     client = ApifyClient(os.environ["APIFY_TOKEN"])
-    run = client.actor(ACTOR).call(run_input={"mode": "url", "urls": urls},
+    # maxListings: the actor stops at 20 by default, even in URL mode
+    run = client.actor(ACTOR).call(run_input={"mode": "url", "urls": urls, "maxListings": len(urls)},
                                    max_total_charge_usd=round(len(urls) * USD_PER_LISTING * 1.5 + 0.05, 2))
     get = (lambda k: run.get(k)) if isinstance(run, dict) else (lambda k: getattr(run, k, None))
     if (get("status") or "") != "SUCCEEDED":
@@ -68,6 +69,8 @@ def ship_file(path, cache_path, fetch=fetch_apify, chunk: int = CHUNK, limit: in
     def one(part):
         try:
             items = {str(it["id"]): it for it in fetch([r["url"] for r in part])}
+            if len(items) * 2 < len(part):  # a capped or blocked run, not half the listings sold: retry, don't remember
+                raise RuntimeError(f"run returned {len(items)} of {len(part)} listings")
         except Exception:  # noqa: BLE001  the whole chunk is retried next run
             with lock:
                 stats["error"] += len(part)
