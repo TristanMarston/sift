@@ -89,6 +89,24 @@ def test_a_few_failed_requests_are_fine():
     assert v.kind == "ok"
 
 
+@pytest.mark.parametrize("line", [
+    "ERROR CheerioCrawler: Request failed and reached maximum retries. Error: Request blocked - received 410 status code.",
+    "[crawlee.crawlers._basic._basic_crawler] ERROR Request to https://www.depop.com/products/x/ failed and reached maximum retries",
+])
+def test_one_request_that_ran_out_of_retries_is_not_a_block(line):
+    """Crawlee (eBay, Poshmark, Depop) logs this for every single request that fails for good. The final request
+    statistics say whether most of them failed; one dead detail page in a healthy run must not stop the marketplace."""
+    v = assess(requested=150, rows=rows(good=149), log=line + "\n",
+               status_message="Finished! Total 151 requests: 150 succeeded, 1 failed.")
+    assert (v.kind, v.bad) == ("ok", False), v
+    assert any("1 request" in n for n in v.notes), v.notes
+
+
+def test_an_actor_that_says_it_is_giving_up_is_still_a_hard_block():
+    v = assess(rows=rows(good=4), requested=100, log="WARN  Every address was refused; giving up on this search.\n")
+    assert (v.kind, v.hard) == ("blocked", True) and any("giving up" in r for r in v.reasons)
+
+
 def test_an_ebay_auth_token_pool_that_is_empty_is_a_hard_block():
     v = assess(rows=rows(), log="[EBAY_AUTH] Token pool: 0 usable token(s); this run opens on #0.")
     assert v.kind == "blocked"
