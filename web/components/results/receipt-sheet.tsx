@@ -111,6 +111,7 @@ export function ReceiptSheet({ r, typical, onClose }: Props) {
                                 lines={[
                                     c.original_price_cents && c.original_price_cents > c.price_cents ? `Seller marked it down from ${priceText(c.original_price_cents)}` : null,
                                     c.free_shipping ? 'Free shipping' : c.shipping_cents !== null ? `Includes ${priceText(c.shipping_cents)} shipping` : 'Shipping unknown',
+                                    c.fee_cents ? `Includes ${r.marketplace === 'depop' ? 'up to ' : ''}${priceText(c.fee_cents)} ${MARKET[r.marketplace]} buyer fee` : null,
                                     c.retail_price_cents ? `New retail ${priceText(c.retail_price_cents)}` : null,
                                 ]}
                             />

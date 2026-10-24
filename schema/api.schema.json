@@ -203,7 +203,7 @@
         },
         "cost": {
           "type": "object",
-          "required": ["price_cents", "currency", "shipping_cents", "free_shipping", "total_cents",
+          "required": ["price_cents", "currency", "shipping_cents", "free_shipping", "fee_cents", "total_cents",
                        "original_price_cents", "retail_price_cents"],
           "additionalProperties": false,
           "properties": {
@@ -211,6 +211,7 @@
             "currency": {"const": "USD"},
             "shipping_cents": {"$ref": "#/$defs/NullableCents"},
             "free_shipping": {"type": ["boolean", "null"]},
+            "fee_cents": {"$ref": "#/$defs/Cents"},
             "total_cents": {"$ref": "#/$defs/Cents"},
             "original_price_cents": {"$ref": "#/$defs/NullableCents"},
             "retail_price_cents": {"$ref": "#/$defs/NullableCents"}

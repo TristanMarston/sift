@@ -93,7 +93,8 @@ def test_depop_fields():
            ("depop:965376720", "965376720", "The North Face", "jackets", "L", "white")
     assert (n.condition, n.condition_raw) == ("like_new", "Used - like new")
     assert n.url == "https://www.depop.com/products/seller-the-north-face-white-fuzzy-f24d/"
-    assert (n.cost.price_cents, n.cost.original_price_cents, n.cost.shipping_cents, n.cost.total_cents) == (2850, 3000, None, 2850)
+    assert (n.cost.price_cents, n.cost.original_price_cents, n.cost.shipping_cents, n.cost.fee_cents, n.cost.total_cents) == (
+        2850, 3000, None, 243, 3093)
     assert (n.seller.region, n.seller.type, n.seller.rating) == ("US", None, None) and n.specifics == {}
 
 
@@ -282,25 +283,25 @@ def test_mercari_fields():
 
 def test_mercari_buyer_pays_shipping_and_a_brand_new_seller_has_no_rating():
     n = mapped("mercari", 0)
-    assert (n.cost.price_cents, n.cost.shipping_cents, n.cost.free_shipping, n.cost.total_cents) == (3100, 849, False, 3949)
+    assert (n.cost.price_cents, n.cost.shipping_cents, n.cost.free_shipping, n.cost.total_cents) == (3100, 849, False, 4091)   # 31 + 8.49 + Mercari's 1.42 fee
     assert (n.seller.rating, n.seller.listing_count, n.seller.type) == (None, 26, "small_shop")   # rating 0 from 0 reviews = unknown
 
 
-def test_mercari_seller_pays_shipping_so_it_is_free_for_the_buyer_whatever_fee_the_actor_lists():
+def test_mercari_seller_pays_shipping_so_it_is_free_for_the_buyer_but_the_buyer_fee_still_applies():
     n = mapped("mercari", 1)
-    assert (n.cost.shipping_cents, n.cost.free_shipping, n.cost.total_cents) == (0, True, 26000)
+    assert (n.cost.shipping_cents, n.cost.free_shipping, n.cost.fee_cents, n.cost.total_cents) == (0, True, 936, 26936)
     assert (n.brand, n.seller.rating, n.seller.listing_count, n.seller.type) == (None, 5.0, 13, "individual")
 
 
-def test_mercari_zero_fee_and_a_big_seller():
+def test_mercari_free_shipping_and_a_big_seller():
     n = mapped("mercari", 2)
-    assert (n.cost.shipping_cents, n.cost.free_shipping, n.cost.total_cents) == (0, True, 8500)
+    assert (n.cost.shipping_cents, n.cost.free_shipping, n.cost.fee_cents, n.cost.total_cents) == (0, True, 306, 8806)
     assert (n.seller.type, n.condition, n.subcategory) == ("large_reseller", "good", 'Active Jackets for Men')
 
 
 def test_mercari_markdowns_are_real_prices_in_cents():
     cut = mapped("mercari", 3)     # Mercari shows 23.94, was 27.94: both actors we tried agree
-    assert (cut.cost.price_cents, cut.cost.original_price_cents, cut.cost.total_cents) == (2394, 2794, 3243)
+    assert (cut.cost.price_cents, cut.cost.original_price_cents, cut.cost.total_cents) == (2394, 2794, 3359)
     assert mapped("mercari", 4).cost.original_price_cents == 9000
 
 
@@ -309,3 +310,17 @@ def test_mercari_status_and_the_track_jacket_category():
     assert mapped("mercari", 1).category == "jackets_outerwear"   # "Men > Coats & jackets > Fleece jacket"
     track = mapped("mercari", 0, categoryPath="Men > Sweats & hoodies > Track jacket", category="Track Jackets")
     assert track.category == "jackets_outerwear"
+
+
+def test_depop_buyer_fee_is_the_stated_maximum_and_in_the_total():
+    """Depop's help centre: a marketplace fee of up to 5% of the item price plus up to $1, excluding shipping and tax.
+    The actor returns no fee (totalPrice = price), so the stated maximum is used and labelled "up to"."""
+    n = mapped("depop", 0)
+    assert (n.cost.price_cents, n.cost.fee_cents, n.cost.total_cents) == (2850, 243, 3093)
+
+
+def test_mercari_buyer_protection_fee_comes_from_mercari_itself():
+    """Mercari's own checkout figure (3.6% of item price + buyer-paid shipping) rides along in the actor's record."""
+    n = mapped("mercari", 0)
+    assert (n.cost.shipping_cents, n.cost.fee_cents, n.cost.total_cents) == (849, 142, 4091)
+    assert mapped("mercari", 0, buyerProtectionFee=None).cost.fee_cents == 0

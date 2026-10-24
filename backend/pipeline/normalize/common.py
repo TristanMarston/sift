@@ -178,10 +178,21 @@ def normalize_brand(raw: str | None) -> str | None:
     return name.title() if name.islower() else name
 
 
-def make_cost(price, currency=None, shipping=None, free_shipping=None, original=None, retail=None) -> dict:
+def depop_fee(price_cents: int | None) -> int | None:
+    """Depop's buyer "Marketplace fee", at its stated maximum. Depop help centre, "What is the Marketplace fee?"
+    (https://depophelp.zendesk.com/hc/en-gb/articles/21752555753361, read 2026-10-24): "up to 5% of the item purchase
+    price, plus a fixed amount of up to £/$1, excluding taxes and shipping costs. The exact amount applicable to your
+    purchase will always be shown as part of the checkout process." US buyers since July 18 2024 (news.depop.com). The
+    actor returns no fee (totalPrice = price), so this is a ceiling, and the receipt says "up to"."""
+    return None if price_cents is None else -(-price_cents * 5 // 100) + 100
+
+
+def make_cost(price, currency=None, shipping=None, free_shipping=None, original=None, retail=None,
+              fee_cents: int | None = None) -> dict:
     """The `cost` block. Raises Drop for a missing price or a non-USD currency (no FX conversion).
     An unstated currency is taken as USD. `original` only counts when it is above the price (a markdown); a zero
-    `retail` price means none was given."""
+    `retail` price means none was given. `fee_cents` is what the marketplace charges the buyer on top (0 when none:
+    eBay US, Grailed and Poshmark charge buyers nothing; see each mapper)."""
     if currency and str(currency).upper() != "USD":
         raise Drop("non_usd")
     cents = to_cents(price)
@@ -190,8 +201,9 @@ def make_cost(price, currency=None, shipping=None, free_shipping=None, original=
     ship, orig = to_cents(shipping), to_cents(original)
     if free_shipping is None and ship is not None:
         free_shipping = ship == 0
-    return dict(price_cents=cents, currency="USD", shipping_cents=ship, free_shipping=free_shipping,
-                total_cents=cents + (ship or 0), original_price_cents=orig if orig and orig > cents else None,
+    fee = fee_cents or 0
+    return dict(price_cents=cents, currency="USD", shipping_cents=ship, free_shipping=free_shipping, fee_cents=fee,
+                total_cents=cents + (ship or 0) + fee, original_price_cents=orig if orig and orig > cents else None,
                 retail_price_cents=to_cents(retail) or None)
 
 

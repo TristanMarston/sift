@@ -41,6 +41,7 @@ export type Result = {
         currency: 'USD';
         shipping_cents: number | null;
         free_shipping: boolean | null;
+        fee_cents: number; // the marketplace's buyer fee at checkout; Depop's is its stated maximum ("up to")
         total_cents: number;
         original_price_cents: number | null; // the seller's own markdown
         retail_price_cents: number | null; // new retail: show "vs retail" only when known

@@ -71,6 +71,7 @@ def test_rejects_seller_identity(bad):
     dict(cost=dict(price_cents=4800, total_cents=4800, currency="EUR")),
     dict(cost=dict(price_cents=-1, total_cents=-1)),
     dict(cost=dict(price_cents=4800, shipping_cents=500, total_cents=4800)),
+    dict(cost=dict(price_cents=4800, fee_cents=340, total_cents=4800)),
 ])
 def test_rejects_invalid_rows(bad):
     with pytest.raises(ValidationError):
@@ -83,6 +84,8 @@ def test_normalized_carries_specifics_but_listing_does_not():
         Listing(**row(specifics={"Material": "Cotton"}))
 
 
-def test_total_is_price_plus_known_shipping():
+def test_total_is_price_plus_known_shipping_plus_buyer_fee():
     ok = Listing(**row(cost=dict(price_cents=4800, shipping_cents=500, total_cents=5300)))
-    assert ok.cost.total_cents == 5300
+    assert (ok.cost.total_cents, ok.cost.fee_cents) == (5300, 0)
+    ok = Listing(**row(cost=dict(price_cents=4800, shipping_cents=500, fee_cents=340, total_cents=5640)))
+    assert ok.cost.fee_cents == 340

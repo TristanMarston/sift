@@ -130,6 +130,7 @@ Any non-2xx response has the body `{"error": {"code": "...", "message": "..."}}`
   "cost": {
     "price_cents": 4800, "currency": "USD",
     "shipping_cents": null, "free_shipping": null,
+    "fee_cents": 0,
     "total_cents": 4800,
     "original_price_cents": 6000,
     "retail_price_cents": null
@@ -189,7 +190,10 @@ Any non-2xx response has the body `{"error": {"code": "...", "message": "..."}}`
   `synthetic_share`, `seller.*`, `subcategory`, `size`, `color`, `brand`, and `thumb_url`.
 - `id` = `"<marketplace>:<external_id>"`. It is stable across responses, so use it as the React key
   and as the animation key for the reshuffle.
-- `cost.total_cents` = price + shipping when shipping is known, otherwise price. Price sorting and CPW both use it.
+- `cost.total_cents` = price + shipping when shipping is known (otherwise price) + `fee_cents`. Price sorting and CPW
+  both use it. `fee_cents` is what the marketplace charges the buyer at checkout: Mercari's Buyer Protection fee
+  (Mercari's own figure, 3.6% of item + buyer-paid shipping) and Depop's Marketplace fee at its stated maximum
+  ("up to 5% + $1" of the item price: show it as "up to"). eBay US, Grailed and Poshmark charge buyers nothing, so 0.
 - `cost.original_price_cents` is the seller's own markdown. `retail_price_cents` is the new
   retail price. Show "vs retail" only when it is non-null.
 - `wear.cpw_cents.at_N` = `round(total_cents / N)`. `at_mid` uses `expected_wears.mid`.
