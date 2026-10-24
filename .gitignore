@@ -1,4 +1,5 @@
 docker-compose.yml
 Dockerfile
 .env
-.DS_Store
+.DS_Store__pycache__/
+.venv/

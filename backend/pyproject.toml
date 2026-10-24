@@ -4,7 +4,12 @@ version = "0.1.0"
 description = "Sift backend: pipeline, ranking, API"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "numpy>=2.5.4",
+    "open-clip-torch>=3.3.0",
+    "pillow>=13.0.0",
+    "torch>=2.14.1",
+]
 
 [project.scripts]
 backend = "backend:main"
@@ -12,3 +17,8 @@ backend = "backend:main"
 [build-system]
 requires = ["uv_build>=0.13.5,<0.14.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
