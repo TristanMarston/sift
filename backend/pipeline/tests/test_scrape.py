@@ -264,6 +264,26 @@ def test_max_spend_stops_before_the_worst_case_would_exceed_it(tmp_path):
     assert len(client.calls) == 2  # after two runs 0.20 is spent; a third could reach 0.33
 
 
+def test_a_lane_can_leave_the_run_report_to_its_batch(tmp_path):
+    S.run_plan(FakeClient(), [t()], None, tmp_path, write_report=False)
+    assert (tmp_path / "runs.jsonl").exists() and not (tmp_path / "run_report.md").exists()
+
+
+def test_clean_rows_are_what_reaches_disk_free_rows_skipped_and_seller_identity_scrubbed():
+    rows = [{"type": "search"}, {"type": "listing", "listingId": "m1", "sellerUsername": "bob",
+                                 "seller": {"id": 1, "ratingAverage": 5}}]
+    assert list(S.clean_rows("mercari", rows)) == [{"type": "listing", "listingId": "m1", "seller": {"ratingAverage": 5}}]
+    assert list(S.clean_rows("depop", [{"id": 1, "slug": "bob-tee", "location": "Austin"}])) == [{"id": 1}]
+
+
+def test_quota_rows_count_rows_of_good_runs_only():
+    past = [dict(marketplace="depop", status="SUCCEEDED", items=5),
+            dict(marketplace="depop", status="SUCCEEDED", items=7, verdict="blocked"),
+            dict(marketplace="ebay", status="FAILED", items=0),
+            dict(marketplace="ebay", status="SUCCEEDED", items=3, verdict="short")]
+    assert S.quota_rows(past) == {"depop": 5, "ebay": 3}
+
+
 # --- the real queries.yaml -----------------------------------------------------------------
 
 @pytest.fixture(scope="module")

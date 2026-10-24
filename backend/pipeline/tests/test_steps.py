@@ -5,6 +5,7 @@ from datetime import datetime
 import pytest
 
 import extract as X
+import jsonl
 import report as R
 from helpers import row
 from listing import Listing, Normalized
@@ -97,6 +98,15 @@ def test_output_is_sorted_and_reruns_are_identical(tmp_path):
 
 
 # --- 03 extract driver ----------------------------------------------------------------------
+
+def test_normalize_runs_judges_only_the_given_runs_and_writes_nothing(tmp_path):
+    write_run(tmp_path, "r1", [{"id": "a", "price": 100}])
+    write_run(tmp_path, "r2", [{"id": "b", "price": 100}, {"id": "c"}])
+    runs = [r for r in jsonl.load(tmp_path / "runs.jsonl") if r["run_id"] == "r2"]
+    rows, stats = N.normalize_runs(tmp_path, runs, {"depop": mapper})
+    assert list(rows) == ["depop:b"] and stats["drop:depop:no_price"] == 1
+    assert not (tmp_path / "normalized.jsonl").exists()
+
 
 def test_extract_file_writes_listings_and_counts_bad_lines(tmp_path):
     good = Normalized(**row(description="100% cotton", specifics={"Material": "Cotton"}))

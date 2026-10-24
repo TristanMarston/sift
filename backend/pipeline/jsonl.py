@@ -2,7 +2,10 @@
 breaks (real Mercari descriptions do), so lines are read on "\\n" only and written ASCII-escaped: no consumer of our
 files, whatever it uses to split lines, can cut a record in half."""
 import json
+import threading
 from pathlib import Path
+
+_APPEND = threading.Lock()  # scrape lanes run in threads; append mode is not atomic across threads on Windows
 
 
 def dumps(obj) -> str:
@@ -18,3 +21,12 @@ def read(path) -> list[str]:
 
 def load(path) -> list[dict]:
     return [json.loads(line) for line in read(path)]
+
+
+def append(path, obj) -> None:
+    """Add one record as one line, creating the folder if needed. Safe to call from several threads."""
+    path = Path(path)
+    with _APPEND:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8", newline="\n") as f:
+            f.write(dumps(obj) + "\n")
