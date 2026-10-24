@@ -37,6 +37,7 @@ def map_item(raw: dict, category: str, scraped_at) -> Normalized:
         image_urls=require(clean_images(raw.get("images")), "no_image"),
         cost=make_cost(raw.get("priceValue"), raw.get("currency"), shipping=raw.get("shippingCost"),
                        free_shipping=True if raw.get("shippingType") == "free" else None),
-        seller=dict(type=_seller_type(raw), rating=round(positive / 20, 2) if positive is not None else None,
+        # 0% positive means no feedback in the last 12 months (eBay's window), not a bad seller
+        seller=dict(type=_seller_type(raw), rating=round(positive / 20, 2) if positive else None,
                     region=normalize_region(raw.get("itemLocation"))),
         specifics=spec)

@@ -9,10 +9,9 @@ from pathlib import Path
 from pydantic import ValidationError
 
 import jsonl
+from health import BAD
 from listing import Normalized
 from normalize.common import Drop, clean_text
-
-BAD_VERDICTS = {"empty", "blocked", "degraded", "failed"}  # health.py: rows of these runs are quarantined
 
 
 def normalize_all(data_dir, mappers) -> Counter:
@@ -22,7 +21,7 @@ def normalize_all(data_dir, mappers) -> Counter:
     stats, best = Counter(), {}
     for run in runs:
         raw_path = data_dir / "raw" / run["marketplace"] / f"{run['run_id']}.jsonl"
-        if run["status"] != "SUCCEEDED" or run.get("verdict", "ok") in BAD_VERDICTS or not raw_path.exists():
+        if run["status"] != "SUCCEEDED" or run.get("verdict", "ok") in BAD or not raw_path.exists():  # bad runs: quarantined
             continue
         mp, scraped_at = run["marketplace"], datetime.fromisoformat(run["at"])
         for line in jsonl.read(raw_path):

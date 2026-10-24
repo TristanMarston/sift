@@ -60,6 +60,8 @@ def test_a_hat_is_dropped_not_filed_under_the_query_category(mp, label):
     ("depop", dict(price={"amount": 20, "currency": "GBP"}), "non_usd"),
     ("depop", dict(pictureUrls=[]), "no_image"),
     ("depop", dict(url=None), "no_url"),
+    ("depop", dict(sizes=["6 years"], size="6 years"), "kids"),      # Depop has no kids label; its kids sizes say so
+    ("depop", dict(sizes=["12-18 months"], size="12-18 months"), "kids"),
     ("poshmark", dict(price=None), "no_price"),
     ("poshmark", dict(currency="CAD"), "non_usd"),
     ("poshmark", dict(images=[], main_image=None), "no_image"),
@@ -145,6 +147,15 @@ def test_grailed_style_tags_are_passed_on_for_the_vintage_flag():
     assert mapped("grailed", 0, styles=[]).specifics == {}
 
 
+def test_grailed_brand_comes_from_the_designer_list_without_the_vintage_tag():
+    tnf, vintage, supreme = {"id": 1106, "name": "The North Face"}, {"id": 160, "name": "Vintage"}, {"id": 6, "name": "Supreme"}
+    tagged = mapped("grailed", 0, designer="The North Face × Vintage", designers=[tnf, vintage], styles=[])
+    assert tagged.brand == "The North Face" and tagged.specifics == {"Vintage": "Yes"}
+    assert mapped("grailed", 0, designer="Supreme × The North Face", designers=[supreme, tnf]).brand == "Supreme × The North Face"
+    assert mapped("grailed", 0, designers=None).brand == "The North Face"   # falls back to `designer`
+    assert mapped("grailed", 0, designers=[vintage]).brand is None
+
+
 def test_grailed_without_us_shipping_has_unknown_shipping():
     n = mapped("grailed", 0, shipping={"us": {"amount": 20, "enabled": False}})
     assert n.cost.shipping_cents is None and n.cost.total_cents == 8500
@@ -172,6 +183,11 @@ def test_ebay_seller_type_and_rating_scale():
     assert (private.type, private.rating) == ("individual", 5.0)
     assert (big.type, big.rating) == ("large_reseller", pytest.approx(4.99, abs=0.02))
     assert mapped("ebay", 3, sellerFeedbackScore=40).seller.type == "small_shop"
+
+
+@pytest.mark.parametrize("score, percentage", [(0, 0), (37, 0)])
+def test_ebay_zero_percent_positive_means_no_recent_feedback_not_a_bad_seller(score, percentage):
+    assert mapped("ebay", 2, sellerFeedbackScore=score, sellerFeedbackPercentage=percentage).seller.rating is None
 
 
 def test_ebay_condition_uses_only_the_label_before_the_seller_prose_and_html_entities_are_decoded():

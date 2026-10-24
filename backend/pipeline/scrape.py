@@ -127,12 +127,12 @@ def load_config(path) -> Config:
     return Config(raw["quotas"], queries)
 
 
-def build_plan(queries, only=None) -> list[Task]:
+def build_plan(queries) -> list[Task]:
     """Breadth first (query 1 of every category and marketplace, then query 2, ...), so stopping early
     still leaves every category and marketplace covered. Put the most valuable queries first."""
     depth = max(len(qs) for by_mp in queries.values() for qs in by_mp.values())
     return [Task(mp, cat, *by_mp[mp][i]) for i in range(depth) for cat, by_mp in queries.items()
-            for mp in by_mp if (only is None or mp in only) and i < len(by_mp[mp])]
+            for mp in by_mp if i < len(by_mp[mp])]
 
 
 def smoke_plan(queries) -> list[Task]:

@@ -115,6 +115,15 @@ def test_the_leaf_of_a_category_path_wins_over_its_parents(label, expected):
     assert C.category_from_label(label) == expected
 
 
+@pytest.mark.parametrize("label, expected", [
+    ("Denim Shorts", None), ("Jean Shorts", None), ("Women > Shorts > Denim", None), ("Men > Shorts > Cargo shorts", None),
+    ("Bottoms shorts denim-shorts", None),
+    ("tops.short_sleeve_shirts", "shirts"),                     # "short" sleeves are not shorts
+])
+def test_shorts_are_never_filed_as_jeans_or_pants(label, expected):
+    assert C.category_from_label(label) == expected
+
+
 def test_resolve_category_prefers_the_label_and_never_lets_a_hat_inherit_the_query_category():
     assert C.resolve_category("Jackets & Coats", "tshirts") == "jackets_outerwear"
     assert C.resolve_category("", "tshirts") == "tshirts" and C.resolve_category(None, "sneakers") == "sneakers"

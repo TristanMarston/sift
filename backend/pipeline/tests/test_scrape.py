@@ -68,10 +68,6 @@ def test_plan_is_breadth_first_over_queries_categories_and_marketplaces():
     assert order == ["a1", "b1", "c1", "d1", "a2", "b2", "c2"]
 
 
-def test_plan_can_be_limited_to_some_marketplaces():
-    assert {x.marketplace for x in S.build_plan(QUERIES, only=["ebay"])} == {"ebay"}
-
-
 def test_smoke_plan_is_one_20_item_query_per_marketplace():
     assert S.smoke_plan(QUERIES) == [Task("depop", "tshirts", "a1", 20), Task("ebay", "tshirts", "b1", 20)]
 
