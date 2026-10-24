@@ -53,6 +53,16 @@ def test_wear_facts_show_the_baseline_and_condition_assumptions():
     assert facts[1]["snippet"] == "Good - used"
 
 
+def test_wear_facts_cite_the_category_source_and_drop_the_assumption_label():
+    base = {"as_of": "2026-10-23", "source": "PEFCR", "source_url": "https://pefcr.pdf",
+            "categories": {"jackets_outerwear": JACKET,
+                           "sneakers": {"low": 67, "high": 167, "source": "PEFCR, expert judgement"}}}
+    jacket = W.wear_facts("jackets_outerwear", base, None, None)[0]
+    assert jacket["value"] == "80–160 wears for jackets & outerwear"
+    assert jacket["snippet"] == "PEFCR" and jacket["source_url"] == "https://pefcr.pdf"
+    assert W.wear_facts("sneakers", base, None, None)[0]["snippet"] == "PEFCR, expert judgement"
+
+
 def test_unknown_condition_is_said_out_loud():
     base = {"as_of": "2026-10-23", "source": "s", "categories": {"tshirts": {"low": 30, "high": 60}}}
     assert W.wear_facts("tshirts", base, None, None)[1]["value"] == "Condition not stated: assume about 85% of its life left"

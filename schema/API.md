@@ -169,9 +169,9 @@ Any non-2xx response has the body `{"error": {"code": "...", "message": "..."}}`
     "cpw_cents": {"at_30": 160, "at_60": 80, "at_100": 48, "at_mid": 30},
     "break_even_wears": 72,
     "facts": [
-      {"kind": "baseline", "label": "Typical lifespan", "value": "80–160 wears for jackets & outerwear (assumption)",
-       "status": "inferred", "source": "baseline", "source_url": null,
-       "snippet": "Sift team assumption (draft)", "as_of": "2026-10-23"},
+      {"kind": "baseline", "label": "Typical lifespan", "value": "67–167 wears for jackets & outerwear",
+       "status": "inferred", "source": "baseline", "source_url": "https://www.carbonfact.com/hubfs/A&FW_PEFCR_v3.1.pdf",
+       "snippet": "EU PEFCR Apparel & Footwear v3.1 (2025), Table 6 default uses, ...", "as_of": "2026-10-23"},
       {"kind": "condition", "label": "Condition", "value": "Good: about 80% of its life left (assumption)",
        "status": "inferred", "source": "baseline", "source_url": null, "snippet": "Good - used", "as_of": "2026-10-23"}
     ]
