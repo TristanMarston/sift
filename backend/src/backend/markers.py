@@ -139,8 +139,9 @@ def eco(row: dict, brands: dict) -> dict:
             facts.append(_fact(attr, label, f"{label} {', '.join(hit)}", as_of=as_of))
             points += 1
     b = brands.get(brand_key(row.get("brand"))) or {}
-    certs = [(c, None, as_of) for c in m["certifications"]] + \
-            [(c["name"], c["url"], b.get("as_of", "")) for c in b.get("certifications", [])]
+    certs = [(c, None, as_of) for c in m["certifications"]]
+    certs += [(c["name"], c["url"], b.get("as_of", "")) for c in b.get("certifications", [])
+              if c["name"] not in m["certifications"]]  # stated by both: one fact, the listing's
     for c, url, when in certs:
         facts.append(_fact("certification", "Certification", CERT_LABEL.get(c, c),
                            source="brand_table" if url else "listing_text", source_url=url, as_of=when))
