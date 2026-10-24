@@ -28,8 +28,10 @@ class Index:
         return len(self.rows)
 
     def search(self, query: np.ndarray, k: int = 50, min_sim: float = 0.0, category=None, max_price_cents=None,
-               marketplaces=None, sizes=None, conditions=None) -> list[tuple[dict, float]]:
-        """Up to k (row, cosine) pairs above min_sim that pass every filter, most similar first."""
+               marketplaces=None, sizes=None, conditions=None, dedupe: float | None = None) -> list[tuple[dict, float]]:
+        """Up to k (row, cosine) pairs above min_sim that pass every filter, most similar first. With `dedupe`, listings
+        whose photos are at least that similar to each other are one item (cross-posted or relisted): the cheapest
+        copy is kept, and duplicates don't use up result slots."""
         if not self.rows:
             return []
         sims = self.vecs @ np.asarray(query, np.float32)
@@ -45,5 +47,15 @@ class Index:
         if conditions:
             keep &= np.isin(self._condition, conditions)
         hits = np.flatnonzero(keep)
-        hits = hits[np.argsort(-sims[hits], kind="stable")][:k]
+        hits = hits[np.argsort(-sims[hits], kind="stable")]
+        if dedupe is None:
+            hits = hits[:k]
+        else:
+            pool = hits[:3 * k]                       # enough room for the copies we drop
+            kept = []
+            for i in pool[np.argsort(self._total[pool], kind="stable")]:   # cheapest copy first
+                if not kept or float(np.max(self.vecs[kept] @ self.vecs[i])) < dedupe:
+                    kept.append(i)
+            hits = np.array(kept, dtype=int)
+            hits = hits[np.argsort(-sims[hits], kind="stable")][:k]
         return [(self.rows[i], float(sims[i])) for i in hits]
