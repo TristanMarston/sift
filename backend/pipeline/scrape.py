@@ -16,7 +16,6 @@ OK = "SUCCEEDED"
 MAX_FAILS_IN_A_ROW = 3
 CAP_MARGIN, CAP_FLOOR = Decimal("1.25"), Decimal("0.05")
 RUN_TIMEOUT = timedelta(minutes=30)  # Apify ends a hung run as TIMED-OUT
-MERCARI_PROXY = {"useApifyProxy": True, "apifyProxyGroups": ["RESIDENTIAL"], "apifyProxyCountry": "US"}
 
 
 @dataclass(frozen=True)
@@ -47,8 +46,6 @@ ACTORS = {
                                     "maxResultsPerScrape": n, "usePagination": True, "scrapeProductDetails": True}),
     "grailed": Actor("piotrv1001/grailed-listings-scraper", Decimal("0.012"), Decimal("0.00005"),
                      lambda q, n: {"searchQuery": q, "maxItems": n, "scrapeDetails": True}),
-    "mercari": Actor("getascraper/mercari-us-scraper", Decimal("0.003"), Decimal("0.04"),
-                     lambda q, n: {"keyword": q, "limit": n, "status": ["on_sale"], "proxyConfiguration": MERCARI_PROXY}),
     "ebay": Actor("memo23/ebay-search-scraper-ppe", Decimal("0.005"), Decimal("0.02"),
                   lambda q, n: {"searchQueries": [q], "maxItems": n, "marketplace": "ebay.com", "mode": "active",
                                 "condition": "used", "detailedItems": True, "includeDescription": True,

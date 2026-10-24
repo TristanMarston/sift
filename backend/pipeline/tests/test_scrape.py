@@ -81,9 +81,6 @@ def test_estimate_simulates_the_quota_stop_and_sums_best_case_cost_and_worst_cas
     ("grailed", {"searchQuery": "carhartt jacket", "maxItems": 50, "scrapeDetails": True}),
     ("poshmark", {"categoryUrls": ["https://poshmark.com/search?query=carhartt+jacket&type=listings&src=dir"],
                   "maxResultsPerScrape": 50, "usePagination": True, "scrapeProductDetails": True}),
-    ("mercari", {"keyword": "carhartt jacket", "limit": 50, "status": ["on_sale"],
-                 "proxyConfiguration": {"useApifyProxy": True, "apifyProxyGroups": ["RESIDENTIAL"],
-                                        "apifyProxyCountry": "US"}}),
     ("ebay", {"searchQueries": ["carhartt jacket"], "maxItems": 50, "marketplace": "ebay.com", "mode": "active",
               "condition": "used", "detailedItems": True, "includeDescription": True, "includeSummary": False}),
 ])
@@ -244,9 +241,21 @@ def test_queries_cover_exactly_the_api_categories_and_marketplaces(cfg):
     from typing import get_args
     import listing
     assert set(cfg.queries) == set(get_args(listing.Category))
-    assert set(cfg.quotas) == set(get_args(listing.Marketplace)) == set(S.ACTORS)
+    assert set(cfg.quotas) == set(S.ACTORS) <= set(get_args(listing.Marketplace))
     for by_mp in cfg.queries.values():
         assert set(by_mp) == set(S.ACTORS)
+
+
+def test_mercari_is_not_collected_but_stays_in_the_api_enum():
+    """It failed the go/no-go (no description, one image). The enum belongs to the API schema, so it stays there."""
+    from typing import get_args
+    import listing
+    assert "mercari" not in S.ACTORS and "mercari" in get_args(listing.Marketplace)
+
+
+def test_no_marketplace_is_more_than_half_of_the_planned_rows(cfg):
+    assert max(cfg.quotas.values()) <= 0.5 * sum(cfg.quotas.values())
+    assert len(cfg.quotas) >= 4
 
 
 def test_every_query_is_capped_at_500_and_unique_per_marketplace(cfg):
@@ -267,7 +276,7 @@ def test_pool_can_reach_the_50k_stage(cfg):
 def test_demo_props_and_conference_tees_are_queried(cfg):
     def has(cat, mp, text):
         return any(text in q for q, _ in cfg.queries[cat][mp])
-    for mp in ("depop", "poshmark", "grailed", "mercari", "ebay"):
+    for mp in S.ACTORS:
         assert has("jackets_outerwear", mp, "carhartt detroit"), mp
         assert has("jackets_outerwear", mp, "better sweater"), mp
         assert has("sneakers", mp, "dunk low"), mp
