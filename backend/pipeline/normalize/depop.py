@@ -11,7 +11,7 @@ def _title(raw: dict) -> str | None:
     The seller's real title is the first line of the description without its hashtags (at most 120 characters)."""
     for line in (raw.get("description") or "").split("\n"):
         line = " ".join(re.sub(r"#\S*", " ", line).split())
-        if line:
+        if re.search(r"[^\W_]", line):   # a letter or digit: a line of only emoji ("✨✨✨") is not a title
             return line if len(line) <= 120 else line[:121].rsplit(" ", 1)[0][:120]
     return raw.get("title")
 

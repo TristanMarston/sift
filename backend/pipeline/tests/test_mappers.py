@@ -110,7 +110,11 @@ def test_depop_title_is_the_first_line_of_the_description_because_its_own_title_
            "Carhartt Detroit Jacket in brown"
 
 
-@pytest.mark.parametrize("description", [None, "", "#vintage #y2k #carhartt"])
+def test_depop_title_skips_a_first_line_of_only_emoji():
+    assert mapped("depop", 0, description="✨✨✨\nCarhartt Detroit Jacket #workwear").title == "Carhartt Detroit Jacket"
+
+
+@pytest.mark.parametrize("description", [None, "", "#vintage #y2k #carhartt", "✨ 🔥"])
 def test_depop_title_falls_back_to_the_actors_title(description):
     assert mapped("depop", 0, description=description).title == "The North Face White Fuzzy"
 
