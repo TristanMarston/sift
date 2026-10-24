@@ -27,6 +27,7 @@ DURABLE = {
     "hoodies_sweatshirts": ({"cotton"}, 80),
     "shirts": ({"cotton", "linen", "hemp", "wool"}, 95),
     "sneakers": ({"leather"}, 0),
+    "dresses_skirts": ({"wool", "linen", "silk"}, 80),   # cotton left out: the default fabric of cheap dresses
 }
 FLAGS = [("is_vintage", "vintage", "Vintage", "Already had a first life"),
          ("is_deadstock", "deadstock", "Deadstock", "Old unsold stock, never worn"),
