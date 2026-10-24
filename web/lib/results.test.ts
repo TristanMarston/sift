@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { bigNumber, categoryLabel, cropRect, dots, headline, marketLine, ordered, perWearText, sampleCategory, sliderOrder } from './results.ts';
+import { bigNumber, categoryLabel, cropRect, dots, headline, marketLine, ordered, perWearText, sampleCategory, sliderOrder, typicalText } from './results.ts';
 
 const r = (id: string, extra: Record<string, unknown> = {}) =>
     ({
@@ -102,4 +102,10 @@ test('sliderOrder picks the backend list for the slider position, clamped to its
     assert.deepEqual(sliderOrder(x as never, 10).map((y) => y.id), ['b', 'c', 'a']);
     assert.deepEqual(sliderOrder(x as never, 14).map((y) => y.id), ['b', 'c', 'a']);
     assert.deepEqual(sliderOrder(x as never, -3).map((y) => y.id), ['c', 'a', 'b']);
+});
+
+test('typicalText explains the middle price and wears, with or without a count', () => {
+    const typical = { price_cents: 13299, expected_wears_mid: 120, cpw_cents: 111 };
+    assert.equal(typicalText(typical, 50), 'Half of these 50 look-alikes cost less than $132.99 and half cost more. Spread over a typical 120 wears, that comes to $1.11 a wear.');
+    assert.equal(typicalText(typical), 'Half of these look-alikes cost less than $132.99 and half cost more. Spread over a typical 120 wears, that comes to $1.11 a wear.');
 });

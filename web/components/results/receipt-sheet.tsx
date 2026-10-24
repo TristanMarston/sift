@@ -1,34 +1,46 @@
 'use client';
 
-import { ExternalLink, X } from 'lucide-react';
-import { motion, useDragControls, type PanInfo } from 'motion/react';
-import { useEffect, useRef } from 'react';
+import { ChevronDown, ExternalLink, X } from 'lucide-react';
+import { AnimatePresence, motion, useDragControls, type PanInfo } from 'motion/react';
+import { useEffect, useRef, useState } from 'react';
 import { EstTag } from '@/components/sift/status-badge';
 import { Button } from '@/components/ui/button';
+import { ecoParts, wearReasons } from '@/lib/explain';
 import { ease, spring } from '@/lib/motion';
-import { levelText, MARKET, marketLine, perWearText, priceText } from '@/lib/results';
+import { levelText, MARKET, marketLine, perWearText, priceText, typicalText } from '@/lib/results';
 import type { Fact, Level, Result, SearchResponse } from '@/lib/search';
 import { useMedia } from '@/lib/use-media';
 import { breakEvenVerdict } from '@/lib/wear';
 import { cn } from '@/lib/utils';
-import { FactLine, LevelDots, noEvidence } from './evidence';
+import { FactRow, LevelDots, noEvidence, sentence } from './evidence';
 import { ListingPhoto } from './result-row';
+
+const QUALITY: Record<Level, string> = {
+    high: 'Several signs it’s built to last.',
+    medium: 'Some signs it’s built to last.',
+    low: 'Signs it may wear out sooner than most.',
+    unknown: 'Not enough evidence yet. It stays in the list, with no boost.',
+};
 
 const CONFIDENCE: Record<Level, string> = {
     high: 'Several firm facts stand behind this estimate.',
     medium: 'Some firm evidence stands behind this estimate.',
     low: 'Only likely facts stand behind this estimate.',
-    unknown: 'No evidence yet: the estimate is the typical lifespan for the category.',
+    unknown: 'No evidence yet, so the estimate is the typical lifespan for the category.',
 };
 
-type Props = { r: Result; typical: SearchResponse['typical']; onClose: () => void };
+// What each eco part says when the listing gives nothing for it.
+const EMPTY: Record<string, string> = { fibers: 'Not stated', durability: 'Typical for the category', shipping: 'Not stated', circularity: 'Nothing extra stated' };
+
+type Props = { r: Result; typical: SearchResponse['typical']; count?: number; onClose: () => void };
 
 /**
- * The Wear Receipt: everything behind one result, line by line, on receipt paper. The link to buy sits right under
- * the item. Every line opens to its source, status and date; anything we don't know says unknown. Phone: a sheet from the bottom (drag the handle down to
- * close). Desktop: a panel from the right. The photo grows out of the row it came from.
+ * Everything behind one result's cost per wear, in plain cards: the math first (price ÷ expected wears, and how the
+ * wears were reached), then quality, eco and a typical look-alike. Each card shows a summary; its evidence and
+ * sources open with a button. The link to buy sits right under the item. Phone: a sheet from the bottom (drag the
+ * handle down to close). Desktop: a panel from the right. The photo grows out of the row it came from.
  */
-export function ReceiptSheet({ r, typical, onClose }: Props) {
+export function ReceiptSheet({ r, typical, count, onClose }: Props) {
     const wide = useMedia('(min-width: 1024px)');
     const drag = useDragControls();
     const panel = useRef<HTMLDivElement>(null);
@@ -48,6 +60,7 @@ export function ReceiptSheet({ r, typical, onClose }: Props) {
     const off = wide ? { x: '100%' } : { y: '100%' };
     const w = r.wear;
     const c = r.cost;
+    const cpw = perWearText(w.cpw_cents.at_mid);
 
     return (
         <>
@@ -56,7 +69,7 @@ export function ReceiptSheet({ r, typical, onClose }: Props) {
                 ref={panel}
                 role='dialog'
                 aria-modal='true'
-                aria-label={`Wear Receipt: ${r.title}`}
+                aria-label={`Why ${r.title} is ${cpw} a wear`}
                 tabIndex={-1}
                 className={cn(
                     'fixed z-40 flex flex-col bg-background text-foreground shadow-float outline-none',
@@ -76,157 +89,242 @@ export function ReceiptSheet({ r, typical, onClose }: Props) {
                 {/* Handle (phone) and close */}
                 <div className='relative flex h-11 shrink-0 items-center justify-center' onPointerDown={(e) => !wide && drag.start(e)} style={{ touchAction: 'none' }}>
                     {!wide && <span className='h-1.5 w-10 rounded-pill bg-muted-foreground/30' />}
-                    <Button variant='ghost' size='icon-sm' aria-label='Close receipt' onClick={onClose} className='absolute top-1.5 right-2'>
+                    <Button variant='ghost' size='icon-sm' aria-label='Close' onClick={onClose} className='absolute top-1.5 right-2'>
                         <X strokeWidth={1.75} />
                     </Button>
                 </div>
 
-                <div className='min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]'>
-                    {/* The item */}
+                <div className='flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]'>
+                    {/* The item, and the way to buy it */}
                     <div className='flex gap-4'>
-                        <ListingPhoto r={r} className='w-[120px]' />
+                        <ListingPhoto r={r} className='w-[104px]' />
                         <div className='flex min-w-0 flex-1 flex-col gap-1'>
                             <h2 className='line-clamp-3 type-headline text-pretty'>{r.title}</h2>
                             <p className='type-footnote text-muted-foreground'>{marketLine(r)}</p>
                             <p className='type-footnote text-muted-foreground'>
-                                {Math.round(r.match.similarity * 100)}% look match{r.match.band === 'exact' ? ' · Exact match' : r.match.band === 'close' ? ' · Close match' : ''}
-                            </p>
-                            <p className='mt-auto flex items-baseline gap-1.5'>
-                                <span className='font-serif text-[34px] leading-9 tracking-tight tabular'>{perWearText(w.cpw_cents.at_mid)}</span>
-                                <span className='type-callout text-muted-foreground'>a wear</span>
-                                <EstTag className='self-center' />
+                                {Math.round(r.match.similarity * 100)}% look match{r.match.band === 'exact' ? ', exact match' : r.match.band === 'close' ? ', close match' : ''}
                             </p>
                         </div>
                     </div>
-
-                    <Button size='lg' className='mt-4 w-full' render={<a href={r.url} target='_blank' rel='noreferrer' />} nativeButton={false}>
+                    <Button size='lg' className='w-full' render={<a href={r.url} target='_blank' rel='noreferrer' />} nativeButton={false}>
                         View on {MARKET[r.marketplace]}
                         <ExternalLink data-icon='inline-end' strokeWidth={1.75} />
                     </Button>
 
-                    {/* The receipt */}
-                    <div className='mt-5 bg-receipt-paper px-4 pt-4 pb-7 text-receipt-ink receipt-edge-bottom'>
-                        <h3 className='font-serif text-xl leading-7'>Wear Receipt</h3>
-                        <p className='type-footnote text-pretty text-muted-foreground'>How it works out to {perWearText(w.cpw_cents.at_mid)} a wear. Tap a line for its source.</p>
+                    {/* The math: price ÷ expected wears, then how the wears were reached */}
+                    <Card>
+                        <h3 className='flex items-center gap-2 type-title-2'>
+                            Why it’s {cpw} a wear <EstTag />
+                        </h3>
+                        <div className='mt-4 grid grid-cols-[1fr_auto_1fr_auto_1fr] items-start gap-x-2 text-center'>
+                            <Term value={priceText(c.total_cents)} label='Price with shipping and fees' />
+                            <Op>÷</Op>
+                            <Term value={String(w.expected_wears.mid)} label='Wears it should last' />
+                            <Op>=</Op>
+                            <Term value={cpw} label='Cost per wear' strong />
+                        </div>
 
-                        <Section title='Cost' value={priceText(c.total_cents)}>
-                            <Lines
-                                lines={[
-                                    c.original_price_cents && c.original_price_cents > c.price_cents ? `Seller marked it down from ${priceText(c.original_price_cents)}` : null,
-                                    c.free_shipping ? 'Free shipping' : c.shipping_cents !== null ? `Includes ${priceText(c.shipping_cents)} shipping` : 'Shipping unknown',
-                                    c.fee_cents ? `Includes ${r.marketplace === 'depop' ? 'up to ' : ''}${priceText(c.fee_cents)} ${MARKET[r.marketplace]} buyer fee` : null,
-                                    c.retail_price_cents ? `New retail ${priceText(c.retail_price_cents)}` : null,
-                                ]}
-                            />
-                        </Section>
-
-                        <Section title='Quality' value={<LevelValue level={r.quality.level} />}>
-                            {noEvidence(r) ? <Lines lines={['Not enough evidence yet. It stays in the list, with no boost.']} /> : <Facts facts={r.quality.facts} />}
-                        </Section>
-
-                        <Section title='Eco' value={<LevelValue level={r.eco.level} />}>
-                            <Lines lines={[`Greener than ${r.eco.percentile}% of these matches`]} />
-                            {r.eco.facts.length ? <Facts facts={r.eco.facts} /> : <Lines lines={['No eco facts stated.']} />}
-                        </Section>
-
-                        <Section title='Expected wears' value={`${w.expected_wears.low}–${w.expected_wears.high}`} estimate>
-                            <Lines lines={[w.basis === 'category_baseline' ? 'No quality evidence, so this is the typical lifespan for the category.' : `About ${w.expected_wears.mid} in the middle of the range.`]} />
-                            <Facts facts={w.facts} />
-                        </Section>
-
-                        <Section title='Cost per wear' estimate>
-                            <div className='mt-2 grid grid-cols-4 gap-1 text-center'>
-                                {(
-                                    [
-                                        ['30 wears', w.cpw_cents.at_30],
-                                        ['60 wears', w.cpw_cents.at_60],
-                                        ['100 wears', w.cpw_cents.at_100],
-                                        [`${w.expected_wears.mid} expected`, w.cpw_cents.at_mid],
-                                    ] as const
-                                ).map(([label, cents], i) => (
-                                    <div key={label} className={cn('rounded-md px-0.5 py-2', i === 3 && 'bg-receipt-ink/[0.07]')}>
-                                        <p className='font-mono text-[15px] leading-5 font-medium tabular'>{perWearText(cents)}</p>
-                                        <p className='mt-0.5 type-footnote text-muted-foreground'>{label}</p>
-                                    </div>
+                        <div className='mt-5 rounded-image bg-secondary p-3'>
+                            <p className='type-callout font-semibold'>How we got {w.expected_wears.mid} wears</p>
+                            <ul className='mt-2 flex flex-col gap-2'>
+                                {wearReasons(r).map((s) => (
+                                    <li key={s.label} className='type-footnote text-pretty'>
+                                        <span className='text-muted-foreground'>{s.label}: </span>
+                                        {sentence(s.value)}
+                                    </li>
                                 ))}
-                            </div>
-                        </Section>
+                            </ul>
+                            <p className='mt-2 type-footnote text-pretty text-muted-foreground'>
+                                So about {w.expected_wears.mid}, somewhere between {w.expected_wears.low} and {w.expected_wears.high}.
+                            </p>
+                        </div>
 
-                        {typical && (
-                            <Section title='Against the typical match'>
-                                <Lines lines={[`The typical match costs ${priceText(typical.price_cents)}, about ${perWearText(typical.cpw_cents)} a wear.`]} />
-                                {{
-                                    cheaper: <Verdict head='It costs less than the typical match up front.' />,
-                                    wins: <Verdict head={`Break-even: wear this ${w.break_even_wears}+ times to win.`} note="If you won't wear it that often, the cheaper one is the better buy." />,
-                                    never: (
-                                        <Verdict
-                                            head='Unlikely to beat the typical match on cost per wear.'
-                                            note={`It would take ${w.break_even_wears}+ wears, more than the ${w.expected_wears.high} it's expected to last.`}
-                                        />
-                                    ),
-                                }[breakEvenVerdict(w.break_even_wears, w.expected_wears.high)]}
-                            </Section>
+                        <p className='mt-5 type-callout font-semibold'>If you wear it</p>
+                        <div className='mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4'>
+                            {(
+                                [
+                                    ['30 times', w.cpw_cents.at_30],
+                                    ['60 times', w.cpw_cents.at_60],
+                                    ['100 times', w.cpw_cents.at_100],
+                                    [`${w.expected_wears.mid} times (expected)`, w.cpw_cents.at_mid],
+                                ] as const
+                            ).map(([label, cents], i) => (
+                                <div key={label} className={cn('rounded-image px-3 py-2', i === 3 ? 'bg-primary text-primary-foreground' : 'bg-secondary')}>
+                                    <p className='type-headline tabular'>{perWearText(cents)}</p>
+                                    <p className={cn('type-footnote', i === 3 ? 'text-primary-foreground/80' : 'text-muted-foreground')}>{label}</p>
+                                </div>
+                            ))}
+                        </div>
+
+                        <Details label='Show the numbers behind this'>
+                            <ul className='flex flex-col gap-1.5 pb-2 type-footnote text-pretty'>
+                                <li>Listed at {priceText(c.price_cents)}</li>
+                                <li>{c.free_shipping ? 'Free shipping' : c.shipping_cents !== null ? `Shipping ${priceText(c.shipping_cents)}` : 'Shipping unknown'}</li>
+                                {c.fee_cents > 0 && (
+                                    <li>
+                                        {MARKET[r.marketplace]} buyer fee {r.marketplace === 'depop' ? 'up to ' : ''}
+                                        {priceText(c.fee_cents)}
+                                    </li>
+                                )}
+                                {c.original_price_cents !== null && c.original_price_cents > c.price_cents && <li>Seller marked it down from {priceText(c.original_price_cents)}</li>}
+                                {c.retail_price_cents !== null && <li>New retail {priceText(c.retail_price_cents)}</li>}
+                            </ul>
+                            <Facts facts={w.facts} />
+                        </Details>
+                    </Card>
+
+                    <Card>
+                        <CardTitle title='Quality' level={r.quality.level} />
+                        <p className='mt-1 type-callout text-pretty text-muted-foreground'>{noEvidence(r) ? QUALITY.unknown : QUALITY[r.quality.level]}</p>
+                        {r.quality.facts.length > 0 && (
+                            <Details label={`Show the evidence (${r.quality.facts.length})`}>
+                                <Facts facts={r.quality.facts} />
+                            </Details>
                         )}
+                    </Card>
 
-                        <Section title='Confidence' value={<LevelValue level={r.confidence} />}>
-                            <Lines lines={[CONFIDENCE[r.confidence]]} />
-                        </Section>
-                    </div>
+                    <EcoCard eco={r.eco} />
+
+                    {typical && (
+                        <Card>
+                            <h3 className='type-headline'>Compared with a typical look-alike</h3>
+                            <Bars rows={[{ label: 'This one', cents: w.cpw_cents.at_mid, strong: true }, { label: 'Typical', cents: typical.cpw_cents }]} />
+                            <p className='mt-3 type-callout font-semibold text-pretty'>
+                                {
+                                    {
+                                        cheaper: 'It costs less than a typical look-alike up front.',
+                                        wins: `It costs more up front, but wear it ${w.break_even_wears}+ times and it works out cheaper.`,
+                                        never: `It costs more up front and likely won’t make it back: that takes ${w.break_even_wears}+ wears, more than the ${w.expected_wears.high} it should last.`,
+                                    }[breakEvenVerdict(w.break_even_wears, w.expected_wears.high)]
+                                }
+                            </p>
+                            <p className='mt-2 type-footnote text-pretty text-muted-foreground'>{typicalText(typical, count)}</p>
+                        </Card>
+                    )}
+
+                    <p className='flex flex-wrap items-center gap-x-2 px-1 pt-1 type-footnote text-pretty text-muted-foreground'>
+                        <span className='font-semibold text-foreground'>How sure we are: {levelText(r.confidence)}</span>
+                        {r.confidence !== 'unknown' && <LevelDots level={r.confidence} className='text-foreground' />}
+                        <span>{CONFIDENCE[r.confidence]}</span>
+                    </p>
                 </div>
             </motion.div>
         </>
     );
 }
 
-/** A receipt section: its title, a dot leader, and the total it adds up to. */
-function Section({ title, value, estimate, children }: { title: string; value?: React.ReactNode; estimate?: boolean; children: React.ReactNode }) {
+/** The eco score's four parts, each with what the listing says for it, then the evidence behind a button. */
+function EcoCard({ eco }: { eco: Result['eco'] }) {
+    const parts = ecoParts(eco);
+    const facts = parts.flatMap((p) => p.facts);
     return (
-        <section className='mt-4 border-t border-dashed border-receipt-ink/25 pt-4'>
-            <div className='flex items-baseline'>
-                <h4 className='flex items-center gap-1.5 type-headline'>
-                    {title}
-                    {estimate && <EstTag className='self-center' />}
-                </h4>
-                {value !== undefined && (
-                    <>
-                        <span className='leader' />
-                        <span className='font-mono text-[15px] font-medium tabular'>{value}</span>
-                    </>
-                )}
-            </div>
-            {children}
-        </section>
+        <Card>
+            <CardTitle title='Eco' level={eco.level} />
+            {typeof eco.percentile === 'number' && <p className='mt-1 type-callout font-semibold'>Greener than {eco.percentile}% of these matches</p>}
+            <p className='mt-1 type-footnote text-pretty text-muted-foreground'>Every listing here is secondhand, so none needs a new garment made. The score compares them on four things:</p>
+            <ul className='mt-3 flex flex-col gap-3'>
+                {parts.map((p) => (
+                    <li key={p.key}>
+                        <p className='flex items-baseline justify-between gap-3 type-footnote'>
+                            <span className='font-semibold'>{p.label}</span>
+                            <span className='shrink-0 text-muted-foreground'>{Math.round(p.weight * 100)}% of the score</span>
+                        </p>
+                        {p.score !== null && (
+                            <div className='mt-1 h-1.5 overflow-hidden rounded-pill bg-secondary' role='img' aria-label={`${Math.round(p.score * 100)} out of 100`}>
+                                <div className='h-full rounded-pill bg-primary' style={{ width: `${Math.round(p.score * 100)}%` }} />
+                            </div>
+                        )}
+                        <p className='mt-1 type-footnote text-pretty text-muted-foreground'>
+                            {p.facts.length ? p.facts.map((f) => (p.key === 'circularity' && f.kind !== 'certification' ? f.label : sentence(f.value))).join(', ') : EMPTY[p.key]}
+                        </p>
+                    </li>
+                ))}
+            </ul>
+            {facts.length > 0 && (
+                <Details label={`Show the evidence (${facts.length})`}>
+                    <Facts facts={facts} />
+                </Details>
+            )}
+        </Card>
     );
 }
 
-const LevelValue = ({ level }: { level: Level }) => (
-    <span className='inline-flex items-center gap-2 font-sans font-semibold'>
-        {levelText(level)}
-        {level !== 'unknown' && <LevelDots level={level} />}
+const Card = ({ children }: { children: React.ReactNode }) => <section className='rounded-card bg-card p-4 shadow-card'>{children}</section>;
+
+function CardTitle({ title, level }: { title: string; level: Level }) {
+    return (
+        <h3 className='flex items-center justify-between gap-3 type-headline'>
+            {title}
+            <span className='inline-flex items-center gap-2 type-callout font-semibold'>
+                {levelText(level)}
+                {level !== 'unknown' && <LevelDots level={level} />}
+            </span>
+        </h3>
+    );
+}
+
+function Term({ value, label, strong }: { value: string; label: string; strong?: boolean }) {
+    return (
+        <div className='min-w-0'>
+            <p className={cn('font-serif text-[26px] leading-8 tracking-tight tabular', strong && 'text-primary')}>{value}</p>
+            <p className='mt-1 type-footnote text-balance text-muted-foreground'>{label}</p>
+        </div>
+    );
+}
+
+const Op = ({ children }: { children: React.ReactNode }) => (
+    <span aria-hidden className='pt-1 type-headline text-muted-foreground'>
+        {children}
     </span>
 );
 
-const Lines = ({ lines }: { lines: (string | null)[] }) => (
-    <>
-        {lines.filter(Boolean).map((l) => (
-            <p key={l} className='mt-1.5 type-callout text-pretty text-muted-foreground'>
-                {l}
-            </p>
-        ))}
-    </>
-);
+/** Cost per wear side by side, as bars on the same scale. */
+function Bars({ rows }: { rows: { label: string; cents: number; strong?: boolean }[] }) {
+    const max = Math.max(...rows.map((r) => r.cents), 1);
+    return (
+        <div className='mt-3 flex flex-col gap-2'>
+            {rows.map((r) => (
+                <div key={r.label} className='grid grid-cols-[4.5rem_1fr_auto] items-center gap-3 type-footnote'>
+                    <span className={r.strong ? 'font-semibold' : 'text-muted-foreground'}>{r.label}</span>
+                    <div className='h-2.5 overflow-hidden rounded-pill bg-secondary'>
+                        <div className={cn('h-full rounded-pill', r.strong ? 'bg-primary' : 'bg-muted-foreground/50')} style={{ width: `${(r.cents / max) * 100}%` }} />
+                    </div>
+                    <span className={cn('tabular', r.strong && 'font-semibold')}>{perWearText(r.cents)} a wear</span>
+                </div>
+            ))}
+        </div>
+    );
+}
 
-const Verdict = ({ head, note }: { head: string; note?: string }) => (
-    <>
-        <p className='mt-2 type-callout font-semibold text-pretty'>{head}</p>
-        {note && <p className='mt-0.5 type-footnote text-pretty text-muted-foreground'>{note}</p>}
-    </>
-);
+/** The evidence and its sources, one tap away so the card stays short. */
+function Details({ label, children }: { label: string; children: React.ReactNode }) {
+    const [open, setOpen] = useState(false);
+    return (
+        <div className='mt-4'>
+            <button
+                type='button'
+                aria-expanded={open}
+                onClick={() => setOpen((o) => !o)}
+                className='inline-flex h-9 items-center gap-1.5 rounded-pill bg-secondary px-3.5 type-footnote font-semibold outline-none transition-transform duration-100 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-ring'
+            >
+                {open ? 'Hide' : label}
+                <ChevronDown className={cn('size-4 transition-transform duration-200', open && 'rotate-180')} strokeWidth={1.75} aria-hidden />
+            </button>
+            <AnimatePresence initial={false}>
+                {open && (
+                    <motion.div key='details' className='overflow-hidden' initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={spring.ui}>
+                        <div className='pt-3'>{children}</div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+}
 
 const Facts = ({ facts }: { facts: Fact[] }) => (
-    <ul className='mt-1'>
+    <ul>
         {facts.map((f, i) => (
-            <FactLine key={`${f.kind}-${i}`} fact={f} />
+            <FactRow key={`${f.kind}-${i}`} fact={f} />
         ))}
     </ul>
 );

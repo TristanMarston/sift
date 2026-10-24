@@ -62,7 +62,7 @@ export function ResultRow({ r, rank, sort, cheapest, open, onOpen }: Props) {
                             <motion.span key={sort} className='flex items-baseline gap-1' initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={spring.snappy}>
                                 <span className='font-serif text-[26px] leading-7 tracking-tight tabular'>{big.value}</span>
                                 {big.unit && <span className='type-footnote text-muted-foreground'>{big.unit}</span>}
-                                {sort === 'cpw' && <EstTag className='ml-0.5 self-center' />}
+                                {sort === 'cpw' && <EstTag className='ml-0.5' />}
                             </motion.span>
                         </AnimatePresence>
                         <span className='ml-auto pb-0.5 type-footnote tabular text-muted-foreground'>{second}</span>
