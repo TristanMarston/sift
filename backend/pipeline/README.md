@@ -108,7 +108,8 @@ raises `Drop("reason")`. The step prints how many rows were kept and why the oth
 | `no_price`, `no_url`, `no_title`, `no_id`, `no_image` | A required field is missing |
 | `non_usd` | The price is not in dollars. There is no currency conversion. |
 | `not_listing` | A free summary row from an actor (Mercari's dataset has some), not a listing |
-| `kids` | The category is children's clothing (it would skew wear estimates); on Depop, which has no kids label, a kids size (`6 years`, `12-18 months`) |
+| `kids` | The category is children's clothing (it would skew wear estimates); on Depop, which has no kids label, the kids department's broad categories (`Clothing`, `Shoes`) or a kids size (`6 years`, `12-18 months`) |
+| `auction` | An eBay auction: its price is the current bid, not what the item will sell for |
 | `unmapped_category` | The marketplace says what it is (hat, bag, shorts, even `Shorts > Denim`) and it is not one of our 8 categories |
 | `invalid`, `error:<Type>` | The row failed validation, or the mapper crashed on an odd record |
 

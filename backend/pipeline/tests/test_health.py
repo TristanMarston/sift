@@ -8,7 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 import health as H
-from normalize import depop
+from normalize import depop, ebay
 from normalize.common import Drop
 
 LOGS = Path(__file__).parent / "fixtures" / "logs"
@@ -156,6 +156,12 @@ def test_row_classification_good_filtered_bad():
     assert H.classify_row(depop.map_item, {**raw, "price": None}, "tshirts", NOW)[:2] == ("bad", "no_price")
     assert H.classify_row(depop.map_item, {**raw, "url": "not a url"}, "tshirts", NOW)[:2] == ("bad", "invalid")
     assert H.classify_row(depop.map_item, {**raw, "id": None}, "tshirts", NOW)[:2] == ("bad", "no_id")
+
+
+def test_an_ebay_auction_is_left_out_on_purpose_not_unusable():
+    import json
+    raw = json.loads((Path(__file__).parent / "fixtures" / "ebay.json").read_text(encoding="utf-8"))[0]
+    assert H.classify_row(ebay.map_item, {**raw, "buyingFormat": "auction"}, "tshirts", NOW)[:2] == ("filtered", "auction")
 
 
 def test_a_mapper_crash_is_a_bad_row_not_a_crash():

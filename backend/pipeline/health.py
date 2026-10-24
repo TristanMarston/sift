@@ -16,7 +16,7 @@ from pydantic import ValidationError
 from normalize.common import Drop
 
 SUCCEEDED = "SUCCEEDED"
-EXPECTED_FILTERS = {"kids", "unmapped_category", "non_usd", "not_listing"}  # rows we choose not to keep: normal
+EXPECTED_FILTERS = {"kids", "unmapped_category", "non_usd", "not_listing", "auction"}  # rows we choose not to keep: normal
 BAD, HARD = {"failed", "empty", "blocked", "degraded"}, {"blocked", "degraded"}
 
 MIN_ROWS_TO_JUDGE = 10          # below this, row quality is too noisy to call

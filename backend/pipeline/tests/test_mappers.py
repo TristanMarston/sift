@@ -77,6 +77,7 @@ def test_a_hat_is_dropped_not_filed_under_the_query_category(mp, label):
     ("ebay", dict(priceValue=None), "no_price"),
     ("ebay", dict(currency="GBP"), "non_usd"),
     ("ebay", dict(images=[]), "no_image"),
+    ("ebay", dict(buyingFormat="auction"), "auction"),    # its price is the current bid, not what the item will cost
     ("ebay", dict(categoryPath="Clothing, Shoes & Accessories > Kids > Boys > Coats, Jackets & Vests"), "kids"),
 ])
 def test_unusable_records_are_dropped_with_a_reason(mp, override, reason):

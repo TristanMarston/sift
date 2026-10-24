@@ -23,6 +23,8 @@ def map_item(raw: dict, category: str, scraped_at) -> Normalized:
     path = raw.get("categoryPath") or ""
     if is_kids(path):
         raise Drop("kids")
+    if raw.get("buyingFormat") == "auction":   # its price is the current bid, not what the item will sell for
+        raise Drop("auction")
     spec = {k: str(v) for k, v in (raw.get("itemSpecifics") or {}).items() if isinstance(v, (str, int, float))}
     condition = (spec.get("Condition") or raw.get("condition") or "").split(". ")[0] or None  # drop the seller prose
     positive = raw.get("sellerFeedbackPercentage")
