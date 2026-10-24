@@ -29,7 +29,7 @@ Effect on the old test data: rows with % composition went from 41.8% to 50.4%; v
 
 ## In progress
 
-There are 4 failing tests for the two decisions above (committed in the commit , in `test_mappers.py` and `test_extract.py`). Still to do:
+There are 4 failing tests for the two decisions above (committed in the commit "bugs, changes to make", in `test_mappers.py` and `test_extract.py`). Still to do:
 - `normalize/depop.py`: build the title from the description.
 - `normalize/poshmark.py`: pass `retail=` to `make_cost`, not `original=`.
 - `extract.py`: when the mapper already set the retail price, add the evidence record `("cost.retail_price_cents", "claimed",
