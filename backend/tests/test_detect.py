@@ -228,8 +228,8 @@ def test_a_product_shot_with_nothing_sure_becomes_one_whole_photo_garment(monkey
 
 
 def test_a_crop_split_into_many_garments_never_gets_a_negative_confidence():
-    many = lambda crop, hint: [{"label": f"item {i}", "category": "tshirts",  # noqa: E731
-                                "box": {"x": 0.0, "y": 0.0, "w": 0.5, "h": 0.5}} for i in range(12)]
+    many = lambda crop, hint: [{"label": f"item {i}", "category": "tshirts",  # noqa: E731  side by side, not one garment
+                                "box": {"x": i / 12, "y": 0.0, "w": 1 / 13, "h": 0.5}} for i in range(12)]
     out = D.relabel(IMG, [TOP], many, pad=0)
     assert len(out) == 12 and all(0 < g["confidence"] <= 1 for g in out)
     validate(D.response(IMG, out))
@@ -240,3 +240,52 @@ def test_the_haiku_schema_uses_a_form_structured_outputs_accept():
     # declared type"), which the fallback hid: a nullable enum must be anyOf [string enum, null]
     cat = D.SCHEMA["properties"]["garments"]["items"]["properties"]["category"]
     assert cat == {"anyOf": [{"type": "string", "enum": D.CATEGORIES}, {"type": "null"}]}
+
+
+# --- one garment, one tab: Haiku answers for overlapping crops are merged ---------------------
+
+def g(label, category, x, y, w, h, conf):
+    return {"label": label, "category": category, "box": {"x": x, "y": y, "w": w, "h": h}, "confidence": conf}
+
+
+def test_the_same_garment_seen_from_two_crops_is_one_garment():
+    jeans_a, jeans_b = g("light wash jeans", "jeans_pants", 0.2, 0.5, 0.5, 0.45, 0.9), g("ripped jeans", "jeans_pants", 0.22, 0.55, 0.5, 0.4, 0.6)
+    assert D.merge([jeans_b, jeans_a]) == [jeans_a]
+
+
+def test_layers_and_other_peoples_clothes_stay_separate():
+    jacket, tee = g("leather jacket", "jackets_outerwear", 0.2, 0.2, 0.6, 0.5, 0.9), g("crop top", "tshirts", 0.35, 0.3, 0.3, 0.3, 0.8)
+    left, right = g("jeans", "jeans_pants", 0.0, 0.5, 0.3, 0.5, 0.9), g("jeans", "jeans_pants", 0.6, 0.5, 0.3, 0.5, 0.8)
+    assert D.merge([jacket, tee, left, right]) == [jacket, tee, left, right]
+
+
+def test_relabel_merges_what_neighbouring_crops_both_saw():
+    both = lambda crop, hint: [{"label": "light wash jeans", "category": "jeans_pants",  # noqa: E731
+                                "box": {"x": 0, "y": 0, "w": 1, "h": 1}}]
+    overlapping = [TOP, {**TOP, "label": "pants", "confidence": 0.7}]
+    assert len(D.relabel(IMG, overlapping, both, pad=0)) == 1
+
+
+def test_a_crop_asks_about_its_main_item_and_the_whole_photo_asks_about_everything(monkeypatch):
+    sent = []
+
+    class Messages:
+        def create(self, **kw):
+            sent.append(kw["messages"][0]["content"][1]["text"])
+            text = json.dumps({"garments": []})
+            return type("Msg", (), {"stop_reason": "end_turn", "content": [type("B", (), {"type": "text", "text": text})]})
+
+    monkeypatch.setattr(D, "_client", lambda: type("C", (), {"messages": Messages()})())
+    D.describe(b"\xff\xd8a", "top")
+    D.describe(b"\xff\xd8a", None)
+    assert "main item" in sent[0] and '"top"' in sent[0] and "main item" not in sent[1]
+
+
+def test_a_pair_of_shoes_is_one_garment_even_when_haiku_boxes_each_shoe():
+    left, right = g("mesh heels", "sneakers", 0.3, 0.86, 0.07, 0.1, 0.86), g("mesh booties", "sneakers", 0.8, 0.86, 0.1, 0.1, 0.77)
+    assert D.merge([left, right]) == [left]
+
+
+def test_garments_sharing_a_third_of_the_smaller_box_are_one():
+    a, b = g("white crop top", "tshirts", 0.36, 0.28, 0.18, 0.27, 0.85), g("white top", "tshirts", 0.42, 0.36, 0.2, 0.25, 0.75)
+    assert D.merge([a, b]) == [a]

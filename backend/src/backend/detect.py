@@ -162,11 +162,16 @@ def yolos(im: Image.Image) -> list[dict]:
 
 # --- Haiku -----------------------------------------------------------------------------
 
-PROMPT = """This is a crop from a shopper's photo. A segmentation model calls it "{hint}".
-List each separate clothing item clearly visible that someone could buy secondhand. A jacket worn open over a \
-t-shirt is two items. Ignore accessories, skin and background. Outermost or largest item first.
+PROMPT = """This is a crop from a shopper's photo. Its main item is the "{hint}" a segmentation model found.
+List that item, plus any item layered with it (a jacket worn open over a t-shirt is two items). Ignore garments that \
+are only partly in the crop at its edges, accessories, skin and background. Outermost or largest item first.
 For each item give: label (2-3 plain words, e.g. "denim jacket"), category (one of the allowed values, or null if \
 none fits), and box (x, y, w, h as fractions of this crop, origin top-left)."""
+
+PHOTO_PROMPT = """This is a shopper's photo. List each separate clothing item clearly visible that someone could buy \
+secondhand. A jacket worn open over a t-shirt is two items. Ignore accessories, skin and background. Largest item first.
+For each item give: label (2-3 plain words, e.g. "denim jacket"), category (one of the allowed values, or null if \
+none fits), and box (x, y, w, h as fractions of the photo, origin top-left)."""
 
 SCHEMA = {
     "type": "object", "additionalProperties": False, "required": ["garments"],
@@ -187,14 +192,15 @@ def _client():
     return anthropic.Anthropic(timeout=20, max_retries=1)
 
 
-def describe(jpeg: bytes, hint: str) -> list[dict]:
-    """Ask Haiku what garments are in one crop. Raises on API errors; the caller falls back."""
+def describe(jpeg: bytes, hint: str | None) -> list[dict]:
+    """Ask Haiku what garments are in one crop (hint: the segmentation label) or the whole photo (hint None).
+    Raises on API errors; the caller falls back."""
     msg = _client().messages.create(
         model=HAIKU, max_tokens=1024, output_config={"effort": "low", "format": {"type": "json_schema", "schema": SCHEMA}},
         messages=[{"role": "user", "content": [
             {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
                                          "data": base64.standard_b64encode(jpeg).decode()}},
-            {"type": "text", "text": PROMPT.format(hint=hint)},
+            {"type": "text", "text": PROMPT.format(hint=hint) if hint else PHOTO_PROMPT},
         ]}],
     )
     if msg.stop_reason == "refusal":
@@ -240,14 +246,35 @@ def relabel(im: Image.Image, regions: list[dict], llm, pad: float = 0.1) -> list
     if llm is None or not regions:
         return regions
     with ThreadPoolExecutor(len(regions)) as pool:
-        return [g for gs in pool.map(lambda r: _haiku(im, r, llm, pad), regions) for g in gs]
+        return merge([g for gs in pool.map(lambda r: _haiku(im, r, llm, pad), regions) for g in gs])
+
+
+def _shared(a: dict, b: dict) -> float:
+    """Overlap of two boxes as a share of the smaller one."""
+    ix = max(0.0, min(a["x"] + a["w"], b["x"] + b["w"]) - max(a["x"], b["x"]))
+    iy = max(0.0, min(a["y"] + a["h"], b["y"] + b["h"]) - max(a["y"], b["y"]))
+    small = min(a["w"] * a["h"], b["w"] * b["h"])
+    return ix * iy / small if small else 0.0
+
+
+def merge(garments: list[dict], same: float = 0.3) -> list[dict]:
+    """Neighbouring crops overlap, so Haiku often names one garment twice: same category and boxes sharing more than
+    `same` of the smaller one are one garment, the most confident kept. Layers (other categories) and other people's
+    clothes (no overlap) stay separate, except shoes: a pair is one garment. Keeps the input order."""
+    kept = []
+    for i in sorted(range(len(garments)), key=lambda i: -garments[i]["confidence"]):
+        g = garments[i]
+        if not any(garments[k]["category"] == g["category"]
+                   and (g["category"] == "sneakers" or _shared(garments[k]["box"], g["box"]) > same) for k in kept):
+            kept.append(i)
+    return [garments[i] for i in sorted(kept)]
 
 
 def _haiku_only(im: Image.Image, llm) -> list[dict]:
     if llm is None:
         return []
     try:
-        found = [clean(g) for g in llm(_jpeg(im), "the whole photo")]
+        found = [clean(g) for g in llm(_jpeg(im), None)]
     except Exception:  # noqa: BLE001
         return []
     return [_region(g["label"], g["category"], [g["box"][k] for k in "xywh"], 0.5) for g in found]
