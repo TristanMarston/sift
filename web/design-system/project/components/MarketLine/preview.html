@@ -1,0 +1,30 @@
+<!-- @dsCard group="Listings" height=150 -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>MarketLine</title>
+<style>
+body { margin: 0; padding: 20px; background: var(--background); color: var(--foreground); font-family: var(--font-sans); }
+.row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.col { display: flex; flex-direction: column; gap: 16px; }
+.cam { background: var(--camera); border-radius: 24px; overflow: hidden; position: relative; }
+.note { font: 13px/18px var(--font-mono); color: var(--muted-foreground); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+var S = window.Sift, h = React.createElement, D = S.samples, use = React.useState, effect = React.useEffect;
+function replay(label, onClick) { return h(S.Button, { variant: 'secondary', size: 'sm', onClick: onClick }, label || 'Replay'); }
+function App() {
+  return h('div', { className: 'col', style: { gap: 10 } },
+    h(S.PriceLine, { cents: 4800, retailCents: 13000 }),
+    h(S.MarketLine, { parts: ['Depop', 'Size M', 'Good'] }),
+    h(S.PriceLine, { cents: 3550 }),
+    h(S.MarketLine, { parts: ['Grailed', 'Size L', 'Very good'] }));
+}
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+</script>
+</body>
+</html>

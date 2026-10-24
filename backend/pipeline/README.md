@@ -1,7 +1,7 @@
 # Sift data pipeline
 
 This pipeline builds the **catalog**: a big file of clean secondhand clothing listings, collected once from
-Depop, Poshmark, Grailed and eBay. For every listing it keeps the price, photos, description, condition, size and
+Depop, Poshmark, Grailed, Mercari and eBay. For every listing it keeps the price, photos, description, condition, size and
 brand, and it pulls out the facts the ranker needs later (materials, certifications, vintage/deadstock flags,
 retail price, country of manufacture). Each fact records where it came from and how sure we are.
 
@@ -20,7 +20,7 @@ Longer background: [`SPEC.md`](SPEC.md) (decisions, costs, test-run results) and
  (what to search)  Apify actors   data/runs.jsonl                           with seller identity removed
                        │
                        ▼
-                  02_normalize ──▶ data/normalized.jsonl                    one common shape for all four
+                  02_normalize ──▶ data/normalized.jsonl                    one common shape for all five
                   one mapper per    (drops junk, removes duplicates)        marketplaces
                   marketplace
                        │
@@ -47,11 +47,11 @@ Everything runs from the `backend/` folder with `uv` (Python 3.12).
 ```bash
 cd backend
 uv sync                                    # install dependencies
-uv run pytest                              # ~380 tests, no network, no money
+uv run pytest                              # ~600 tests, no network, no money
 
 # put your Apify token in the repo root: /workspace/.env  ->  APIFY_TOKEN=...
 uv run python pipeline/01_scrape.py --dry-run      # see the plan and what it would cost. Calls nothing.
-uv run python pipeline/01_scrape.py --test         # go/no-go: 20 items per marketplace, about $0.44
+uv run python pipeline/01_scrape.py --test         # go/no-go: 20 items per marketplace, about $0.50
 uv run python pipeline/02_normalize.py --test
 uv run python pipeline/03_extract.py --test
 uv run python pipeline/04_report.py --test --min-rows 80
@@ -59,7 +59,7 @@ uv run python pipeline/05_embed.py --test           # needs the model weights; d
 uv run python pipeline/06_query.py some_photo.jpg --test   # eyeball the top matches
 
 # the real run (spends money; start it in the background, it takes a while; progress goes to scrape.log)
-uv run python pipeline/01_scrape.py --max-spend 125 > scrape.log 2>&1 &
+uv run python pipeline/01_scrape.py --max-spend 120 > scrape.log 2>&1 &   # the plan costs ~$94, ~$118 at the caps
 uv run python pipeline/02_normalize.py
 uv run python pipeline/03_extract.py
 uv run python pipeline/04_report.py                # writes pipeline/REPORT.md
@@ -67,7 +67,7 @@ uv run python pipeline/05_embed.py                 # resumable; rerun after a cr
 ```
 
 `--test` makes every step work in `pipeline/data/test/` instead of `pipeline/data/`, so a test run never mixes
-with real data.
+with real data. Every step also takes `--data-dir PATH` for any other folder.
 
 ## The four steps
 
@@ -80,7 +80,9 @@ Runs one Apify actor per search in `queries.yaml` and saves what comes back.
 | `--dry-run` | Prints runs, rows, best-case cost and worst-case cost per marketplace. Calls nothing, needs no token. |
 | `--test` | The go/no-go run: the first query of each marketplace, 20 items. |
 | `--only depop,ebay` | Only these marketplaces. |
-| `--max-spend 125` | Stop before the *estimated* spend (earlier runs included) would pass this many dollars. |
+| `--max-spend 120` | Stop before the *estimated* spend (earlier runs included) would pass this many dollars. |
+| `--stop-all-on-block` | A block or junk data halts every marketplace, not just the one affected. |
+| `--data-dir PATH` | Write somewhere else than `pipeline/data` (or `data/test`). |
 
 How it behaves:
 
@@ -88,32 +90,50 @@ How it behaves:
   every category covered, so **put the best queries first** in each list.
 - **Quotas.** A marketplace stops when its raw rows reach its quota in `queries.yaml`.
 - **Resumable.** Rerun the same command after a crash or Ctrl-C. Queries that already succeeded are skipped, and
-  quotas count the rows already saved. Failed queries are retried.
+  quotas count the rows already saved. Bad runs (blocked, empty, junk, failed) are retried; a query that comes back
+  empty twice is treated as really empty.
 - **Safe on money.** Every actor call carries a hard charge cap (expected cost + 25%, at least $0.05) and a
-  30-minute timeout. A marketplace is abandoned after 3 failures in a row. Progress lines show the estimated spend.
+  30-minute timeout. Progress lines show the estimated spend. A run that fails or times out is booked at its full cap,
+  because its rows were billed but not saved.
+- **Notices blocks at once.** Each run is judged when it finishes. A bad one prints an `ALERT` line and is appended to
+  `alerts.jsonl`; a block or junk data stops that marketplace immediately, and a second empty or failed run in a row
+  stops it too. The other marketplaces carry on. Create `data/STOP` to halt before the next run. See [`BLOCKING.md`](BLOCKING.md).
+- **Ends with a report** (printed, and saved as `run_report.md` and `.json`): per marketplace the queries that were ok,
+  short or bad, and the rows that were good, duplicate, filtered, unusable or quarantined, plus estimated and wasted spend.
+  The exit code tells a script what happened: 0 finished, 2 a marketplace was stopped, 3 `--max-spend`, 4 `STOP` file, 130 Ctrl-C.
 - **Atomic files.** A raw file appears only when the whole dataset was downloaded.
 
 ### 02 · Normalize — `02_normalize.py` (logic in `normalize/`)
 
 Turns each marketplace's own record format into one shape (`Normalized`: a listing plus a `specifics` dictionary
 with the marketplace's structured fields, such as eBay's item specifics). There is one small mapper per
-marketplace: `normalize/depop.py`, `poshmark.py`, `grailed.py`, `ebay.py`. A mapper either returns a row or
+marketplace: `normalize/depop.py`, `poshmark.py`, `grailed.py`, `mercari.py`, `ebay.py`. A mapper either returns a row or
 raises `Drop("reason")`. The step prints how many rows were kept and why the others were dropped:
 
 | Drop reason | Meaning |
 | --- | --- |
 | `no_price`, `no_url`, `no_title`, `no_id`, `no_image` | A required field is missing |
 | `non_usd` | The price is not in dollars. There is no currency conversion. |
-| `kids` | The category is children's clothing (it would skew wear estimates) |
-| `unmapped_category` | The marketplace says what it is (hat, bag, shorts) and it is not one of our 8 categories |
+| `not_listing` | A free summary row from an actor (Mercari's dataset has some), not a listing |
+| `kids` | The category is children's clothing (it would skew wear estimates); on Depop, which has no kids label, the kids department's broad categories (`Clothing`, `Shoes`) or a kids size (`6 years`, `12-18 months`) |
+| `auction` | An eBay auction: its price is the current bid, not what the item will sell for |
+| `unmapped_category` | The marketplace says what it is (hat, bag, shorts, even `Shorts > Denim`) and it is not one of our 8 categories |
 | `invalid`, `error:<Type>` | The row failed validation, or the mapper crashed on an odd record |
 
 Duplicates (same marketplace and item id) are collapsed, keeping the newest copy.
 
 Shared rules (`normalize/common.py`): prices become integer cents; brands get one canonical spelling
-(`Levis`, `LEVI'S` → `Levi's`; junk like `unbranded` → null); condition text maps to `new_with_tags`, `like_new`,
+(`Levis`, `LEVI'S` → `Levi's`; a known brand followed by a model is that brand, `Nike Dunk Low` → `Nike`, because Poshmark
+sellers type these; junk like `unbranded` → null; Grailed's style tags such as `Flannel` and `Designer` are not brands, and
+its `Vintage` designer tag becomes a vintage flag); condition text maps to `new_with_tags`, `like_new`,
 `good`, `fair` (or null); the marketplace's category label maps to one of the 8 categories (all footwear counts as
-`sneakers`); a missing label falls back to the query's category.
+`sneakers`; the leaf of a path like `Men > Sweats & hoodies > Track jacket` wins; blazers and suits count as jackets;
+boot-cut jeans are jeans; Grailed's `short_sleeve_shirts` and `long_sleeve_shirts` are its T-shirt categories; eBay's
+`Type` specific is the leaf, because eBay files tees under a generic `Women's Clothing > Tops`);
+a missing label falls back to the query's category. Titles and descriptions lose invisible characters (zero-width
+spaces, soft hyphens) and non-breaking spaces, because a zero-width space inside `100%cotton` defeats the composition
+regex. Depop's own title is just the first few words of the description, cut mid-phrase, so the title is the first line
+of the description without hashtags (at most 120 characters, cut at a word), falling back to the actor's title.
 
 ### 03 · Extract — `03_extract.py` (logic in `extract.py`)
 
@@ -121,17 +141,21 @@ Adds the evidence. It never invents: if the listing does not say, the field is e
 
 | Fact | Where it looks | Status |
 | --- | --- | --- |
-| Materials | 1. structured fields (eBay `Material`, `Outer Shell Material`, `Fabric Type`, …) 2. title + description 3. `product_lines.yaml` | `claimed` (1, 2) or `inferred` (3) |
+| Materials | 1. structured fields (eBay `Material`, `Outer Shell Material`, sneakers' `Upper Material`, `Fabric Type`, …; suede counts as leather) 2. title + description, also when it names the field's fibers with the percentages the field lacks 3. `product_lines.yaml` | `claimed` (1, 2) or `inferred` (3) |
 | Composition | `60% cotton / 40% polyester`, `100% organic cotton`; bare words (`cotton tee`) give a fiber with no percentage | `claimed` |
 | Certifications | GOTS, OEKO-TEX, bluesign, Fair Trade, RWS, RDS, B Corp | `claimed` |
-| Vintage / deadstock / upcycled | **title** and structured style fields only (descriptions carry shop boilerplate) | `claimed` |
-| Retail price | `retails for $120`, `MSRP $75` in the title or description | `claimed` |
-| Country of manufacture | the structured country field, else `made in X` | `claimed` |
+| Vintage / deadstock / upcycled | **title** (`vintage`, `vtg`, `deadstock`, ...) and structured style fields only (descriptions carry shop boilerplate) | `claimed` |
+| Retail price | Poshmark's `Original Price` field, else `retails for $120`, `MSRP $75` in the title or description | `claimed` |
+| Country of manufacture | the structured country field, else `made in X` where X is on a known-country list | `claimed` |
 
-Composition details: synonyms are unified (`poly` → `polyester`, `spandex` → `elastane`, `merino` → `wool`);
+Countries get one name each (`U.S.A.`, `United States`, `America` → `USA`; `Korea` → `South Korea`), and eBay's
+`Unknown` is not a country. The list is in `extract.py`; a country not on it is left null rather than guessed.
+
+Composition details: synonyms are unified (`poly` → `polyester`, `spandex` → `elastane`, `merino` and `lambswool` → `wool`);
+words between the number and the fiber are allowed (`100% pure new wool`, `100% Italian boiled wool`, `100% baby alpaca`);
 percentages that add up to 90–110 are scaled to 100; any other sum is kept but marked `composition_suspect`
 (multi-part tags like shell + lining land here). `synthetic_share` is the share of polyester, nylon, acrylic and
-elastane, and is only computed when every fiber has a percentage and the sum is sound. Fabrics that are not fibers
+elastane (plus modacrylic and polyurethane), and is only computed when every fiber has a percentage and the sum is sound. Fabrics that are not fibers
 (fleece, ripstop, Gore-Tex) are not reported as materials.
 
 ### 04 · Report — `04_report.py` (logic in `report.py`)
@@ -191,6 +215,8 @@ Everything lands in `pipeline/data/` (ignored by git), except `REPORT.md`.
 ```
 data/
   runs.jsonl                     one line per actor run (the log; also how reruns know what is done)
+  alerts.jsonl                   one line per bad run: marketplace, query, verdict, reasons, run id, what we did
+  run_report.md / .json          the report of the last step-01 invocation
   raw/<marketplace>/<run_id>.jsonl   the actors' records, seller identity removed
   normalized.jsonl               step 02: one row per listing
   listings.jsonl                 step 03: the final catalog
@@ -199,8 +225,13 @@ data/
 REPORT.md                        step 04 (committed with the PR)
 ```
 
+Every file is JSON Lines: one record per line, written ASCII-escaped and read on newline only (`jsonl.py`), because real
+listings contain characters like U+2028 that `str.splitlines()` treats as a line break and would cut a record in half. If you
+read these files from your own code, split on `\n` (or iterate the open file), not `splitlines()`.
+
 **`runs.jsonl`** line: `{"marketplace", "category", "query", "max_items", "run_id", "status", "status_message",
-"items", "est_charge_usd", "at"}`. `est_charge_usd` is our own estimate (items × price + start fee), checked against
+"items", "est_charge_usd", "at", "verdict", "reasons", "notes", "rows_good", "rows_duplicate", "rows_filtered", "rows_bad"}`.
+`verdict` is `ok`, `short`, `empty`, `failed`, `blocked` or `degraded`; step 02 skips the rows of `empty`, `failed`, `blocked` and `degraded` runs. `est_charge_usd` is our own estimate (items × price + start fee), checked against
 the real Apify bills in the test run.
 
 **`listings.jsonl`**: one JSON object per line, validated by `listing.py`. It mirrors the static part of
@@ -257,29 +288,37 @@ A real row (description and photo list shortened):
 
 ## What each marketplace gives us
 
-Measured in the 20-item test run. This decides which facts are empty for which marketplace.
+Measured in the test runs. This decides which facts are empty for which marketplace.
 
-| | Depop | Poshmark | Grailed | eBay |
-| --- | --- | --- | --- | --- |
-| Cost per row | $0.001 | $0.002 (+$0.02 per run) | $0.012 | $0.005 (+$0.02 per run) |
-| Description | yes | yes (some very short) | yes | yes |
-| Photos (average) | 4 | 7 | 8 | 7 |
-| Condition | yes | **no** | yes | yes |
-| Shipping | no | no | seller's US rate | yes |
-| Markdown (`original_price_cents`) | yes | yes | from earlier prices | no |
-| Seller type / rating | no | no | yes | yes |
-| Structured materials | no | no | no | yes (`Outer Shell Material`) |
+| | Depop | Poshmark | Grailed | Mercari | eBay |
+| --- | --- | --- | --- | --- | --- |
+| Actor | `jongoose/depop-scraper` | `123webdata/poshmark-scraper` | `piotrv1001/grailed-listings-scraper` | `automation_craft/mercari-us-scraper` | `memo23/ebay-search-scraper-ppe` |
+| Cost per row | $0.001 | $0.002 (+$0.02 per run) | $0.012 | $0.00273 (+$0.006 per run) | $0.005 (+$0.02 per run) |
+| Description | yes | yes (some very short) | yes | yes (94% over 40 characters) | yes |
+| Photos (average) | 4 | 7 | 8 | 8 | 7 |
+| Condition | yes | **no** | yes | yes | yes |
+| Shipping | no | no | seller's US rate | yes (free when the seller pays) | yes |
+| Markdown (`original_price_cents`) | yes | no | from earlier prices | yes | no |
+| Retail price field (`retail_price_cents`) | no | yes (`Original Price`, seller-entered) | no | no | no |
+| Seller type / rating | no | no | yes | yes | yes |
+| Structured materials | no | no | no | no | yes (`Outer Shell Material`; sneakers `Upper Material`) |
+| Color | yes | yes | yes | **never** | yes |
+| Repeats inside one full-size run (billed) | 0 of 200 | 20 of 200 | not measured | not measured | 16 of 150 |
+| Left out on purpose (review scrape) | kids 3% | kids, crop tops 2% | none | kids, shorts 17% | auctions, kids 4% |
 
-Mercari was tried and dropped: its records have no description and one photo.
+Mercari's first actor (`getascraper/mercari-us-scraper`) returned card data only (no description, one photo) and was
+replaced; see `SPEC.md` §13a–b for what went wrong and how the new one was tested. Mercari's own total price also
+includes a buyer-protection fee (about 3.5%) that `cost` does not model.
 
 ## Privacy
 
 No seller usernames, profile links, avatars or account ids are stored.
 
 - `scrape.py` removes them **before anything is written**. Flat keys such as `sellerUsername` are dropped at any depth.
-  Inside any seller block (`seller`, `sellerProfile`, `user`) only a short allowlist survives (ratings, counts,
-  location). eBay records keep only the top-level fields the mapper reads, because its raw page data contains the
-  seller's handle and buyers' feedback.
+  Inside any seller block (`seller`, `sellerProfile`, `user`), at every depth, only a short allowlist survives (ratings,
+  counts, location). eBay records keep only the top-level fields the mapper reads, because its raw page data contains the
+  seller's handle and buyers' feedback. Depop records lose `location` (the seller's city) and `slug` (it starts with
+  the seller's handle).
 - `tests/test_privacy.py` scans the fixtures, the mapper output and any real files in `data/` for identity keys.
 - Two things are deliberately kept: the listing `url` (the link-out; **Depop URLs begin with the seller's handle**)
   and the description text (sellers sometimes write their store name in it).
@@ -311,12 +350,25 @@ that is not mirrored in `listing.py` fails a test.
 
 - `seller.region` mixes formats: `US` for any US place, otherwise whatever the marketplace reports (a code like `CN`
   from Grailed, a name like `China` from eBay).
-- Poshmark gives no condition, so it is null. Depop gives no shipping and no seller details.
-- Sellers sometimes put the wrong category on an item; a mislabeled item passes through.
+- Poshmark gives no condition, so it is null. Depop gives no shipping and no seller details. Mercari gives no color.
+- Sellers sometimes put the wrong category on an item; a mislabeled item passes through. A tank top under a
+  `Shirts` or `Tops & blouses` parent (Poshmark men's, Mercari women's) is filed as a shirt; eBay's and Poshmark
+  women's tank tops and crop tops are dropped.
+- Grailed resellers cross-list one item as several listings (same title and price, different ids). Deduping by id
+  cannot catch this; it needs image-based dedupe later.
+- The duplicate counts in `run_report.md` ignore rows from earlier invocations of step 01 (step 02 still dedupes
+  everything).
 - `seller.type` thresholds are guesses (Grailed: ≤ 20 / ≤ 200 listings; eBay: business accounts with ≥ 5,000
-  feedback are large resellers).
-- Material coverage depends on the queries. The first test (one generic jacket query) gave 41% with a stated material
-  and 6% with percentages; the material-rich queries are meant to lift that. Check `REPORT.md` after the run.
+  feedback are large resellers). An eBay seller with 0% positive feedback has no feedback in eBay's 12-month window,
+  so `seller.rating` is null, as it is for a Mercari seller with no reviews.
+- Material coverage depends on the queries. One generic jacket query gave 41% with a stated material and 6% with
+  percentages; material-rich queries lifted Mercari to 70% and 50%. Check `REPORT.md` after the run.
+- Tags with several parts (shell, lining) add up past 100%, so they are kept but marked `composition_suspect` and get no
+  `synthetic_share`. This is 15% of the Mercari rows we tested, almost all coats, usually "shell composition, then a 100%
+  polyester lining". Reading the "Shell:" and "Lining:" labels would recover most of them; taking the first group would
+  be wrong whenever a seller lists the lining first, so we do not.
+- The Mercari actor is new; it worked up to 300 items per run (three results pages) in the review scrape.
+  `tortuga/mercari-scraper` is the fallback.
 - Not built yet: hosted thumbnails, the Supabase upload, care-tag OCR, the LLM fallback for odd material
   text, sold-price comps, and the hand-curated brand facts table.
 - Scraping marketplaces may break their terms of service (Poshmark prohibits automated collection). We use public

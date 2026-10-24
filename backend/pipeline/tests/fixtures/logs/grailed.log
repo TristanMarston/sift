@@ -1,0 +1,7 @@
+ACTOR: Pulling container image of build RhOlQxyc6d7rafnxY from registry.
+ACTOR: Creating container.
+ACTOR: Starting container.
+ACTOR: Running under "LIMITED_PERMISSIONS".
+INFO  System info {"apifyVersion":"3.7.2","apifyClientVersion":"2.23.4","crawleeVersion":"3.17.0","osType":"Linux","nodeVersion":"v24.21.0"}
+WARN  Could not read live Algolia config (Could not locate PUBLIC_CONFIG on the Grailed homepage — site layout may have changed.); using cached credentials.
+INFO  Done. Scraped 20 listing(s).

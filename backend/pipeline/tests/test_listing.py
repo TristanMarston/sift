@@ -9,7 +9,7 @@ import listing as L
 from helpers import row
 from listing import Listing
 
-DEFS = json.loads((Path(__file__).parents[3] / "schema" / "api.schema.json").read_text())["$defs"]
+DEFS = json.loads((Path(__file__).parents[3] / "schema" / "api.schema.json").read_text(encoding="utf-8"))["$defs"]
 RESULT = DEFS["Result"]["properties"]
 
 

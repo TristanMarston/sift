@@ -71,7 +71,8 @@ def test_is_kids(label, kids):
 
 @pytest.mark.parametrize("label, expected", [
     ("tops.t_shirts", "tshirts"), ("tops.button_ups", "shirts"), ("tops.sweatshirts_hoodies", "hoodies_sweatshirts"),
-    ("tops.long_sleeve_shirts", "shirts"), ("tops.sweaters_knitwear", "sweaters_knitwear"),
+    ("tops.long_sleeve_shirts", "tshirts"), ("tops.short_sleeve_shirts", "tshirts"),    # Grailed: "Long/Short Sleeve T-Shirts"
+    ("womens_tops.short_sleeve_shirts", "tshirts"), ("tops.sweaters_knitwear", "sweaters_knitwear"),
     ("bottoms.denim", "jeans_pants"), ("bottoms.sweatpants_joggers", "jeans_pants"), ("bottoms.shorts", None),
     ("footwear.sneakers", "sneakers"), ("outerwear.light_jackets", "jackets_outerwear"),
     ("tailoring.blazers", "jackets_outerwear"), ("flat shirt", "shirts"),
@@ -87,6 +88,50 @@ def test_category_from_marketplace_slugs(label, expected):
     ("Clothing, Shoes & Accessories > Men > Men's Accessories > Hats", None),
 ])
 def test_ebay_root_category_does_not_make_everything_footwear(label, expected):
+    assert C.category_from_label(label) == expected
+
+
+@pytest.mark.parametrize("label, expected", [
+    ("Men > Suits", "jackets_outerwear"),                       # Mercari files blazers and sport coats here
+    ("Men > Suits > Four button", "jackets_outerwear"),
+    ("Men > Suits > Pants", "jeans_pants"),                     # the leaf still wins
+    ("Women > Swimwear > One-piece swimsuit", None),
+    ("Women > Jumpsuits & rompers", None),
+    ("Vintage & collectibles > Supplies > Yarn", None),
+    ("Pet Supplies > Dog Supplies > Other Dog Supplies", None),
+])
+def test_suits_are_jackets_but_swimsuits_and_pet_supplies_are_not(label, expected):
+    assert C.category_from_label(label) == expected
+
+
+@pytest.mark.parametrize("label, expected", [
+    ("Men > Sweats & hoodies > Track jacket", "jackets_outerwear"),     # Mercari files track jackets under hoodies
+    ("Women > Sweats & hoodies > Hoodie", "hoodies_sweatshirts"),
+    ("Men > Sweats & hoodies > Other", "hoodies_sweatshirts"),          # unmapped leaf: the parent decides
+    ("Women > Coats & jackets > Puffer", "jackets_outerwear"),
+    ("Men > Athletic apparel > Jackets", "jackets_outerwear"),
+    ("Women > Accessories > Hats", None),
+])
+def test_the_leaf_of_a_category_path_wins_over_its_parents(label, expected):
+    assert C.category_from_label(label) == expected
+
+
+@pytest.mark.parametrize("label, expected", [
+    ("Denim Shorts", None), ("Jean Shorts", None), ("Women > Shorts > Denim", None), ("Men > Shorts > Cargo shorts", None),
+    ("Bottoms shorts denim-shorts", None),
+    ("tops.short_sleeve_shirts", "tshirts"),                    # "short" sleeves are not shorts
+])
+def test_shorts_are_never_filed_as_jeans_or_pants(label, expected):
+    assert C.category_from_label(label) == expected
+
+
+@pytest.mark.parametrize("label, expected", [
+    ("Women > Jeans > Boot cut", "jeans_pants"), ("Boot Cut Jeans", "jeans_pants"), ("Women > Jeans > Boot-cut", "jeans_pants"),
+    ("Men > Shoes > Boots", "sneakers"), ("Combat Boot", "sneakers"),
+    ("Women > Coats & jackets > Hooded jacket", "jackets_outerwear"), ("Hooded Coat", "jackets_outerwear"),
+    ("Hooded Sweatshirt", "hoodies_sweatshirts"), ("Men > Sweats & hoodies > Hooded", "hoodies_sweatshirts"),
+])
+def test_boot_cut_jeans_are_not_boots_and_a_hooded_jacket_is_a_jacket(label, expected):
     assert C.category_from_label(label) == expected
 
 
@@ -109,6 +154,22 @@ def test_resolve_category_prefers_the_label_and_never_lets_a_hat_inherit_the_que
 ])
 def test_normalize_brand(raw, expected):
     assert C.normalize_brand(raw) == expected
+
+
+@pytest.mark.parametrize("raw, expected", [
+    ("Nike Dunk Low", "Nike"), ("Nike dunk low retro", "Nike"), ("Levi's 501", "Levi's"), ("LEVIS 501", "Levi's"),
+    ("Levi’s 501 Jeans", "Levi's"), ("Levis Strauss", "Levi's"), ("Levi 501", "Levi's"), ("Champion Reverse Weave", "Champion"),
+    ("Carhartt WIP Detroit", "Carhartt WIP"), ("New Balance 990v5", "New Balance"), ("The North Face Nuptse", "The North Face"),
+    ("Jordache", "Jordache"), ("Nikerunner", "Nikerunner"),
+])
+def test_a_known_brand_followed_by_a_product_line_is_that_brand(raw, expected):
+    """Poshmark sellers type the model into the brand field. Brand is the join key for brand facts."""
+    assert C.normalize_brand(raw) == expected
+
+
+@pytest.mark.parametrize("raw", ["Flannel", "Designer", "Band Tees", "Streetwear", "Made In Usa", "Japanese Brand"])
+def test_grailed_style_tags_are_not_brands(raw):
+    assert C.normalize_brand(raw) is None
 
 
 # --- building blocks every mapper uses -------------------------------------------------------
@@ -161,3 +222,14 @@ def test_require_returns_the_value_or_drops():
     for empty in (None, "", [], 0):
         with pytest.raises(C.Drop, match="no_title"):
             C.require(empty, "no_title")
+
+
+@pytest.mark.parametrize("text, one_line, expected", [
+    ("\u200bWoolrich  Womens\u00a0XL", True, "Woolrich Womens XL"),
+    ("100%\u200bcotton\u2060 tee", True, "100%cotton tee"),
+    ("soft\u00adware", True, "software"),
+    ("line one\n\nline  two\u00a0here  ", False, "line one\n\nline two here"),
+    ("  \u200b ", True, None), ("", False, None), (None, False, None),
+])
+def test_clean_text_removes_invisible_characters_and_odd_spaces(text, one_line, expected):
+    assert C.clean_text(text, one_line=one_line) == expected

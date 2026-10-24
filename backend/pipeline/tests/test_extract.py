@@ -41,6 +41,24 @@ def fibers(text):
     ("100% cotton ... 100% cotton", [("cotton", 100, None, None)]),
     ("2100% cotton", [("cotton", None, None, None)]),
     ("150% cotton", []),
+    ("100% pure wool", [("wool", 100, None, None)]),
+    ("100% Virgin Wool", [("wool", 100, None, None)]),
+    ("100% pure new wool", [("wool", 100, None, None)]),
+    ("100% pure new/virgin wool", [("wool", 100, None, None)]),
+    ("100% Italian boiled wool", [("wool", 100, None, None)]),
+    ("100% extra fine merino", [("wool", 100, None, None)]),
+    ("100% lambswool", [("wool", 100, None, None)]),
+    ("100% lambs wool", [("wool", 100, None, None)]),
+    ("100% lamb's wool", [("wool", 100, None, None)]),
+    ("100% baby alpaca", [("alpaca", 100, None, None)]),
+    ("100% pure recycled cashmere", [("cashmere", 100, None, True)]),
+    ("100% camel hair", [("camel", 100, None, None)]),
+    ("80% wool 20% acetate", [("wool", 80, None, None), ("acetate", 20, None, None)]),
+    ("55% linen 45% ramie", [("linen", 55, None, None), ("ramie", 45, None, None)]),
+    ("90% polyester 10% polyurethane", [("polyester", 90, None, None), ("polyurethane", 10, None, None)]),
+    ("70% acrylic 30% modacrylic", [("acrylic", 70, None, None), ("modacrylic", 30, None, None)]),
+    ("100% authentic", []),
+    ("100% new with tags", []),
 ])
 def test_percent_compositions(text, expected):
     assert fibers(text) == expected
@@ -51,6 +69,8 @@ def test_percent_compositions(text, expected):
     ("organic cotton hoodie", [("cotton", None, True, None)]),
     ("recycled polyester fleece", [("polyester", None, None, True)]),
     ("wool blend sweater", [("wool", None, None, None)]),
+    ("lambswool crewneck", [("wool", None, None, None)]),
+    ("camel coat", []),                                       # a colour, not a fiber, without a percentage
     ("Woolrich jacket", []),
     ("Cotton On tee", []),
     ("silk screen graphic tee", []),
@@ -75,6 +95,13 @@ def test_bare_words_and_traps(text, expected):
 
 def test_percent_wins_over_bare_word_for_the_same_fiber():
     assert fibers("100% cotton, soft cotton feel") == [("cotton", 100, None, None)]
+    assert fibers("Brown genuine leather bomber. Shell: 100% Genuine Leather") == [("leather", 100, None, None)]
+    assert fibers("100% polyester shell. Goose down fill, down jacket") == [("polyester", 100, None, None), ("down", None, None, None)]
+
+
+def test_lamb_only_qualifies_wool():
+    assert fibers("100% lamb leather accent") == []
+    assert fibers("100% lambs' wool") == [("wool", 100, None, None)]
 
 
 def test_snippet_quotes_the_matched_text():
@@ -91,6 +118,8 @@ def F(fiber, pct=None):
     ([F("cotton", 55), F("polyester", 40)], [57.9, 42.1], 42.1, False),
     ([F("cotton", 100), F("polyester", 100)], [100, 100], None, True),
     ([F("cotton", 60)], [60], None, True),
+    ([F("polyester", 90), F("polyurethane", 10)], [90, 10], 100, False),
+    ([F("acrylic", 70), F("modacrylic", 30)], [70, 30], 100, False),
     ([F("cotton")], [None], None, False),
     ([], [], None, False),
 ])
@@ -128,6 +157,8 @@ def test_certifications(text, expected):
     ("Deadstock NWT", False, True, False),
     ("dead stock from the 80s", False, True, False),
     ("new old stock", False, True, False),
+    ("Vtg Carhartt Detroit Jacket", True, False, False),
+    ("VTG J.Crew merino sweater", True, False, False),
     ("upcycled flannel", False, False, True),
     ("Up-cycled patchwork", False, False, True),
     ("plain tee", False, False, False),
@@ -170,9 +201,23 @@ def test_retail_price(text, cents):
 @pytest.mark.parametrize("text, country", [
     ("Made in USA", "USA"), ("made in the USA", "USA"), ("Made in China", "China"),
     ("Handmade in Peru", None), ("made in 1995", None), ("no origin", None),
+    ("Made in Hong Kong.", "Hong Kong"), ("made in the Dominican Republic", "Dominican Republic"),
+    ("Made in Sri Lanka", "Sri Lanka"), ("made in the Republic of Korea", "South Korea"), ("Made in Korea", "South Korea"),
+    ("Made in the U.S.A. Features", "USA"), ("Made in U.S.A", "USA"), ("Made in the United States, this", "USA"),
+    ("Made in America", "USA"), ("Made in : China", "China"), ("Made in: Vietnam", "Vietnam"), ("MADE IN ITALY", "Italy"),
+    ("made in Republic of Ireland. Care: hand wash", "Ireland"), ("made in a smoke free home", None), ("made in limited quantities", None), ("made in us", "USA"), ("made in usual way", None),
 ])
 def test_made_in(text, country):
     assert ex(text).country_of_manufacture == country
+
+
+@pytest.mark.parametrize("value, text, country", [
+    ("United States", "", "USA"), ("Viet Nam", "", "Vietnam"), ("Korea, Republic of", "", "South Korea"),
+    ("Unknown", "made in china", "China"), ("Unknown", "", None),
+])
+def test_specifics_country_uses_the_same_names_and_unknown_is_not_a_country(value, text, country):
+    out = X.extract(norm(description=text, specifics={"Country/Region of Manufacture": value}))
+    assert out.country_of_manufacture == country
 
 
 # --- product lines --------------------------------------------------------------------------
@@ -223,6 +268,22 @@ def test_a_material_field_is_unambiguous_so_leather_and_down_count(material, exp
     assert [f.fiber for f in out.materials.fibers] == expected
 
 
+@pytest.mark.parametrize("upper, expected", [("Leather", ["leather"]), ("Suede", ["leather"]), ("Leather, Suede", ["leather"]),
+                                             ("Synthetic", []), ("Mesh", [])])
+def test_ebay_sneaker_upper_material_counts_and_suede_is_leather(upper, expected):
+    out = X.extract(norm(category="sneakers", specifics={"Upper Material": upper, "Outsole Material": "Rubber",
+                                                         "Lining Material": "Fabric"}))
+    assert [f.fiber for f in out.materials.fibers] == expected
+
+
+def test_text_percentages_beat_a_material_field_that_names_the_same_fibers_without_them():
+    out = X.extract(norm(description="Soft. 100% merino wool.", specifics={"Material": "Wool"}))
+    assert [(f.fiber, f.pct) for f in out.materials.fibers] == [("wool", 100)]
+    assert (out.evidence[0].source, out.evidence[0].snippet) == ("listing_text", "100% merino")
+    blend = X.extract(norm(description="82% cotton 18% polyester", specifics={"Material": "Cotton"}))
+    assert [(f.fiber, f.pct) for f in blend.materials.fibers] == [("cotton", 82), ("polyester", 18)]
+
+
 def test_ebay_outer_shell_material_counts_but_lining_and_insulation_do_not():
     out = X.extract(norm(specifics={"Outer Shell Material": "Nylon", "Lining Material": "Polyester",
                                     "Insulation Material": "Down", "Fabric Type": "Ripstop"}))
@@ -262,9 +323,11 @@ def test_missing_material_is_null_with_unknown_evidence():
     assert [(e.field, e.status) for e in out.evidence] == [("materials.fibers", "unknown")]
 
 
-def test_actor_retail_price_beats_text():
+def test_actor_retail_price_beats_text_and_has_its_own_evidence():
     out = X.extract(norm(description="retail $99", cost=dict(price_cents=2000, total_cents=2000, retail_price_cents=8000)))
     assert out.cost.retail_price_cents == 8000
+    assert [(e.status, e.source, e.snippet) for e in out.evidence if e.field == "cost.retail_price_cents"] == \
+           [("claimed", "specifics", "$80.00")]
 
 
 def test_certification_evidence_and_other_fields_untouched():

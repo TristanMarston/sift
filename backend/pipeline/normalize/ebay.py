@@ -1,5 +1,6 @@
 """eBay (memo23/ebay-search-scraper-ppe, detail mode) record -> Normalized.
-Material and origin live in `itemSpecifics`, which is passed on as `specifics` for 03_extract.py."""
+Material and origin live in `itemSpecifics`, which is passed on as `specifics` for 03_extract.py.
+The item specific `Type` is the leaf of the category path: eBay files tees under a generic "Women's Clothing > Tops"."""
 import html
 
 from listing import Normalized
@@ -22,6 +23,8 @@ def map_item(raw: dict, category: str, scraped_at) -> Normalized:
     path = raw.get("categoryPath") or ""
     if is_kids(path):
         raise Drop("kids")
+    if raw.get("buyingFormat") == "auction":   # its price is the current bid, not what the item will sell for
+        raise Drop("auction")
     spec = {k: str(v) for k, v in (raw.get("itemSpecifics") or {}).items() if isinstance(v, (str, int, float))}
     condition = (spec.get("Condition") or raw.get("condition") or "").split(". ")[0] or None  # drop the seller prose
     positive = raw.get("sellerFeedbackPercentage")
@@ -31,12 +34,14 @@ def map_item(raw: dict, category: str, scraped_at) -> Normalized:
         url=f"https://www.ebay.com/itm/{external_id}", title=html.unescape(require(raw.get("title"), "no_title")),
         description=html.unescape(raw["description"]) if raw.get("description") else None,
         status="active" if raw.get("listingStatus") == "ACTIVE" else "sold", scraped_at=scraped_at,
-        brand=normalize_brand(raw.get("brand") or spec.get("Brand")), category=resolve_category(path, category),
-        subcategory=spec.get("Type"), size=spec.get("Size"), color=spec.get("Color"),
+        brand=normalize_brand(raw.get("brand") or spec.get("Brand")),
+        category=resolve_category(" > ".join(filter(None, [path, spec.get("Type")])), category),
+        subcategory=spec.get("Type"), size=spec.get("Size") or spec.get("US Shoe Size"), color=spec.get("Color"),
         condition=map_condition(condition), condition_raw=condition,
         image_urls=require(clean_images(raw.get("images")), "no_image"),
         cost=make_cost(raw.get("priceValue"), raw.get("currency"), shipping=raw.get("shippingCost"),
                        free_shipping=True if raw.get("shippingType") == "free" else None),
-        seller=dict(type=_seller_type(raw), rating=round(positive / 20, 2) if positive is not None else None,
+        # 0% positive means no feedback in the last 12 months (eBay's window), not a bad seller
+        seller=dict(type=_seller_type(raw), rating=round(positive / 20, 2) if positive else None,
                     region=normalize_region(raw.get("itemLocation"))),
         specifics=spec)
