@@ -53,7 +53,7 @@ _CATEGORY_RULES = [
     ("hoodies_sweatshirts", r"hoodie|hooded|sweatshirt"),
     ("sweaters_knitwear", r"sweater|cardigan|knitwear|jumper|\bknits?\b|turtleneck"),
     ("jackets_outerwear", r"jacket|coat|parka|puffer|\bvests?\b|windbreaker|anorak|blazer|outerwear|\bfleece\b|poncho"),
-    ("tshirts", r"t-?shirt|\btees?\b"),
+    ("tshirts", r"\bt[- ]?shirts?|\btees?\b"),
     ("shirts", r"shirt|flannel|button[- ]?(?:up|down)|blouse|\bpolos?\b|overshirt"),
     ("jeans_pants", r"jeans?|\bpants?\b|trouser|chino|jogger|sweatpants?|slacks|leggings?|cargo|denim"),
 ]
@@ -61,17 +61,36 @@ _CATEGORY_RULES = [
 
 def category_from_label(label: str | None) -> str | None:
     """A marketplace category label or path ("Men > Coats & Jackets") -> one of the 8 categories, else None."""
-    text = (label or "").lower()
+    text = re.sub(r"[._]", " ", re.sub(r"clothing, shoes (?:&|and) accessories", "", (label or "").lower()))  # eBay's root
     return next((cat for cat, pattern in _CATEGORY_RULES if re.search(pattern, text)), None)
 
 
-def is_us(location: str | None) -> bool | None:
-    """True for a US country/region string, False for any other text, None when there is none.
-    A bare state name or code reads as False: mappers for markets that return those handle them first."""
-    text = (location or "").strip().lower()
-    if not text:
+def resolve_category(label: str | None, fallback: str) -> str:
+    """The marketplace's own label wins. No label at all: the query's category (`fallback`). A label that maps to
+    none of our 8 categories (hats, bags, shorts) drops the record, so a beanie never inherits "jackets"."""
+    if not (label or "").strip():
+        return fallback
+    category = category_from_label(label)
+    if category is None:
+        raise Drop("unmapped_category")
+    return category
+
+
+def is_kids(label: str | None) -> bool:
+    """True for a kids' category label ("Kids > Girls coats"). Children's clothes are outgrown, not worn out,
+    so they would skew wear estimates, and an adult's photo should not match them."""
+    return bool(re.search(r"\b(?:kids?|boys?|girls?|baby|toddlers?|infants?|youth)\b", (label or "").lower()))
+
+
+def normalize_region(text: str | None) -> str | None:
+    """Country only ("Berlin, Germany" -> "Germany", any US place -> "US"), never a city or street.
+    Recorded on every row so a US-only view is a one-line filter; the pipeline itself does not filter on it."""
+    t = re.sub(r"^located in\s+", "", " ".join((text or "").split()), flags=re.I)
+    if not t:
         return None
-    return text in {"us", "usa", "u.s.", "u.s.a."} or "united states" in text
+    if t.lower() in {"us", "usa", "u.s.", "u.s.a."} or "united states" in t.lower():
+        return "US"
+    return t.split(",")[-1].strip()
 
 
 _BRANDS = ["The North Face", "Carhartt", "Carhartt WIP", "Patagonia", "Nike", "Jordan", "New Balance", "Levi's",

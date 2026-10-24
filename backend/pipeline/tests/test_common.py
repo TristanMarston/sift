@@ -52,12 +52,49 @@ def test_category_from_label(label, expected):
 
 
 @pytest.mark.parametrize("text, expected", [
-    ("US", True), ("usa", True), ("United States", True), ("Austin, TX, United States", True),
-    ("Canada", False), ("United Kingdom", False), ("Europe", False), ("GB", False),
+    ("US", "US"), ("usa", "US"), ("United States", "US"), ("Located in United States", "US"),
+    ("Hattiesburg, United States", "US"), ("Austin, TX, United States", "US"),
+    ("Located in China", "China"), ("Berlin, Germany", "Germany"), ("Europe", "Europe"), ("MY", "MY"),
     ("", None), (None, None),
 ])
-def test_is_us(text, expected):
-    assert C.is_us(text) is expected
+def test_normalize_region_is_coarse_and_never_a_filter(text, expected):
+    assert C.normalize_region(text) == expected
+
+
+@pytest.mark.parametrize("label, kids", [
+    ("Kids > Girls coats & jackets > Girls (4+)", True), ("Boys", True), ("Baby & toddler", True),
+    ("Women > Coats & jackets > Fleece jacket", False), ("Clothing > Men > Men's Clothing", False), ("", False), (None, False),
+])
+def test_is_kids(label, kids):
+    assert C.is_kids(label) is kids
+
+
+@pytest.mark.parametrize("label, expected", [
+    ("tops.t_shirts", "tshirts"), ("tops.button_ups", "shirts"), ("tops.sweatshirts_hoodies", "hoodies_sweatshirts"),
+    ("tops.long_sleeve_shirts", "shirts"), ("tops.sweaters_knitwear", "sweaters_knitwear"),
+    ("bottoms.denim", "jeans_pants"), ("bottoms.sweatpants_joggers", "jeans_pants"), ("bottoms.shorts", None),
+    ("footwear.sneakers", "sneakers"), ("outerwear.light_jackets", "jackets_outerwear"),
+    ("tailoring.blazers", "jackets_outerwear"), ("flat shirt", "shirts"),
+])
+def test_category_from_marketplace_slugs(label, expected):
+    assert C.category_from_label(label) == expected
+
+
+@pytest.mark.parametrize("label, expected", [
+    ("Clothing, Shoes & Accessories > Men > Men's Clothing > Coats, Jackets & Vests", "jackets_outerwear"),
+    ("Clothing, Shoes & Accessories > Men > Men's Clothing > Activewear > Activewear Jackets", "jackets_outerwear"),
+    ("Clothing, Shoes & Accessories > Women > Women's Shoes > Athletic Shoes", "sneakers"),
+    ("Clothing, Shoes & Accessories > Men > Men's Accessories > Hats", None),
+])
+def test_ebay_root_category_does_not_make_everything_footwear(label, expected):
+    assert C.category_from_label(label) == expected
+
+
+def test_resolve_category_prefers_the_label_and_never_lets_a_hat_inherit_the_query_category():
+    assert C.resolve_category("Jackets & Coats", "tshirts") == "jackets_outerwear"
+    assert C.resolve_category("", "tshirts") == "tshirts" and C.resolve_category(None, "sneakers") == "sneakers"
+    with pytest.raises(C.Drop, match="unmapped_category"):
+        C.resolve_category("accessories.hats", "jackets_outerwear")
 
 
 @pytest.mark.parametrize("raw, expected", [
