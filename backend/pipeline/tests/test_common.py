@@ -156,6 +156,22 @@ def test_normalize_brand(raw, expected):
     assert C.normalize_brand(raw) == expected
 
 
+@pytest.mark.parametrize("raw, expected", [
+    ("Nike Dunk Low", "Nike"), ("Nike dunk low retro", "Nike"), ("Levi's 501", "Levi's"), ("LEVIS 501", "Levi's"),
+    ("Levi’s 501 Jeans", "Levi's"), ("Levis Strauss", "Levi's"), ("Levi 501", "Levi's"), ("Champion Reverse Weave", "Champion"),
+    ("Carhartt WIP Detroit", "Carhartt WIP"), ("New Balance 990v5", "New Balance"), ("The North Face Nuptse", "The North Face"),
+    ("Jordache", "Jordache"), ("Nikerunner", "Nikerunner"),
+])
+def test_a_known_brand_followed_by_a_product_line_is_that_brand(raw, expected):
+    """Poshmark sellers type the model into the brand field. Brand is the join key for brand facts."""
+    assert C.normalize_brand(raw) == expected
+
+
+@pytest.mark.parametrize("raw", ["Flannel", "Designer", "Band Tees", "Streetwear", "Made In Usa", "Japanese Brand"])
+def test_grailed_style_tags_are_not_brands(raw):
+    assert C.normalize_brand(raw) is None
+
+
 # --- building blocks every mapper uses -------------------------------------------------------
 
 def cost(**kw):

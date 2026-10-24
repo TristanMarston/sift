@@ -119,21 +119,26 @@ _BRANDS = ["The North Face", "Carhartt", "Carhartt WIP", "Patagonia", "Nike", "J
            "Uniqlo", "Arc'teryx", "Columbia", "Champion", "Adidas", "Dr. Martens", "Converse", "Vans", "Dickies",
            "Wrangler", "Reebok", "Puma", "Asics", "Hoka", "Salomon", "Allbirds", "Veja"]
 _BRAND_BY_SLUG = {slug(b): b for b in _BRANDS} | {
-    "northface": "The North Face", "tnf": "The North Face", "levistrauss": "Levi's", "levistraussco": "Levi's",
+    "northface": "The North Face", "tnf": "The North Face", "levi": "Levi's", "levistrauss": "Levi's", "levistraussco": "Levi's",
     "docmartens": "Dr. Martens", "airjordan": "Jordan"}
 _NO_BRAND = {"", "unbranded", "nobrand", "none", "na", "other", "vintage", "handmade", "generic", "unknown",
-             "custom", "unmarked"}
+             "custom", "unmarked",
+             # Grailed's style tags, listed as designers ("Carhartt × Flannel")
+             "flannel", "designer", "bandtees", "streetwear", "madeinusa", "japanesebrand", "military", "sportswear"}
 
 
 def normalize_brand(raw: str | None) -> str | None:
-    """Canonical spelling for known brands (the join key for brand facts); junk values become None.
+    """Canonical spelling for known brands (the join key for brand facts); junk values become None. A known brand
+    followed by a model is that brand ("Nike Dunk Low", "Levi's 501": Poshmark sellers type these).
     Unknown brands are trimmed, and title-cased only when typed all lowercase."""
     key = slug(raw or "")
     if key in _NO_BRAND:
         return None
-    if key in _BRAND_BY_SLUG:
-        return _BRAND_BY_SLUG[key]
-    name = " ".join(raw.split())
+    words = raw.split()
+    for n in range(len(words), 0, -1):   # longest first, so "Carhartt WIP Detroit" is Carhartt WIP
+        if (known := _BRAND_BY_SLUG.get(slug(" ".join(words[:n])))):
+            return known
+    name = " ".join(words)
     return name.title() if name.islower() else name
 
 
