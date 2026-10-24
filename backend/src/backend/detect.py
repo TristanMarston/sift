@@ -32,6 +32,7 @@ MIN_AREA = 0.005   # share of the image a garment must cover
 MIN_SCORE = 0.5    # YOLOS class probability
 SAME = 0.5         # IoU above which two YOLOS boxes of one category are the same garment
 PART = 0.25        # a SegFormer blob this share of a garment's largest blob belongs to the same garment
+FRAGMENT = 0.02    # a garment under this share of the largest one is a sliver seen from a neighbouring crop
 SURE = 0.7         # SegFormer mean confidence: real garments score 0.84-0.99, fragments on product shots 0.4-0.7
 
 SEG_CLASSES = {4: ("top", None), 5: ("skirt", "dresses_skirts"), 6: ("pants", "jeans_pants"),
@@ -260,10 +261,15 @@ def _shared(a: dict, b: dict) -> float:
 def merge(garments: list[dict], same: float = 0.3) -> list[dict]:
     """Neighbouring crops overlap, so Haiku often names one garment twice: same category and boxes sharing more than
     `same` of the smaller one are one garment, the most confident kept. Layers (other categories) and other people's
-    clothes (no overlap) stay separate, except shoes: a pair is one garment. Keeps the input order."""
+    clothes (no overlap) stay separate, except shoes: a pair is one garment. Slivers (under FRAGMENT of the largest
+    garment: a collar, a strip of a top) are dropped. Keeps the input order."""
+    area = lambda g: g["box"]["w"] * g["box"]["h"]  # noqa: E731
+    largest = max((area(g) for g in garments), default=0)
     kept = []
     for i in sorted(range(len(garments)), key=lambda i: -garments[i]["confidence"]):
         g = garments[i]
+        if area(g) < FRAGMENT * largest:
+            continue
         if not any(garments[k]["category"] == g["category"]
                    and (g["category"] == "sneakers" or _shared(garments[k]["box"], g["box"]) > same) for k in kept):
             kept.append(i)
