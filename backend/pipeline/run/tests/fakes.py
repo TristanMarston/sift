@@ -42,7 +42,7 @@ class FakeApify:
         self.lock, self.calls, self.jobs, self.storage, self.named = threading.Lock(), [], {}, {}, {}
 
     def actor(self, actor_id):
-        def call(run_input, max_total_charge_usd, run_timeout):
+        def call(run_input, max_total_charge_usd, run_timeout, logger):
             mp, q = self.MP[actor_id], query_of(run_input)
             items = self.rows(mp, q, items_of(run_input))
             a = S.ACTORS[mp]

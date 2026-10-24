@@ -192,7 +192,8 @@ def _execute(client, task: Task, cap: Decimal, data_dir: Path, classify, seen: s
     counts, ids = H.RowCounts(), set()
     try:
         run = client.actor(actor.id).call(run_input=actor.build_input(task.query, task.max_items),
-                                          max_total_charge_usd=cap, run_timeout=RUN_TIMEOUT)
+                                          max_total_charge_usd=cap, run_timeout=RUN_TIMEOUT,
+                                          logger=None)   # don't stream the actor's log into ours: _fetch_log reads it
     except Exception as e:
         return Outcome({**entry, "status_message": f"{type(e).__name__}: {e}"}, counts, "", ids)
     if run is None:

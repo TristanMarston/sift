@@ -111,6 +111,9 @@ def test_cap_is_a_call_option_never_part_of_run_input(tmp_path):
     assert kw["max_total_charge_usd"] == Decimal("0.13")
     assert kw["run_input"] == {"query": "boxy tee", "maxItems": 100}
     assert "max_total_charge_usd" not in kw["run_input"]
+    # no streaming of the actor's log into ours: it was 98% of a live batch's output and buried the ALERT lines.
+    # The log is still read once per run (health.py) and every alert links to the run on Apify.
+    assert kw["logger"] is None
 
 
 # --- privacy -------------------------------------------------------------------------------
