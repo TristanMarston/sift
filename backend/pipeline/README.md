@@ -43,7 +43,7 @@ Everything runs from the `backend/` folder with `uv` (Python 3.12).
 ```bash
 cd backend
 uv sync                                    # install dependencies
-uv run pytest                              # ~380 tests, no network, no money
+uv run pytest                              # ~540 tests, no network, no money
 
 # put your Apify token in the repo root: /workspace/.env  ->  APIFY_TOKEN=...
 uv run python pipeline/01_scrape.py --dry-run      # see the plan and what it would cost. Calls nothing.
@@ -86,7 +86,8 @@ How it behaves:
   quotas count the rows already saved. Bad runs (blocked, empty, junk, failed) are retried; a query that comes back
   empty twice is treated as really empty.
 - **Safe on money.** Every actor call carries a hard charge cap (expected cost + 25%, at least $0.05) and a
-  30-minute timeout. Progress lines show the estimated spend.
+  30-minute timeout. Progress lines show the estimated spend. A run that fails or times out is booked at its full cap,
+  because its rows were billed but not saved.
 - **Notices blocks at once.** Each run is judged when it finishes. A bad one prints an `ALERT` line and is appended to
   `alerts.jsonl`; a block or junk data stops that marketplace immediately, and a second empty or failed run in a row
   stops it too. The other marketplaces carry on. Create `data/STOP` to halt before the next run. See [`BLOCKING.md`](BLOCKING.md).
@@ -107,14 +108,14 @@ raises `Drop("reason")`. The step prints how many rows were kept and why the oth
 | `no_price`, `no_url`, `no_title`, `no_id`, `no_image` | A required field is missing |
 | `non_usd` | The price is not in dollars. There is no currency conversion. |
 | `not_listing` | A free summary row from an actor (Mercari's dataset has some), not a listing |
-| `kids` | The category is children's clothing (it would skew wear estimates) |
-| `unmapped_category` | The marketplace says what it is (hat, bag, shorts) and it is not one of our 8 categories |
+| `kids` | The category is children's clothing (it would skew wear estimates); on Depop, which has no kids label, a kids size (`6 years`, `12-18 months`) |
+| `unmapped_category` | The marketplace says what it is (hat, bag, shorts, even `Shorts > Denim`) and it is not one of our 8 categories |
 | `invalid`, `error:<Type>` | The row failed validation, or the mapper crashed on an odd record |
 
 Duplicates (same marketplace and item id) are collapsed, keeping the newest copy.
 
 Shared rules (`normalize/common.py`): prices become integer cents; brands get one canonical spelling
-(`Levis`, `LEVI'S` → `Levi's`; junk like `unbranded` → null); condition text maps to `new_with_tags`, `like_new`,
+(`Levis`, `LEVI'S` → `Levi's`; junk like `unbranded` → null; Grailed's `Vintage` designer tag becomes a vintage flag, not part of the brand); condition text maps to `new_with_tags`, `like_new`,
 `good`, `fair` (or null); the marketplace's category label maps to one of the 8 categories (all footwear counts as
 `sneakers`; the leaf of a path like `Men > Sweats & hoodies > Track jacket` wins; blazers and suits count as jackets);
 a missing label falls back to the query's category. Titles and descriptions lose invisible characters (zero-width
@@ -130,14 +131,18 @@ Adds the evidence. It never invents: if the listing does not say, the field is e
 | Materials | 1. structured fields (eBay `Material`, `Outer Shell Material`, `Fabric Type`, …) 2. title + description 3. `product_lines.yaml` | `claimed` (1, 2) or `inferred` (3) |
 | Composition | `60% cotton / 40% polyester`, `100% organic cotton`; bare words (`cotton tee`) give a fiber with no percentage | `claimed` |
 | Certifications | GOTS, OEKO-TEX, bluesign, Fair Trade, RWS, RDS, B Corp | `claimed` |
-| Vintage / deadstock / upcycled | **title** and structured style fields only (descriptions carry shop boilerplate) | `claimed` |
+| Vintage / deadstock / upcycled | **title** (`vintage`, `vtg`, `deadstock`, ...) and structured style fields only (descriptions carry shop boilerplate) | `claimed` |
 | Retail price | `retails for $120`, `MSRP $75` in the title or description | `claimed` |
-| Country of manufacture | the structured country field, else `made in X` | `claimed` |
+| Country of manufacture | the structured country field, else `made in X` where X is on a known-country list | `claimed` |
 
-Composition details: synonyms are unified (`poly` → `polyester`, `spandex` → `elastane`, `merino` → `wool`);
+Countries get one name each (`U.S.A.`, `United States`, `America` → `USA`; `Korea` → `South Korea`), and eBay's
+`Unknown` is not a country. The list is in `extract.py`; a country not on it is left null rather than guessed.
+
+Composition details: synonyms are unified (`poly` → `polyester`, `spandex` → `elastane`, `merino` and `lambswool` → `wool`);
+words between the number and the fiber are allowed (`100% pure new wool`, `100% Italian boiled wool`, `100% baby alpaca`);
 percentages that add up to 90–110 are scaled to 100; any other sum is kept but marked `composition_suspect`
 (multi-part tags like shell + lining land here). `synthetic_share` is the share of polyester, nylon, acrylic and
-elastane, and is only computed when every fiber has a percentage and the sum is sound. Fabrics that are not fibers
+elastane (plus modacrylic and polyurethane), and is only computed when every fiber has a percentage and the sum is sound. Fabrics that are not fibers
 (fleece, ripstop, Gore-Tex) are not reported as materials.
 
 ### 04 · Report — `04_report.py` (logic in `report.py`)
@@ -280,7 +285,8 @@ No seller usernames, profile links, avatars or account ids are stored.
 - `scrape.py` removes them **before anything is written**. Flat keys such as `sellerUsername` are dropped at any depth.
   Inside any seller block (`seller`, `sellerProfile`, `user`) only a short allowlist survives (ratings, counts,
   location). eBay records keep only the top-level fields the mapper reads, because its raw page data contains the
-  seller's handle and buyers' feedback.
+  seller's handle and buyers' feedback. Depop records lose `location` (the seller's city) and `slug` (it starts with
+  the seller's handle).
 - `tests/test_privacy.py` scans the fixtures, the mapper output and any real files in `data/` for identity keys.
 - Two things are deliberately kept: the listing `url` (the link-out; **Depop URLs begin with the seller's handle**)
   and the description text (sellers sometimes write their store name in it).
@@ -315,7 +321,8 @@ that is not mirrored in `listing.py` fails a test.
 - Poshmark gives no condition, so it is null. Depop gives no shipping and no seller details. Mercari gives no color.
 - Sellers sometimes put the wrong category on an item; a mislabeled item passes through.
 - `seller.type` thresholds are guesses (Grailed: ≤ 20 / ≤ 200 listings; eBay: business accounts with ≥ 5,000
-  feedback are large resellers).
+  feedback are large resellers). An eBay seller with 0% positive feedback has no feedback in eBay's 12-month window,
+  so `seller.rating` is null, as it is for a Mercari seller with no reviews.
 - Material coverage depends on the queries. One generic jacket query gave 41% with a stated material and 6% with
   percentages; material-rich queries lifted Mercari to 70% and 50%. Check `REPORT.md` after the run.
 - Tags with several parts (shell, lining) add up past 100%, so they are kept but marked `composition_suspect` and get no

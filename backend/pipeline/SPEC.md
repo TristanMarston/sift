@@ -193,7 +193,7 @@ One JSON object per line in `data/listings.jsonl`. Names and enums mirror
 | Field | Type | Notes |
 | --- | --- | --- |
 | `id` | string | `<marketplace>:<external_id>`; matches `^(depop\|poshmark\|grailed\|mercari\|ebay):.+$` |
-| `marketplace` | enum | `depop poshmark grailed mercari ebay` (the schema enum; `mercari` is not collected) |
+| `marketplace` | enum | `depop poshmark grailed mercari ebay` (the schema enum) |
 | `external_id` | string | actor id field, else last path segment of `url` |
 | `url` | string | link-out |
 | `title` | string | |
