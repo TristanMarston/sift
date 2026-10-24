@@ -176,3 +176,15 @@ def test_describe_sends_the_crop_and_reads_the_structured_answer(monkeypatch):
     assert sent["output_config"]["format"]["type"] == "json_schema"
     image, text = sent["messages"][0]["content"]
     assert image["source"]["media_type"] == "image/jpeg" and '"top"' in text["text"]
+
+
+def test_unsure_segmentation_counts_as_nothing_so_product_shots_go_to_haiku_or_the_whole_image(monkeypatch):
+    # On a lone-sneaker product shot SegFormer (trained on worn clothes) guesses top/pants fragments at ~0.4-0.7
+    unsure = [{**TOP, "confidence": 0.62}, {**PANTS_R, "confidence": 0.55}]
+    monkeypatch.setattr(D, "segformer", lambda im: unsure)
+    fake = lambda crop, hint: [{"label": "sneakers", "category": "sneakers",  # noqa: E731
+                               "box": {"x": 0.2, "y": 0.3, "w": 0.6, "h": 0.4}}]
+    assert [g["label"] for g in D.detect(IMG, llm=fake)["garments"]] == ["sneakers"]
+    assert D.detect(IMG, llm=None)["garments"] == []
+    monkeypatch.setattr(D, "segformer", lambda im: [*unsure, {**TOP, "label": "top", "confidence": 0.95}])
+    assert [g["confidence"] for g in D.detect(IMG, llm=None)["garments"]] == [0.95]

@@ -25,6 +25,7 @@ MEAN, STD = np.array([0.485, 0.456, 0.406], np.float32), np.array([0.229, 0.224,
 MIN_AREA = 0.005   # share of the image a garment must cover
 MIN_SCORE = 0.5    # YOLOS class probability
 SAME = 0.5         # IoU above which two YOLOS boxes of one category are the same garment
+SURE = 0.7         # SegFormer mean confidence: real garments score 0.84-0.99, fragments on product shots 0.4-0.7
 
 SEG_CLASSES = {4: ("top", None), 5: ("skirt", "dresses_skirts"), 6: ("pants", "jeans_pants"),
                7: ("dress", "dresses_skirts")}  # uppers get their category from Haiku
@@ -257,5 +258,5 @@ def detect(image: Image.Image, backend: str = "segformer", llm=DEFAULT_LLM) -> d
     im = upright(image)
     if backend == "yolos":
         return response(im, yolos(im))
-    regions = segformer(im)
+    regions = [r for r in segformer(im) if r["confidence"] >= SURE]
     return response(im, relabel(im, regions, llm) if regions else _haiku_only(im, llm))
