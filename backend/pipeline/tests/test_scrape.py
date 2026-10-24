@@ -129,9 +129,14 @@ def test_scrub_keeps_only_known_safe_fields_inside_any_seller_block():
                "seller_score": {"sold_count": 960, "rating_average": 4.8, "rating_count": 489, "tag_list": ["fast"]}}
     assert S.scrub({"sellerProfile": profile, "Seller": {"email": "a@b.c", "ratingCount": 2}}) == {
         "sellerProfile": {"location": "Asia", "total_bought_and_sold": 960, "listings_for_sale_count": 312,
-                          "seller_score": {"sold_count": 960, "rating_average": 4.8, "rating_count": 489,
-                                           "tag_list": ["fast"]}},
+                          "seller_score": {"rating_average": 4.8, "rating_count": 489}},
         "Seller": {"ratingCount": 2}}
+
+
+def test_the_seller_allowlist_applies_at_every_depth_inside_a_seller_block():
+    nested = {"seller": {"seller_score": {"rating_average": 4.8, "display_name": "Bob", "shop": {"handle": "bob"}},
+                         "location": [{"location": "US", "street": "1 Main St"}]}}
+    assert S.scrub(nested) == {"seller": {"seller_score": {"rating_average": 4.8}, "location": [{"location": "US"}]}}
 
 
 def test_scrub_keep_drops_every_other_top_level_key():

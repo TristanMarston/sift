@@ -93,12 +93,12 @@ def _seller_block(key: str) -> bool:
 
 def scrub(value, in_seller=False, keep=None):
     """Copy of an actor record without seller usernames, profile URLs, avatars, account ids or contact data.
-    `keep`: if given, only these top-level keys survive."""
+    Everything below a seller block is held to SELLER_SAFE. `keep`: if given, only these top-level keys survive."""
     if isinstance(value, list):
-        return [scrub(v) for v in value]
+        return [scrub(v, in_seller) for v in value]
     if not isinstance(value, dict):
         return value
-    return {k: scrub(v, _seller_block(k) and not in_seller) for k, v in value.items()
+    return {k: scrub(v, in_seller or _seller_block(k)) for k, v in value.items()
             if k.lower() not in IDENTITY_KEYS and (keep is None or k in keep)
             and (not in_seller or k.lower().replace("_", "") in SELLER_SAFE)}
 
