@@ -38,7 +38,7 @@ Apify gives us a record of every photo, full description, and structured fields.
 - We collect only public listing data with no accounts needed (the same information any visitor sees in a browser).
 - All links go directly to the marketplace.
 - User-uploaded photos are used only for search matching.
-- We do not store seller usernames, profile links, or account IDs. A scanner checks all data after every batch and stops collection if any identity information is found.
+- We do not store seller usernames or profile information. A scanner checks all data after every batch and stops collection if any identity information is found.
 
 ## Image detection and matching
 
@@ -54,7 +54,7 @@ Every item is already secondhand, so we score how good it is for the planet by d
 
 ## Challenges we ran into
 
-- Our catalog had to come from five different marketplaces. We also needed the full description, every photo, condition, size, and shipping information. Writing and maintaining five collectors that deal with proxies and layout changes would have taken most of our time. Apify actors handled that for us. We chose one actor per marketplace, and each one returns the full listing as structured data. That left our time for the interesting part of exploring the data and ranking items by cost per wear.
+- Our catalog had to come from five different marketplaces. We also needed the full description, every photo, condition, size, and shipping information. Writing and maintaining scrapers that deal with proxies and layout changes would have taken most of our time. Apify actors handled that for us. We chose one actor per marketplace, and each one returns the full listing as structured data. That left our time for the interesting part of exploring the data and ranking items by cost per wear.
 - Most listings don't include fabric data, and fabric is the biggest indicator to how long a garment lasts. Sellers usually include a photo of the care tag, so we send those photos to Claude Haiku to transcribe the printed text and fill in missing fields.
 - No single database covers eco facts for secondhand clothes either, so we built one from sources we checked ourselves. It includes brand repair programs, B Corp and bluesign certifications, and the EU's published wear baselines.
 
