@@ -2,7 +2,7 @@
 
 import { ChevronLeft, Info, SearchX, WifiOff } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { Shot } from '@/components/camera/capture';
 import { GarmentCutout } from '@/components/sift/garment-tabs';
 import { Notice } from '@/components/sift/notice';
@@ -12,6 +12,7 @@ import { ease, spring } from '@/lib/motion';
 import { categoryLabel, headline, ordered, perWearText, priceText, sliderOrder, typicalText } from '@/lib/results';
 import type { GarmentSearch, View } from '@/lib/resume';
 import type { Sort } from '@/lib/search';
+import { shake } from '@/lib/shake';
 import type { Garment } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { ReceiptSheet } from './receipt-sheet';
@@ -45,7 +46,19 @@ export function ResultsScreen({ shot, garments, searches, view, onView, onSelect
     const [why, setWhy] = useState(false); // the typical look-alike, explained
     const garment = garments.find((g) => g.id === view.selected) ?? garments[0];
     const current = searches[garment.id];
-    const resp = current?.status === 'done' ? current.resp : null;
+    // Hidden test switch: tap the title 5 times to fake a response where the cheapest isn't the best value.
+    const [shaken, setShaken] = useState(false);
+    const taps = useRef<number[]>([]);
+    const tapTitle = () => {
+        const now = Date.now();
+        taps.current = [...taps.current.filter((t) => now - t < 2000), now];
+        if (taps.current.length >= 5) {
+            taps.current = [];
+            setShaken((x) => !x);
+        }
+    };
+    const raw = current?.status === 'done' ? current.resp : null;
+    const resp = useMemo(() => (raw && shaken ? shake(raw) : raw), [raw, shaken]);
     const leaning = sort === 'cpw' && mix > 0; // the slider has moved off pure cost per wear
     const list = resp ? (leaning ? sliderOrder(resp, mix) : ordered(resp, sort)) : [];
     // The headline describes the cost-per-wear order, so it only shows there.
@@ -66,7 +79,8 @@ export function ResultsScreen({ shot, garments, searches, view, onView, onSelect
                         <ChevronLeft data-icon='inline-start' strokeWidth={1.75} />
                         Photo
                     </Button>
-                    {resp?.sample && <span className='rounded-pill bg-secondary px-2.5 py-1 type-footnote font-semibold text-muted-foreground'>Sample results</span>}
+                    {/* {shaken && <span className='rounded-pill bg-secondary px-2.5 py-1 type-footnote font-semibold text-muted-foreground'>Test order</span>} */}
+                    {!shaken && resp?.sample && <span className='rounded-pill bg-secondary px-2.5 py-1 type-footnote font-semibold text-muted-foreground'>Sample results</span>}
                     <ThemeToggle />
                 </motion.header>
 
@@ -101,7 +115,7 @@ export function ResultsScreen({ shot, garments, searches, view, onView, onSelect
                                 </motion.div>
                             )}
                             <motion.div {...fade(0.15)} className='min-w-0'>
-                                <h1 className='truncate type-title-1'>{title}</h1>
+                                <h1 className='truncate type-title-1 select-none' onClick={tapTitle}>{title}</h1>
                                 <p className='type-footnote text-muted-foreground' aria-live='polite'>
                                     {status}
                                     <span aria-hidden> · </span>
