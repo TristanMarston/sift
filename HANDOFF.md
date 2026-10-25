@@ -23,6 +23,11 @@ the contract; `CLAUDE.md` rules still apply (branch per feature, PR, TDD for dat
   evidence; every result carries `scraped_at` ("Price checked Oct 24"); `/health` has `by_category`; `/detect` shrinks
   photos to 2,048 px; 404/405 use the error shape; lots, bundles and one-word titles are dropped or mended when the
   index loads. **D1 (slider start) is still the team's call.**
+- **Oct 24, 21:15 PT: Haram's second batch is live.** 103,862 listings (Depop 38,101 · Poshmark 30,115 · Mercari 17,707 ·
+  eBay 13,425 · Grailed 4,514), index 103,859, the API serves 103,553 after dropping lots and bundles. Backup:
+  `sift-index:/snapshots/sift-data-haram-2026-10-25.zip`. Not done: care-tag reads for 15,789 new listings (~$11 of
+  Haiku, Anthony's call). Haram's 149 new runs live on Haram's second Apify account, so `cli.py sync` cannot see them:
+  import the zip before scraping.
 - Biggest open items: D1, the web items in `DIAGNOSTIC.md` (W1 accessories, W2 landing data), and the demo checklist.
 
 ## Overnight run (finished Oct 24)
