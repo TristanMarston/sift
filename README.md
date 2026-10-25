@@ -1,41 +1,37 @@
 # Sift
 
-> **Picking this up? Read [`HANDOFF.md`](HANDOFF.md) first:** what's live, what's running overnight (don't touch the Apify token or the Modal app), and what each of us can do next.
+## How Sift collects data with Apify
 
+Calculating cost per wear requires prices, photos, material, condition, shipping, and more. No public dataset offers this kind of data across several marketplaces, so we built our catalog with Apify. We picked one Apify actor per marketplace with fallback actors ready.
 
-Take a photo of clothing. We find look-alikes across secondhand marketplaces and rank them by
-**cost per wear**, with a Wear Receipt showing the cost, quality, and eco evidence.
-Cal Hacks 13.0.
+Our catalog currently holds **XYZ listings** from 5 marketplaces and 8 categories. In total, it took **XYZ Apify runs** resulting in XYZ raw rows and XYZ clean listings across **XYZ hours**. We collected XYZ photo URLs (XYZ per listing) and about XYZ distinct brands.
 
-## Docs
+### Running at scale
 
-| Doc | What it covers | Owner |
-| --- | --- | --- |
-| [`DESCRIPTION.md`](DESCRIPTION.md) | Why, product intent, scope, demo, decisions | Everyone |
-| [`backend/pipeline/README.md`](backend/pipeline/README.md) | How to run the data pipeline: steps, inputs, outputs | Andy |
-| [`backend/pipeline/run/README.md`](backend/pipeline/run/README.md) | How the team runs the scrape: batches, checks, sync, handing off | Andy |
-| [`backend/pipeline/BLOCKING.md`](backend/pipeline/BLOCKING.md) | What happens when a marketplace blocks the scraper: detection, alerts, stopping, the end-of-run report | Andy |
-| [`backend/pipeline/SPEC.md`](backend/pipeline/SPEC.md) | Pipeline decisions, costs, test-run results (newer than SCRAPING.md where they differ) | Andy |
-| [`backend/pipeline/SCRAPING.md`](backend/pipeline/SCRAPING.md) | Marketplaces, fields per listing, extraction, pipeline steps | Andy |
-| [`schema/API.md`](schema/API.md) | Frontend ↔ backend endpoints, payloads, sort rules | Anthony + Tristan |
-| [`schema/api.schema.json`](schema/api.schema.json) | Machine-readable API contract (JSON Schema) | Anthony + Tristan |
+We run actors on five marketplaces in parallel using all five concurrent slots on Apify. To do this, a load balancer plans the run and separates it into batches:
 
-**When docs disagree, the more specific one wins:**
-`api.schema.json` > `API.md` > `SCRAPING.md` > `DESCRIPTION.md`.
-Fix the loser in the same PR. Changing the schema needs a quick team huddle.
+- Data volume is split by ratio and by price. For example, Grailed costs 12 times more per row than Depop, so it gets a much smaller share of the rows.
+- The planner reads our Apify balance and sizes the batch so that its worst case fits within the balance.
+- Every run goes into a shared Apify dataset so we don't scrape duplicate entries.
 
-## Layout
+Every batch is validated for data integrity. If a marketplace starts returning error codes or empty data, the balancer will switch to a fallback actor and retry. If that actor also fails, it re-allocates rows to other marketplaces. With this system, we can let the load balancer run autonomously overnight.
 
-```
-backend/            Python 3.12, uv
-  pipeline/         scrape → normalize → extract → thumbs → embed → upsert
-  database/         Supabase / Postgres (pgvector)
-  ml/               garment detection, embeddings, wear_baselines.yaml
-  src/backend/      shared package: models, embed, FastAPI app
-schema/             API contract (the source of truth for web ↔ backend)
-web/                frontend
-```
+| Marketplace                  | Items Scraped |
+| ---------------------------- | ------------- |
+| Depop                        |               |
+| Poshmark                     |               |
+| Grailed                      |               |
+| Mercari                      |               |
+| eBay                         |               |
 
-## Rules
+### Processing data
 
-See [`CLAUDE.md`](CLAUDE.md): never push to main, one branch + PR per feature, red/green TDD for data and ML code.
+Apify gives us a record of every photo, full description, and structured fields. That means we can call any other tool on it. For listings with no fabric type, we send the photos to Claude Haiku because sellers usually put the care tag near the end. Haiku transcribes the printed text, which costs about $0.0007 per listing.
+
+Across XYZ listings, XYZ state a material and XYZ give percentages. With Haiku scanning labels, we fill in XYZ missing fields.
+
+## Privacy and Transparency
+
+Every extracted fact has a record of its source. It's *verified* if we read it from a care tag, *claimed* if the seller stated it, *inferred* if it's looked up from our product info tables, or *unknown* if the listing does not say. We never fill in blanks with guesses. We keep exact text so receipts can quote the original. Final prices include buyer fees and shipping.
+
+We do not store seller usernames, profile links, or account IDs. A scanner checks all data after every batch and stops collection if any identity information is found. We scrape only public listing data with no accounts needed. Original photos are shown and links go to the marketplace. User-uploaded photos are used only for search matching.
