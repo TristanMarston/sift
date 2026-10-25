@@ -56,8 +56,8 @@ test('bigNumber follows the sort', () => {
     assert.deepEqual(bigNumber(r('a'), 'cpw'), { value: '$0.30', unit: '/wear' });
     assert.deepEqual(bigNumber(r('a'), 'price'), { value: '$48', unit: '' });
     assert.deepEqual(bigNumber(r('a'), 'match'), { value: '91%', unit: 'match' });
-    assert.deepEqual(bigNumber(r('a'), 'eco'), { value: 'Medium', unit: 'eco' });
-    assert.deepEqual(bigNumber(r('a', { eco: { level: 'unknown', score: null, facts: [] } }), 'eco'), { value: 'Unknown', unit: 'eco' });
+    // The eco level is already on the row (its marker), so the Eco tab's big number stays cost per wear.
+    assert.deepEqual(bigNumber(r('a'), 'eco'), { value: '$0.30', unit: '/wear' });
 });
 
 test('dots turn a level into filled dots out of three, never a number', () => {

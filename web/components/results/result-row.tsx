@@ -7,7 +7,8 @@ import { spring } from '@/lib/motion';
 import { bigNumber, marketLine, perWearText, priceText } from '@/lib/results';
 import type { Result, Sort } from '@/lib/search';
 import { cn } from '@/lib/utils';
-import { MarkerLine } from './evidence';
+import type { MarkerStyle } from '@/lib/marker-style';
+import { RowMarkers } from './markers';
 
 // A touch of bounce: the user's tap gave the reshuffle its energy.
 const reorder = { type: 'spring', bounce: 0.15, duration: 0.6 } as const;
@@ -28,16 +29,16 @@ export function ListingPhoto({ r, className, children }: { r: Result; className?
     );
 }
 
-type Props = { r: Result; rank: number; sort: Sort; cheapest: boolean; open: boolean; onOpen: () => void };
+type Props = { r: Result; rank: number; sort: Sort; cheapest: boolean; open: boolean; onOpen: () => void; markerStyle?: MarkerStyle };
 
 /** One look-alike: photo with its rank, title, where it is, the evidence levels, and the number the sort is about. */
-export function ResultRow({ r, rank, sort, cheapest, open, onOpen }: Props) {
+export function ResultRow({ r, rank, sort, cheapest, open, onOpen, markerStyle }: Props) {
     const big = bigNumber(r, sort);
     // Cost per wear is always on the row: as the big number, or next to it.
-    const second = sort === 'cpw' ? priceText(r.cost.total_cents) : sort === 'price' ? `${perWearText(r.wear.cpw_cents.at_mid)}/wear` : `${priceText(r.cost.total_cents)} · ${perWearText(r.wear.cpw_cents.at_mid)}/wear`;
+    const second = sort === 'cpw' || sort === 'eco' ? priceText(r.cost.total_cents) : sort === 'price' ? `${perWearText(r.wear.cpw_cents.at_mid)}/wear` : `${priceText(r.cost.total_cents)} · ${perWearText(r.wear.cpw_cents.at_mid)}/wear`;
     return (
-        <motion.li layout variants={rowIn} transition={{ layout: reorder, default: spring.ui }} className='list-none'>
-            <button type='button' onClick={onOpen} className='flex w-full gap-3 rounded-card bg-card p-2.5 text-left text-card-foreground shadow-card outline-none transition-transform duration-100 active:scale-[0.985] focus-visible:ring-2 focus-visible:ring-ring'>
+        <motion.li layout variants={rowIn} transition={{ layout: reorder, default: spring.ui }} className='h-full min-w-0 list-none'>
+            <button type='button' onClick={onOpen} className='flex h-full w-full gap-3 rounded-card bg-card p-2.5 text-left text-card-foreground shadow-card outline-none transition-transform duration-100 active:scale-[0.985] focus-visible:ring-2 focus-visible:ring-ring'>
                 {open ? (
                     <div className='aspect-[4/5] w-[88px] shrink-0 rounded-image bg-muted' /> // the photo is in the open receipt
                 ) : (
@@ -54,15 +55,17 @@ export function ResultRow({ r, rank, sort, cheapest, open, onOpen }: Props) {
                             {r.match.band === 'exact' && <span className='rounded-tag bg-secondary px-1.5 py-px type-label text-secondary-foreground'>EXACT MATCH</span>}
                         </span>
                     )}
-                    <h3 className='line-clamp-2 type-callout font-semibold text-pretty'>{r.title}</h3>
+                    <h3 className='truncate type-callout font-semibold' title={r.title}>
+                        {r.title}
+                    </h3>
                     <p className='truncate type-footnote text-muted-foreground'>{marketLine(r)}</p>
-                    <MarkerLine r={r} />
+                    <RowMarkers r={r} style={markerStyle} />
                     <div className='mt-auto flex items-end gap-2 pt-1'>
                         <AnimatePresence mode='popLayout' initial={false}>
                             <motion.span key={sort} className='flex items-baseline gap-1' initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={spring.snappy}>
                                 <span className='font-serif text-[26px] leading-7 tracking-tight tabular'>{big.value}</span>
                                 {big.unit && <span className='type-footnote text-muted-foreground'>{big.unit}</span>}
-                                {sort === 'cpw' && <EstTag className='ml-0.5' />}
+                                {(sort === 'cpw' || sort === 'eco') && <EstTag className='ml-0.5' />}
                             </motion.span>
                         </AnimatePresence>
                         <span className='ml-auto pb-0.5 type-footnote tabular text-muted-foreground'>{second}</span>

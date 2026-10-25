@@ -7,12 +7,14 @@ import { EstTag } from '@/components/sift/status-badge';
 import { Button } from '@/components/ui/button';
 import { ecoParts, wearReasons } from '@/lib/explain';
 import { ease, spring } from '@/lib/motion';
-import { levelText, MARKET, marketLine, perWearText, priceText, typicalText } from '@/lib/results';
+import { CONDITION, levelText, MARKET, perWearText, priceText, typicalText } from '@/lib/results';
 import type { Fact, Level, Result, SearchResponse } from '@/lib/search';
 import { useMedia } from '@/lib/use-media';
 import { breakEvenVerdict } from '@/lib/wear';
 import { cn } from '@/lib/utils';
+import { useMarkerStyle, type MarkerStyle } from '@/lib/marker-style';
 import { FactRow, LevelDots, noEvidence, sentence } from './evidence';
+import { EcoHero, LevelBadge } from './markers';
 import { ListingPhoto } from './result-row';
 
 const QUALITY: Record<Level, string> = {
@@ -33,6 +35,12 @@ const CONFIDENCE: Record<Level, string> = {
 const EMPTY: Record<string, string> = { fibers: 'Not stated', durability: 'Typical for the category', shipping: 'Not stated', circularity: 'Nothing extra stated' };
 
 type Props = { r: Result; typical: SearchResponse['typical']; count?: number; onClose: () => void };
+
+/** "Oct 24" from the listing's scraped_at. Undefined when the API didn't send one (older responses, saved samples). */
+const checked = (iso?: string) => {
+    const d = iso ? new Date(iso) : null;
+    return d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : undefined;
+};
 
 /**
  * Everything behind one result's cost per wear, in plain cards: the math first (price ÷ expected wears, and how the
@@ -61,6 +69,7 @@ export function ReceiptSheet({ r, typical, count, onClose }: Props) {
     const w = r.wear;
     const c = r.cost;
     const cpw = perWearText(w.cpw_cents.at_mid);
+    const [fullTitle, setFullTitle] = useState(false);
 
     return (
         <>
@@ -98,18 +107,28 @@ export function ReceiptSheet({ r, typical, count, onClose }: Props) {
                     {/* The item, and the way to buy it */}
                     <div className='flex gap-4'>
                         <ListingPhoto r={r} className='w-[104px]' />
-                        <div className='flex min-w-0 flex-1 flex-col gap-1'>
-                            <h2 className='line-clamp-3 type-headline text-pretty'>{r.title}</h2>
-                            <p className='type-footnote text-muted-foreground'>{marketLine(r)}</p>
+                        <div className='flex min-w-0 flex-1 flex-col gap-2'>
+                            {/* Two lines at most; tap to read the rest of a long listing title. */}
+                            <h2 onClick={() => setFullTitle((f) => !f)} className={cn('type-headline text-pretty', !fullTitle && 'line-clamp-2 cursor-pointer')}>
+                                {r.title}
+                            </h2>
+                            {/* Size and condition decide whether it's worth tapping through, so they're chips, not fine print. */}
+                            <div className='flex flex-wrap gap-1.5'>
+                                <span className='rounded-pill bg-foreground px-2.5 py-1 type-footnote font-semibold text-background'>{r.size ? `Size ${r.size}` : 'Size unknown'}</span>
+                                <span className='rounded-pill bg-secondary px-2.5 py-1 type-footnote font-semibold'>{r.condition ? CONDITION[r.condition] : 'Condition unknown'}</span>
+                            </div>
                             <p className='type-footnote text-muted-foreground'>
-                                {Math.round(r.match.similarity * 100)}% look match{r.match.band === 'exact' ? ', exact match' : r.match.band === 'close' ? ', close match' : ''}
+                                {MARKET[r.marketplace]}, {Math.round(r.match.similarity * 100)}% look match
                             </p>
                         </div>
                     </div>
-                    <Button size='lg' className='w-full' render={<a href={r.url} target='_blank' rel='noreferrer' />} nativeButton={false}>
-                        View on {MARKET[r.marketplace]}
-                        <ExternalLink data-icon='inline-end' strokeWidth={1.75} />
-                    </Button>
+                    <div>
+                        <Button size='lg' className='w-full' render={<a href={r.url} target='_blank' rel='noreferrer' />} nativeButton={false}>
+                            View on {MARKET[r.marketplace]}
+                            <ExternalLink data-icon='inline-end' strokeWidth={1.75} />
+                        </Button>
+                        {checked(r.scraped_at) && <p className='mt-1.5 text-center type-footnote text-muted-foreground'>Price checked {checked(r.scraped_at)}. Listings can sell or change.</p>}
+                    </div>
 
                     {/* The math: price ÷ expected wears, then how the wears were reached */}
                     <Card>
@@ -173,16 +192,7 @@ export function ReceiptSheet({ r, typical, count, onClose }: Props) {
                         </Details>
                     </Card>
 
-                    <Card>
-                        <CardTitle title='Quality' level={r.quality.level} />
-                        <p className='mt-1 type-callout text-pretty text-muted-foreground'>{noEvidence(r) ? QUALITY.unknown : QUALITY[r.quality.level]}</p>
-                        {r.quality.facts.length > 0 && (
-                            <Details label={`Show the evidence (${r.quality.facts.length})`}>
-                                <Facts facts={r.quality.facts} />
-                            </Details>
-                        )}
-                    </Card>
-
+                    <QualityCard r={r} />
                     <EcoCard eco={r.eco} />
 
                     {typical && (
@@ -213,14 +223,39 @@ export function ReceiptSheet({ r, typical, count, onClose }: Props) {
     );
 }
 
+/** Quality: the level and what it means, then the evidence behind a button. `style` forces a marker look. */
+export function QualityCard({ r, style }: { r: Result; style?: MarkerStyle }) {
+    const level = noEvidence(r) ? 'unknown' : r.quality.level;
+    return (
+        <Card>
+            <h3 className='flex items-center justify-between gap-3 type-headline'>
+                Quality
+                <LevelBadge kind='quality' level={level} style={style} />
+            </h3>
+            <p className='mt-2 type-callout text-pretty text-muted-foreground'>{QUALITY[level]}</p>
+            {r.quality.facts.length > 0 && (
+                <Details label={`Show the evidence (${r.quality.facts.length})`}>
+                    <Facts facts={r.quality.facts} />
+                </Details>
+            )}
+        </Card>
+    );
+}
+
 /** The eco score's four parts, each with what the listing says for it, then the evidence behind a button. */
-function EcoCard({ eco }: { eco: Result['eco'] }) {
+export function EcoCard({ eco, style: forced }: { eco: Result['eco']; style?: MarkerStyle }) {
+    const chosen = useMarkerStyle();
+    const style = forced ?? chosen;
     const parts = ecoParts(eco);
     const facts = parts.flatMap((p) => p.facts);
     return (
         <Card>
-            <CardTitle title='Eco' level={eco.level} />
-            {typeof eco.percentile === 'number' && <p className='mt-1 type-callout font-semibold'>Greener than {eco.percentile}% of these matches</p>}
+            <h3 className='flex items-center justify-between gap-3 type-headline'>
+                Eco
+                {/* The dots look keeps the level by the title; the others show it big just below. */}
+                {style === 'dots' || style === 'chips' ? <LevelBadge kind='eco' level={eco.level} style={style} /> : null}
+            </h3>
+            <EcoHero eco={eco} style={style} />
             <p className='mt-1 type-footnote text-pretty text-muted-foreground'>Every listing here is secondhand, so none needs a new garment made. The score compares them on four things:</p>
             <ul className='mt-3 flex flex-col gap-3'>
                 {parts.map((p) => (
@@ -250,18 +285,6 @@ function EcoCard({ eco }: { eco: Result['eco'] }) {
 }
 
 const Card = ({ children }: { children: React.ReactNode }) => <section className='rounded-card bg-card p-4 shadow-card'>{children}</section>;
-
-function CardTitle({ title, level }: { title: string; level: Level }) {
-    return (
-        <h3 className='flex items-center justify-between gap-3 type-headline'>
-            {title}
-            <span className='inline-flex items-center gap-2 type-callout font-semibold'>
-                {levelText(level)}
-                {level !== 'unknown' && <LevelDots level={level} />}
-            </span>
-        </h3>
-    );
-}
 
 function Term({ value, label, strong }: { value: string; label: string; strong?: boolean }) {
     return (

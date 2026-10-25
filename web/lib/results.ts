@@ -61,12 +61,11 @@ export function typicalText(t: NonNullable<SearchResponse['typical']>, count?: n
 const LEVEL: Record<Level, string> = { high: 'High', medium: 'Medium', low: 'Low', unknown: 'Unknown' };
 export const levelText = (l: Level) => LEVEL[l];
 
-/** The big number on a row follows the sort, so each reshuffle explains itself. */
+/** The big number on a row. Eco sorts by the eco marker already on the row, so its big number stays cost per wear. */
 export function bigNumber(r: Result, sort: Sort): { value: string; unit: string } {
-    if (sort === 'cpw') return { value: perWearText(r.wear.cpw_cents.at_mid), unit: '/wear' };
     if (sort === 'price') return { value: dollars(r.cost.total_cents), unit: '' };
     if (sort === 'match') return { value: `${Math.round(r.match.similarity * 100)}%`, unit: 'match' };
-    return { value: LEVEL[r.eco.level], unit: 'eco' };
+    return { value: perWearText(r.wear.cpw_cents.at_mid), unit: '/wear' };
 }
 
 /** Filled dots out of three. A level, never a number (DESCRIPTION.md §10.1). */
