@@ -14,7 +14,7 @@ We run actors on five marketplaces in parallel using all five concurrent slots o
 - The planner reads our Apify balance and sizes the batch so that its worst case fits within the balance.
 - Every run goes into a shared Apify dataset so we don't scrape duplicate entries.
 
-Every batch is validated for data integrity. If a marketplace starts returning error codes or empty data, the balancer will switch to a fallback actor and retry. If that actor also fails, it re-allocates rows to other marketplaces. With this system, we can let the load balancer run autonomously overnight.
+Every batch is validated for data integrity. If a marketplace starts returning error codes or empty data, the balancer will switch to a fallback actor and retry. If that actor also fails, it re-allocates rows to other marketplaces. With this system, we can let the load balancer run autonomously overnight without worry of data corruption.
 
 | Marketplace                  | Items Scraped |
 | ---------------------------- | ------------- |
