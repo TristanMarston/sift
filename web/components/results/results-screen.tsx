@@ -46,13 +46,13 @@ export function ResultsScreen({ shot, garments, searches, view, onView, onSelect
     const [why, setWhy] = useState(false); // the typical look-alike, explained
     const garment = garments.find((g) => g.id === view.selected) ?? garments[0];
     const current = searches[garment.id];
-    // Hidden test switch: tap the title 5 times to fake a response where the cheapest isn't the best value.
+    // TESTING: Hidden switch to tap the title 2 times to fake a response where the cheapest isn't the best value.
     const [shaken, setShaken] = useState(false);
     const taps = useRef<number[]>([]);
     const tapTitle = () => {
         const now = Date.now();
         taps.current = [...taps.current.filter((t) => now - t < 2000), now];
-        if (taps.current.length >= 5) {
+        if (taps.current.length >= 2) {
             taps.current = [];
             setShaken((x) => !x);
         }
@@ -62,19 +62,30 @@ export function ResultsScreen({ shot, garments, searches, view, onView, onSelect
     const leaning = sort === 'cpw' && mix > 0; // the slider has moved off pure cost per wear
     const list = resp ? (leaning ? sliderOrder(resp, mix) : ordered(resp, sort)) : [];
     // The headline describes the cost-per-wear order, so it only shows there.
-    const head = resp && sort === 'cpw' && !leaning ? headline(resp) : null;
+    // Shown on the better-value half of the slider (steps 0–4), never toward closer match: it's about cost per wear.
+    const head = resp && sort === 'cpw' && mix < 5 ? headline(resp) : null;
     const open = resp?.results.find((r) => r.id === openId) ?? null;
     // A whole-photo search is titled by the category the backend read from it ("Jackets"), not "Your photo".
     const title = (!garment.category && categoryLabel(resp?.query.category)) || garment.label;
 
-    const status = !current || current.status === 'loading' ? 'Searching…' : current.status === 'error' ? "The search didn't finish" : resp?.headline.match === 'similar' ? `No close match: ${list.length} similar ${categoryLabel(resp.query.category, 'lower') ?? 'items'}` : `${list.length} look-${list.length === 1 ? 'alike' : 'alikes'}`;
+    const status =
+        !current || current.status === 'loading'
+            ? 'Searching…'
+            : current.status === 'error'
+              ? "The search didn't finish"
+              : resp?.headline.match === 'similar'
+                ? `No close match: ${list.length} similar ${categoryLabel(resp.query.category, 'lower') ?? 'items'}`
+                : `${list.length} look-${list.length === 1 ? 'alike' : 'alikes'}`;
 
     return (
         <motion.div className='fixed inset-0 z-10' exit={{ opacity: 0, transition: { duration: 0.25 } }}>
             {/* Only the background fades from the dark camera, so the garment flying in stays solid. */}
             <motion.div className='absolute inset-0 bg-background' initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4, ease: ease.out }} />
             <div className={cn('absolute inset-0 text-foreground', open ? 'overflow-hidden' : 'overflow-y-auto')}>
-                <motion.header {...fade(0.1)} className='sticky top-0 z-20 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center justify-between bg-background/85 px-2 pt-[env(safe-area-inset-top)] backdrop-blur-md'>
+                <motion.header
+                    {...fade(0.1)}
+                    className='sticky top-0 z-20 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center justify-between bg-background/85 px-2 pt-[env(safe-area-inset-top)] backdrop-blur-md'
+                >
                     <Button variant='ghost' size='sm' onClick={onBack} className='pl-2'>
                         <ChevronLeft data-icon='inline-start' strokeWidth={1.75} />
                         Photo
@@ -98,12 +109,21 @@ export function ResultsScreen({ shot, garments, searches, view, onView, onSelect
                                         aria-selected={g.id === garment.id}
                                         aria-label={g.label}
                                         onClick={() => onSelect(g.id)}
-                                        className={cn('relative shrink-0 rounded-image outline-none transition-opacity duration-200 focus-visible:ring-2 focus-visible:ring-ring', g.id !== garment.id && 'opacity-60 hover:opacity-100')}
+                                        className={cn(
+                                            'relative shrink-0 rounded-image outline-none transition-opacity duration-200 focus-visible:ring-2 focus-visible:ring-ring',
+                                            g.id !== garment.id && 'opacity-60 hover:opacity-100',
+                                        )}
                                     >
                                         <motion.div layoutId={`garment-${g.id}`} transition={spring.ui} className='size-16 rounded-image bg-card p-1.5 shadow-card'>
                                             <GarmentCutout garment={g} src={shot.url} aspect={shot.aspect} />
                                         </motion.div>
-                                        {g.id === garment.id && <motion.span layoutId='garment-ring' transition={spring.ui} className='absolute inset-0 rounded-image ring-2 ring-primary ring-offset-2 ring-offset-background' />}
+                                        {g.id === garment.id && (
+                                            <motion.span
+                                                layoutId='garment-ring'
+                                                transition={spring.ui}
+                                                className='absolute inset-0 rounded-image ring-2 ring-primary ring-offset-2 ring-offset-background'
+                                            />
+                                        )}
                                     </button>
                                 ))}
                             </div>
@@ -115,11 +135,17 @@ export function ResultsScreen({ shot, garments, searches, view, onView, onSelect
                                 </motion.div>
                             )}
                             <motion.div {...fade(0.15)} className='min-w-0'>
-                                <h1 className='truncate type-title-1 select-none' onClick={tapTitle}>{title}</h1>
+                                <h1 className='truncate type-title-1 select-none' onClick={tapTitle}>
+                                    {title}
+                                </h1>
                                 <p className='type-footnote text-muted-foreground' aria-live='polite'>
                                     {status}
                                     <span aria-hidden> · </span>
-                                    <button type='button' onClick={onDrawBox} className='rounded-sm text-foreground underline decoration-current/30 underline-offset-2 outline-none hover:decoration-current focus-visible:ring-2 focus-visible:ring-ring'>
+                                    <button
+                                        type='button'
+                                        onClick={onDrawBox}
+                                        className='rounded-sm text-foreground underline decoration-current/30 underline-offset-2 outline-none hover:decoration-current focus-visible:ring-2 focus-visible:ring-ring'
+                                    >
                                         Wrong garment? Draw a box
                                     </button>
                                 </p>
@@ -129,11 +155,21 @@ export function ResultsScreen({ shot, garments, searches, view, onView, onSelect
 
                     {resp && list.length > 0 && (
                         <>
-                            <motion.div {...fade(0.2)} className='sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-10 -mx-4 bg-background/85 px-4 py-2 backdrop-blur-md lg:-mx-8 lg:px-8'>
+                            <motion.div
+                                {...fade(0.2)}
+                                className='sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-10 -mx-4 bg-background/85 px-4 py-2 backdrop-blur-md lg:-mx-8 lg:px-8'
+                            >
                                 <SortControl value={sort} onChange={setSort} />
                                 <AnimatePresence initial={false}>
                                     {sort === 'cpw' && (
-                                        <motion.div key='slider' className='overflow-hidden' initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={spring.ui}>
+                                        <motion.div
+                                            key='slider'
+                                            className='overflow-hidden'
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: 'auto', opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            transition={spring.ui}
+                                        >
                                             <MatchSlider value={mix} onChange={(m) => onView({ mix: m })} className='pt-1' />
                                         </motion.div>
                                     )}
@@ -142,19 +178,42 @@ export function ResultsScreen({ shot, garments, searches, view, onView, onSelect
 
                             <AnimatePresence initial={false} mode='popLayout'>
                                 {head && (
-                                    <motion.div key={head.kind} layout initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={spring.ui} className='pt-3 pb-1'>
-                                        <p className='type-title-2 text-balance'>{head.kind === 'drops' ? `The cheapest match drops to #${head.rank}` : 'The cheapest match is also the best value per wear'}</p>
+                                    <motion.div
+                                        key={head.kind}
+                                        layout
+                                        initial={{ opacity: 0, y: -6 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0 }}
+                                        transition={spring.ui}
+                                        className='pt-3 pb-1'
+                                    >
+                                        <p className='type-title-2 text-balance'>
+                                            {head.kind === 'drops' ? `The cheapest match drops to #${head.rank} by cost per wear` : 'The cheapest match is also the best value per wear'}
+                                        </p>
                                         {resp.typical && (
                                             <div className='mt-1 type-footnote text-muted-foreground'>
                                                 <p className='flex items-center gap-1'>
                                                     A typical look-alike costs {priceText(resp.typical.price_cents)}, about {perWearText(resp.typical.cpw_cents)} a wear.
-                                                    <button type='button' aria-expanded={why} aria-label='What is a typical look-alike?' onClick={() => setWhy((w) => !w)} className='-m-2 grid size-8 shrink-0 place-items-center rounded-full outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring'>
+                                                    <button
+                                                        type='button'
+                                                        aria-expanded={why}
+                                                        aria-label='What is a typical look-alike?'
+                                                        onClick={() => setWhy((w) => !w)}
+                                                        className='-m-2 grid size-8 shrink-0 place-items-center rounded-full outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring'
+                                                    >
                                                         <Info className='size-4' strokeWidth={1.75} />
                                                     </button>
                                                 </p>
                                                 <AnimatePresence initial={false}>
                                                     {why && (
-                                                        <motion.p key='why' className='overflow-hidden text-pretty' initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={spring.ui}>
+                                                        <motion.p
+                                                            key='why'
+                                                            className='overflow-hidden text-pretty'
+                                                            initial={{ height: 0, opacity: 0 }}
+                                                            animate={{ height: 'auto', opacity: 1 }}
+                                                            exit={{ height: 0, opacity: 0 }}
+                                                            transition={spring.ui}
+                                                        >
                                                             {typicalText(resp.typical, resp.results.length)}
                                                         </motion.p>
                                                     )}
@@ -167,7 +226,15 @@ export function ResultsScreen({ shot, garments, searches, view, onView, onSelect
 
                             <motion.ol key={garment.id} initial='hidden' animate='show' variants={rows} className='mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2'>
                                 {list.map((r, i) => (
-                                    <ResultRow key={r.id} r={r} rank={i + 1} sort={sort} cheapest={r.id === resp.headline.cheapest_id} open={r.id === openId} onOpen={() => setOpenId(r.id)} />
+                                    <ResultRow
+                                        key={r.id}
+                                        r={r}
+                                        rank={i + 1}
+                                        sort={sort}
+                                        cheapest={r.id === resp.headline.cheapest_id}
+                                        open={r.id === openId}
+                                        onOpen={() => setOpenId(r.id)}
+                                    />
                                 ))}
                             </motion.ol>
 
@@ -210,7 +277,9 @@ export function ResultsScreen({ shot, garments, searches, view, onView, onSelect
                 </main>
             </div>
 
-            <AnimatePresence>{open && resp && <ReceiptSheet key={open.id} r={open} typical={resp.typical} count={resp.results.length} onClose={() => setOpenId(null)} />}</AnimatePresence>
+            <AnimatePresence>
+                {open && resp && <ReceiptSheet key={open.id} r={open} typical={resp.typical} count={resp.results.length} onClose={() => setOpenId(null)} />}
+            </AnimatePresence>
         </motion.div>
     );
 }

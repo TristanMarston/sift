@@ -42,8 +42,8 @@ test('headline says so honestly when the cheapest is also the best value per wea
     assert.deepEqual(headline(resp(1)), { kind: 'best' });
 });
 
-test('headline stays quiet at #2 and with no results', () => {
-    assert.equal(headline(resp(2)), null);
+test('headline names #2 too, and stays quiet only with no results', () => {
+    assert.deepEqual(headline(resp(2)), { kind: 'drops', rank: 2 });
     assert.equal(headline(resp(null)), null);
 });
 
