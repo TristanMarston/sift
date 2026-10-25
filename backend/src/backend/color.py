@@ -4,8 +4,11 @@ search takes the query crop's colour to re-rank the shortlist. The reported simi
 import numpy as np
 from PIL import Image
 
-COLOR_WEIGHT = 0.12   # a colour FAR or more away costs this much similarity: a grey tee at 0.83 drops below a green at 0.78
-FAR = 60.0            # CIE76 distance that counts as a different colour altogether
+COLOR_WEIGHT = 0.2    # a colour FAR or more away costs this much similarity: a grey tee at 0.83 drops below a green at 0.78
+FAR = 40.0            # CIE76 distance that counts as a different colour altogether
+# Tuned on 13 phone photos against the 76k index (Oct 24). At 0.12 over 60: 83% of the top 10 shared the query's colour
+# and the cheapest pick (what the slider's value end shows first) did in 77% of searches; a black hoodie's value pick was
+# light blue. At 0.2 over 40: 95% and 92%, for 0.015 of mean top similarity. Steeper settings gained nothing more.
 _M = np.array([[0.4124564, 0.3575761, 0.1804375], [0.2126729, 0.7151522, 0.0721750], [0.0193339, 0.1191920, 0.9503041]])
 _D65 = np.array([0.95047, 1.0, 1.08883])
 

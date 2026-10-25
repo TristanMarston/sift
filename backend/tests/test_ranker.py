@@ -104,7 +104,7 @@ def test_break_even_only_on_items_pricier_than_typical(hits):
 def test_match_band_and_small_thumbnail(hits):
     res = {r["id"]: r for r in R.rank(hits, QUERY, CFG)["results"]}
     assert res["depop:cheap"]["match"] == {"similarity": 0.95, "band": "exact"}
-    assert res["depop:pricey"]["match"]["band"] == "similar"
+    assert res["depop:pricey"]["match"]["band"] == "close"      # 0.78: a worn photo of the same garment scores this
     assert res["depop:cheap"]["thumb_url"].endswith("/P5.jpg")
 
 
@@ -143,10 +143,13 @@ def test_match_order_is_the_order_the_index_gave(hits):
     assert resp["orders"]["match"][:2] == [swapped[0][0]["id"], swapped[1][0]["id"]]
 
 
-@pytest.mark.parametrize("sim, band", [(0.95, "exact"), (0.9, "exact"), (0.8986, "close"), (0.8, "close"), (0.72, "similar")])
+@pytest.mark.parametrize("sim, band", [(0.95, "exact"), (0.9, "exact"), (0.8986, "close"), (0.8, "close"), (0.72, "close"),
+                                       (0.7, "close"), (0.69, "similar"), (0.55, "similar")])
 def test_three_match_bands(sim, band):
     """0.90 and 0.72 both read "similar" before; a 0.80-0.90 match looks like the same garment in another colour or
-    cut, so it gets its own band."""
+    cut, so it gets its own band. Worn photos score lower than product shots against flat listing photos (top matches
+    0.70-0.86 on 8 worn test photos, all the right garment; 0.80-0.99 on listing photos), so "close" starts at 0.70;
+    other kinds of garment sit around 0.5-0.6."""
     assert R.band(sim) == band
 
 
@@ -162,9 +165,15 @@ def test_eco_percentile_places_each_result_among_the_others(hits):
 
 def test_headline_says_how_close_the_best_match_is(hits):
     assert R.rank(hits, QUERY, CFG)["headline"]["match"] == "exact"          # best similarity 0.95
-    low = [(row, min(sim, 0.7)) for row, sim in hits]
+    low = [(row, min(sim, 0.65)) for row, sim in hits]
     assert R.rank(low, QUERY, CFG)["headline"]["match"] == "similar"
     assert R.rank([], QUERY, CFG)["headline"]["match"] is None
+
+
+def test_the_scrape_date_is_passed_through_so_the_panel_can_say_when_the_price_was_checked(hits):
+    """Prices drift (a Mercari jacket was $42.75 in our data and $50 live a day later): every result says when it was read."""
+    by_id = {r["id"]: r for r in R.rank(hits, QUERY, CFG)["results"]}
+    assert all(by_id[row["id"]]["scraped_at"] == row["scraped_at"] for row, _ in hits)
 
 
 def test_wear_steps_show_how_the_expected_wears_were_reached(hits):

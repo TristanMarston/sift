@@ -153,3 +153,35 @@ def test_a_brand_read_off_the_photo_lifts_that_brands_listings():
     assert [row["id"] for row, _ in idx.search(unit(1, 0, 0))] == ["depop:other", "depop:gap"]
     assert [row["id"] for row, _ in idx.search(unit(1, 0, 0), brand=" GAP ")] == ["depop:gap", "depop:other"]
     assert [round(s, 2) for _, s in idx.search(unit(1, 0, 0), brand="GAP")] == [0.94, 1.0]   # similarity unchanged
+
+
+# --- what the index refuses to serve ------------------------------------------------------------
+
+def test_load_drops_lots_and_bundles_and_mends_titles(tmp_path):
+    """Live: "Bulk Denim Jeans Lot 10+ lb Scrap Crafting" was the #1 look match for a pair of Wrangler jeans, and
+    titles like "New" or "Title: Uniqlo ..." reached the screen. 198 of 75,841 titles are lots or bundles; 935 are under
+    three words. Dropped at load so the fix needs no re-embedding; the vectors and colours stay aligned."""
+    rows = [r(0, title="Levi's 501 jeans 32x30"), r(1, title="Bulk Denim Jeans Lot 10+ lb Mens Womens Scrap Crafting"),
+            r(2, title="Title: Uniqlo Ultra Light Down Jacket"), r(3, title="New", brand="Uniqlo", color="black, grey"),
+            r(4, title="Bundle discounts are on!"), r(5, title="", brand=None, color=None),
+            r(6, title="Lots of life left in these Levi's"), r(7, title="Brown sweater", brand="Uniqlo", color="grey"),
+            r(8, title="Stay warm without the bulk: Uniqlo Ultra Light Down"), r(9, title="LOT (7) VINTAGE HILO HATTIE shirts"),
+            r(10, title="ON HOLD!!", brand="Arc'teryx", color="black"), r(11, title="Nike Dunk Low Off-White Lot 8"),
+            r(12, title="Levi 511", brand="Levi's", color="navy")]
+    (tmp_path / "rows.jsonl").write_text("".join(json.dumps(x) + "\n" for x in rows))
+    np.save(tmp_path / "embeddings.npy", np.arange(39, dtype=np.float32).reshape(13, 3))
+    np.save(tmp_path / "colors.npy", np.arange(39, dtype=np.float32).reshape(13, 3))
+    idx = Index.load(tmp_path)
+    assert [x["id"] for x in idx.rows] == ["depop:0", "depop:2", "depop:3", "depop:5", "depop:6", "depop:7", "depop:8",
+                                           "depop:10", "depop:11", "depop:12"]
+    assert idx.vecs.tolist() == idx.colors.tolist() == [[0, 1, 2], [6, 7, 8], [9, 10, 11], [15, 16, 17], [18, 19, 20],
+                                                        [21, 22, 23], [24, 25, 26], [30, 31, 32], [33, 34, 35], [36, 37, 38]]
+    assert [x["title"] for x in idx.rows] == ["Levi's 501 jeans 32x30", "Uniqlo Ultra Light Down Jacket",
+                                              "Uniqlo black jacket", "Jacket", "Lots of life left in these Levi's",
+                                              "Brown sweater", "Stay warm without the bulk: Uniqlo Ultra Light Down",
+                                              "Arc'teryx black jacket", "Nike Dunk Low Off-White Lot 8", "Levi 511"]
+
+
+def test_by_category_counts_what_a_search_in_that_category_sees(idx):
+    assert idx.by_category() == {"jackets_outerwear": 3, "sneakers": 1}
+    assert Index(np.zeros((0, 3), np.float32), []).by_category() == {}

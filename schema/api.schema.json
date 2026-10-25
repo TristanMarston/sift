@@ -189,7 +189,7 @@
       "required": ["id", "marketplace", "url", "title", "brand", "category", "subcategory",
                    "size", "color", "condition", "condition_raw", "thumb_url", "image_urls",
                    "flags", "match", "cost", "materials", "quality", "eco", "wear",
-                   "confidence", "seller"],
+                   "confidence", "seller", "scraped_at"],
       "additionalProperties": false,
       "properties": {
         "id": {"type": "string", "pattern": "^(depop|poshmark|grailed|mercari|ebay):.+$"},
@@ -203,6 +203,7 @@
         "color": {"type": ["string", "null"]},
         "condition": {"anyOf": [{"$ref": "#/$defs/Condition"}, {"type": "null"}]},
         "condition_raw": {"type": ["string", "null"]},
+        "scraped_at": {"type": "string", "format": "date-time", "description": "When the listing was read. The price, shipping and facts are as of then; show it as \"Price checked Oct 24\"."},
         "thumb_url": {"type": ["string", "null"], "format": "uri"},
         "image_urls": {"type": "array", "minItems": 1, "items": {"type": "string", "format": "uri"}},
         "flags": {
@@ -330,7 +331,7 @@
           "required": ["code", "message"],
           "additionalProperties": false,
           "properties": {
-            "code": {"enum": ["invalid_image", "invalid_params", "image_too_large", "internal"]},
+            "code": {"enum": ["invalid_image", "invalid_params", "image_too_large", "not_found", "method_not_allowed", "http_error", "internal"]},
             "message": {"type": "string"}
           }
         }

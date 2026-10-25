@@ -1,5 +1,6 @@
 """Garment colour: one CIELAB point per photo, so a green tee is not out-ranked by a grey one of the same cut."""
 import numpy as np
+import pytest
 from PIL import Image
 
 from backend import color as C
@@ -33,3 +34,11 @@ def test_delta_e_is_zero_for_the_same_colour_and_large_across_hues():
     assert C.delta_e(green, green) == 0
     assert C.delta_e(green, dark_green) < 15 < C.delta_e(green, grey)
     assert np.isnan(C.delta_e(green, np.array([np.nan] * 3)))      # unknown colour: no opinion
+
+
+def test_a_colour_forty_delta_e_away_costs_a_fifth_of_similarity():
+    """13 phone photos against the 76k index: at 0.12 over 60 dE, 83% of the top 10 shared the query's colour and the
+    cheapest pick did in 77% of searches (a black hoodie's value pick was light blue); at 0.2 over 40 dE, 95% and 92%,
+    for 0.015 of mean top similarity."""
+    assert C.penalty(np.array([[60.0, 0, 0]]), np.array([10.0, 0, 0]))[0] == pytest.approx(0.2)    # 50 dE: capped
+    assert C.penalty(np.array([[30.0, 0, 0]]), np.array([10.0, 0, 0]))[0] == pytest.approx(0.1)    # 20 dE: halfway
