@@ -16,8 +16,14 @@ the contract; `CLAUDE.md` rules still apply (branch per feature, PR, TDD for dat
   re-index + redeploy). Quality: buyer fees (#47), HEIC (#48), no Grailed drift in batches (#51), a `close` match
   band (#52), fabric facts from titles (#53), **colour-aware re-rank** (#54: run `modal run modal_app.py::colors
   --name full` after every `::embed`, then redeploy), sliver-free detection (#55).
-- Biggest open items: the frontend pointing at the live API, a real phone-photo test of the demo props, and picking
-  the demo moment.
+- **Oct 24 evening (#71, from `DIAGNOSTIC.md`):** `close` starts at 0.70 (worn photos score 0.70-0.86 against flat
+  listing photos, so half of real photos read "No close match" before); the colour penalty is 0.2 over 40 dE (95% of
+  the top 10 now share the query's colour, 83% before); Haiku's prompt keeps collared shirts out of jackets, says black
+  before navy, and gives a brand only when the letters are readable; sneaker descriptions that name the upper count as
+  evidence; every result carries `scraped_at` ("Price checked Oct 24"); `/health` has `by_category`; `/detect` shrinks
+  photos to 2,048 px; 404/405 use the error shape; lots, bundles and one-word titles are dropped or mended when the
+  index loads. **D1 (slider start) is still the team's call.**
+- Biggest open items: D1, the web items in `DIAGNOSTIC.md` (W1 accessories, W2 landing data), and the demo checklist.
 
 ## Overnight run (finished Oct 24)
 

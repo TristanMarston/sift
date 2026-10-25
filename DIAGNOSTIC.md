@@ -151,6 +151,12 @@ Photos of people wearing clothes had top matches of 0.64–0.82. For judging, sc
 
 ## Anthony (backend, ranking, detection)
 
+**Status (Anthony, Oct 24 evening, PR #71):** A1, A2, A3, A5, A6 (server shrink), A7, A8 done; A4 partly (seller-stated
+uppers from descriptions; the product-line list the fix asks for contradicts the evidence rule in
+`backend/pipeline/product_lines.yaml`: Air Force 1, Dunk and 550 ship in synthetic leather too, so they are not one
+fabric per line); N1 done in the API (lots and bundles dropped and titles mended when the index loads, no re-embedding;
+Andy can move it into the pipeline). Live after the redeploy; `SIFT_MIN_CONTAINERS=1` is set for judging.
+
 ### A1 (P0): bands are tuned on product shots, so real photos read "No close match"
 
 - **Seen:** the band of the best result (`headline.match`) was `similar` in 7 of 14 searches. The web shows "No close

@@ -169,13 +169,19 @@ List that item, plus any item layered with it (a jacket worn open over a t-shirt
 are only partly in the crop at its edges, accessories, skin and background. Outermost or largest item first.
 For each item give: label (2-3 plain words, e.g. "denim jacket"), category (one of the allowed values, or null if \
 none fits), brand (the brand name only if a logo, wordmark or label on the item is clearly readable, else null), and \
-box (x, y, w, h as fractions of this crop, origin top-left)."""
+box (x, y, w, h as fractions of this crop, origin top-left).
+Rules: a shirt with a collar and buttons is "shirts" unless it is clearly padded, lined or a coat (a flannel \
+shirt is a shirt). Name colours conservatively: say black unless another hue is clearly visible (black before navy or \
+charcoal). Give a brand only when you can read the letters of a logo, wordmark or label; never guess it from the style."""
 
 PHOTO_PROMPT = """This is a shopper's photo. List each separate clothing item clearly visible that someone could buy \
 secondhand. A jacket worn open over a t-shirt is two items. Ignore accessories, skin and background. Largest item first.
 For each item give: label (2-3 plain words, e.g. "denim jacket"), category (one of the allowed values, or null if \
 none fits), brand (the brand name only if a logo, wordmark or label on the item is clearly readable, else null), and \
-box (x, y, w, h as fractions of the photo, origin top-left)."""
+box (x, y, w, h as fractions of the photo, origin top-left).
+Rules: a shirt with a collar and buttons is "shirts" unless it is clearly padded, lined or a coat (a flannel \
+shirt is a shirt). Name colours conservatively: say black unless another hue is clearly visible (black before navy or \
+charcoal). Give a brand only when you can read the letters of a logo, wordmark or label; never guess it from the style."""
 
 SCHEMA = {
     "type": "object", "additionalProperties": False, "required": ["garments"],

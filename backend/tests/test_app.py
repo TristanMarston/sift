@@ -67,8 +67,10 @@ def error_code(resp, status):
 
 # --- GET /health -----------------------------------------------------------------------
 
-def test_health_reports_the_index_size(client):
-    assert client.get("/health").json() == {"status": "ok", "index_size": 4}
+def test_health_reports_the_index_size_and_the_count_per_category(client):
+    """The web counter said "Searched jackets, 75,839 listings" when only the jackets were searched."""
+    assert client.get("/health").json() == {"status": "ok", "index_size": 4,
+                                            "by_category": {"jackets_outerwear": 3, "sneakers": 1}}
 
 
 # --- POST /search ----------------------------------------------------------------------
@@ -164,11 +166,31 @@ def test_an_unexpected_failure_is_a_500_in_the_error_shape():
         "/search", files={"image": ("c.jpg", jpeg(), "image/jpeg")}), 500) == "internal"
 
 
+def test_the_wrong_method_path_or_field_type_gets_the_error_shape(client):
+    """GET /search answered FastAPI's {"detail": "Method Not Allowed"}."""
+    assert error_code(client.get("/search"), 405) == "method_not_allowed"
+    assert error_code(client.get("/nothing-here"), 404) == "not_found"
+    assert error_code(client.post("/search", data={"image": "not a file"}), 400) == "invalid_image"
+
+
 # --- POST /detect ----------------------------------------------------------------------
 
 def test_detect_returns_the_garments(client):
     body = valid("DetectResponse", client.post("/detect", files={"image": ("p.jpg", jpeg((80, 60)), "image/jpeg")}).json())
     assert body == {"image": {"width": 80, "height": 60}, "garments": []}
+
+
+def test_a_huge_photo_is_shrunk_before_detection():
+    """A 6,000 px photo took 16.7 s to detect (the crops go to Haiku as JPEG); the web gives up at 15 s. 2,048 px keeps
+    every box fraction the same and is still twice what the web app uploads."""
+    seen = []
+
+    def detect(im):
+        seen.append(im.size)
+        return {"image": {"width": im.width, "height": im.height}, "garments": []}
+    app = A.create_app(index=Index(np.zeros((0, 3), np.float32), []), cfg=CFG, embed=None, detect=detect)
+    body = TestClient(app).post("/detect", files={"image": ("p.jpg", jpeg((3000, 1500)), "image/jpeg")}).json()
+    assert seen == [(2048, 1024)] and body["image"] == {"width": 2048, "height": 1024}
 
 
 def test_detect_refuses_non_photos(client):

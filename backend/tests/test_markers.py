@@ -278,6 +278,20 @@ def test_sneakers_named_leather_in_the_title_get_the_fiber_point(row):
     assert q["facts"] == []
 
 
+def test_a_sneaker_description_naming_the_upper_counts_like_a_title_fabric(row):
+    """6,589 of 8,999 sneakers had no material evidence; 742 of them say what the upper is in the description
+    ("suede upper", "Upper Material: Leather"). Only an "upper" phrase counts: descriptions also mention other shoes."""
+    q, _ = M.quality(row(category="sneakers", title="Nike Air Force 1 '07 size 10",
+                         description="Full-grain leather upper, rubber cupsole, worn twice"), {})
+    assert q["level"] == "medium" and q["facts"][0]["value"] == "Leather" and q["facts"][0]["snippet"] == "leather upper"
+    q, _ = M.quality(row(category="sneakers", title="Adidas Samba size 9", description="Upper Material: Suede / Mesh"), {})
+    assert q["facts"][0]["value"] == "Suede (leather)"
+    q, _ = M.quality(row(category="sneakers", title="Nike Dunk Low", description="pairs well with a leather jacket"), {})
+    assert q["facts"] == []
+    q, _ = M.quality(row(category="jeans_pants", title="Levi's 501", description="leather upper"), {})
+    assert q["facts"] == []                                        # shoes only
+
+
 # --- eco parts: what the item panel shows as bars (web/BACKEND-REQUESTS.md) ---------------------------
 
 def test_eco_parts_add_up_to_the_score_and_every_fact_names_its_part(row):

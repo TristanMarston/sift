@@ -27,7 +27,8 @@ Decided in the interview on Fri Oct 23, 2026.
 ## 1. Endpoints
 
 ### `GET /health`
-→ `200 {"status": "ok", "index_size": 20412}`
+→ `200 {"status": "ok", "index_size": 75641, "by_category": {"jackets_outerwear": 12034, "sneakers": 8981, ...}}`
+`by_category` is what a search in that category looks through: show "Searched 12,034 jackets", not the whole index.
 
 ### `POST /detect`
 Finds the garments in a photo.
@@ -88,6 +89,8 @@ Any non-2xx response has the body `{"error": {"code": "...", "message": "..."}}`
 | 400 | `invalid_image` | The image is unreadable or of an unsupported type |
 | 400 | `invalid_params` | `params` is not valid JSON or fails the schema |
 | 413 | `image_too_large` | The image is > 10 MB |
+| 404 | `not_found` | No such path |
+| 405 | `method_not_allowed` | e.g. `GET /search` |
 | 500 | `internal` | Anything else |
 
 ## 2. `SearchResponse`
@@ -127,6 +130,7 @@ Any non-2xx response has the body `{"error": {"code": "...", "message": "..."}}`
   "color": "brown",
   "condition": "good",
   "condition_raw": "Good - used",
+  "scraped_at": "2026-10-24T10:30:04Z",
   "thumb_url": "https://<supabase>/storage/v1/object/public/thumbs/poshmark/64f1a2.jpg",
   "image_urls": ["https://...", "https://..."],
   "flags": {"is_vintage": true, "is_deadstock": false, "is_upcycled": false},
@@ -221,9 +225,13 @@ Any non-2xx response has the body `{"error": {"code": "...", "message": "..."}}`
   costs more than the typical match**, so the UI shows "Break-even: wear this N+ times to win" exactly when it is set.
 - `wear.facts` are the assumptions behind `expected_wears` (the category baseline and the condition factor).
   Show them under "Expected wears" so the number is never a black box.
-- `match.band`: `exact` when `similarity ≥ 0.9`, `close` from 0.8 (the same garment in another colour or cut),
+- `match.band`: `exact` when `similarity ≥ 0.9`, `close` from 0.7 (the same garment in another colour or cut),
   otherwise `similar` (the kind of thing). `headline.match` is the band of the best result: when it is `similar`,
-  say so ("Nothing close — showing similar t-shirts") instead of presenting look-alikes as matches.
+  say so ("No close match: 50 similar t-shirts") instead of presenting look-alikes as matches. Why 0.7: a worn garment
+  photographed on a person scores 0.70-0.86 against the flat listing photo of the same garment (8 worn test photos),
+  a product shot 0.80-0.99; other kinds of garment sit around 0.5-0.6.
+- `scraped_at`: when the listing was read. Prices drift (a jacket went from $42.75 to $50 in a day), so the item panel
+  says "Price checked Oct 24" and the demo's top results get re-checked on the morning.
 - `thumb_url` is a small (~320 px) variant of the first photo, fast on a phone. Use `image_urls` for the full gallery.
 - `quality.level == "unknown"` and `facts == []` → show **"Not enough evidence yet."**
   `score` is then `null`, and the item sorts last on that marker but stays in the list.

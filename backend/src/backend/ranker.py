@@ -10,9 +10,11 @@ from backend.images import small_url
 
 ML = Path(__file__).resolve().parents[2] / "ml"
 EXACT = 0.9  # similarity at or above this is shown as an exact match
-CLOSE = 0.8  # same garment in another colour or cut; below this it is only the kind of thing
+CLOSE = 0.7  # same garment in another colour or cut; below this it is only the kind of thing. Worn photos score lower
+# than product shots against flat listing photos: 0.70-0.86 on 8 worn test photos (all the right garment), 0.80-0.99 on
+# listing photos; other kinds of garment sit around 0.5-0.6. At 0.8 half of real photos read "No close match".
 PASS_THROUGH = ["id", "marketplace", "url", "title", "brand", "category", "subcategory", "size", "color", "condition",
-                "condition_raw", "image_urls", "flags", "cost", "materials"]
+                "condition_raw", "image_urls", "flags", "cost", "materials", "scraped_at"]
 
 
 @dataclass

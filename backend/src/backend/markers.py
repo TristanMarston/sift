@@ -38,6 +38,9 @@ FABRIC = {"denim": "cotton", "corduroy": "cotton", "chambray": "cotton", "canvas
           "nubuck": "leather"}
 _FABRIC_RE = re.compile(r"\b(denim|corduroy|chambray|canvas|suede|nubuck)\b", re.I)
 _SHOE_RE = re.compile(r"\b(denim|canvas|suede|nubuck|leather)\b", re.I)   # a sneaker title's "leather" is its upper
+# A sneaker description that says what the upper is ("suede upper", "Upper Material: Leather"): 742 of the 6,589 sneakers
+# with no other material evidence. Only an "upper" phrase counts; descriptions also mention other shoes and jackets.
+_UPPER_RE = re.compile(r"\b(denim|canvas|suede|nubuck|leather)\b[^.]{0,20}?\buppers?\b|\buppers?\b[^.]{0,25}?\b(denim|canvas|suede|nubuck|leather)\b", re.I)
 FLAGS = [("is_vintage", "vintage", "Vintage", "Already had a first life"),
          ("is_deadstock", "deadstock", "Deadstock", "Old unsold stock, never worn"),
          ("is_upcycled", "upcycled", "Upcycled", "Remade from existing garments")]
@@ -76,11 +79,15 @@ def _level(points, bands):
 def title_fabric(row: dict) -> tuple[str, str, str] | None:
     """(word as written, implied fiber, display value) for a fabric the title names, e.g. ("denim", "cotton",
     "Denim (cotton)"); a sneaker title's plain "leather" is its upper. None when the title names none."""
-    m = (_SHOE_RE if row["category"] == "sneakers" else _FABRIC_RE).search(row["title"] or "")
+    shoe = row["category"] == "sneakers"
+    m = (_SHOE_RE if shoe else _FABRIC_RE).search(row["title"] or "")
+    snippet = m and m[0]
+    if not m and shoe and (u := _UPPER_RE.search(row.get("description") or "")):
+        m, snippet = _SHOE_RE.search(u[0]), u[0].strip()
     if not m:
         return None
     fabric, fiber = m[0].lower(), FABRIC.get(m[0].lower(), m[0].lower())
-    return m[0], fiber, fabric.capitalize() if fabric == fiber else f"{fabric.capitalize()} ({fiber})"
+    return snippet, fiber, fabric.capitalize() if fabric == fiber else f"{fabric.capitalize()} ({fiber})"
 
 
 def quality(row: dict, brands: dict) -> tuple[dict, list[dict]]:

@@ -13,10 +13,12 @@ from typing import Literal
 
 import pillow_heif
 from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from starlette.exceptions import HTTPException
 
 from backend import ranker
 from backend.color import garment_color
@@ -27,6 +29,9 @@ FORMATS = {"JPEG", "PNG", "WEBP", "HEIF"}
 K = 50
 DUPLICATE = 0.97  # photo similarity at which two listings are one item; checked by eye on the first real batch
 MIN_SIM = 0.3  # cosine below this looks nothing alike: dropped, so a search may come back empty (API.md: Result set)
+DETECT_PX = 2048  # long edge for /detect: SegFormer sees 512 px and each crop goes to Haiku as JPEG; a 6,000 px photo took
+# 16.7 s against the web's 15 s limit. Boxes are fractions, so nothing downstream changes.
+HTTP_CODES = {404: "not_found", 405: "method_not_allowed"}
 INDEX = Path(os.getenv("SIFT_INDEX", Path(__file__).resolve().parents[2] / "pipeline" / "data" / "index"))
 
 Category = Literal["jackets_outerwear", "hoodies_sweatshirts", "tshirts", "sneakers", "jeans_pants",
@@ -120,17 +125,28 @@ def create_app(index=None, cfg=None, embed=None, detect=None, categorize=None, o
     def api_error(request: Request, e: ApiError):
         return _error(e.status, e.code, e.message)
 
+    @app.exception_handler(HTTPException)
+    def http_error(request: Request, e: HTTPException):   # the wrong path or method: the same shape as our errors
+        return _error(e.status_code, HTTP_CODES.get(e.status_code, "http_error"), str(e.detail))
+
+    @app.exception_handler(RequestValidationError)
+    def bad_request(request: Request, e: RequestValidationError):   # e.g. `image` sent as text, not a file
+        return _error(400, "invalid_image", "send the photo as a file in the multipart field `image`")
+
     @app.exception_handler(Exception)
     def internal(request: Request, e: Exception):
         return _error(500, "internal", "something went wrong on our side")
 
     @app.get("/health")
     def health():
-        return {"status": "ok", "index_size": len(deps()[0])}
+        idx = deps()[0]
+        return {"status": "ok", "index_size": len(idx), "by_category": idx.by_category()}
 
     @app.post("/detect")
     def detect_route(image: UploadFile | None = File(None)):
-        return detect_fn(_photo(image))
+        im = _photo(image)
+        im.thumbnail((DETECT_PX, DETECT_PX))
+        return detect_fn(im)
 
     @app.post("/jpeg")
     def jpeg(image: UploadFile | None = File(None)):

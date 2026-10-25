@@ -36,6 +36,7 @@ export type Result = {
     color: string | null;
     condition: Condition | null;
     condition_raw: string | null;
+    scraped_at?: string; // RFC 3339, when the listing was read: "Price checked Oct 24" (prices drift)
     thumb_url: string | null;
     image_urls: string[];
     flags: { is_vintage: boolean; is_deadstock: boolean; is_upcycled: boolean };

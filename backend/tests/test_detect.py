@@ -334,3 +334,12 @@ def test_the_haiku_call_only_uses_arguments_the_installed_sdk_accepts():
     assert all(p.kind is not p.VAR_KEYWORD for p in params.values()), "a **kwargs signature would hide a rejected argument"
     assert set(D.request(b"jpeg", "top")) <= set(params)
     assert "brand" in D.SCHEMA["properties"]["garments"]["items"]["properties"]
+
+
+def test_the_prompts_carry_the_rules_for_shirts_colours_and_brands():
+    """Live misses: a flannel shirt came back "plaid shirt jacket" in jackets_outerwear, a black hoodie "navy" with an
+    unreadable brand that then lifted the wrong listings."""
+    for prompt in (D.PROMPT, D.PHOTO_PROMPT):
+        assert "collar" in prompt and "shirts" in prompt
+        assert "black" in prompt and "navy" in prompt
+        assert "read the letters" in prompt
