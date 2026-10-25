@@ -4,7 +4,7 @@ import { Suspense } from 'react';
 import { Landing } from '@/components/landing/landing';
 import { VARIANTS, type Variant } from '@/components/landing/variants';
 
-export const metadata: Metadata = { title: 'Sift: buy it once' };
+export const metadata: Metadata = { title: 'Sift: just buy once' };
 
 // Safari's bars match the forest landing.
 export const viewport: Viewport = { themeColor: '#103520' };

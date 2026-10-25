@@ -82,7 +82,7 @@ export function LandingShell({ variant, scanButton = true, compare = false, hero
                 </div>
 
                 <div className='relative z-10 flex flex-col gap-3 px-5 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] lg:order-1 lg:gap-5 lg:px-0 lg:pb-0'>
-                    <h1 className='type-display lg:text-[72px] lg:leading-[72px]'>Buy it once.</h1>
+                    <h1 className='type-display text-balance lg:text-[72px] lg:leading-[72px]'>Just buy once.</h1>
                     <p className='type-body text-pretty text-stage-foreground/85 lg:max-w-md lg:text-xl lg:leading-7'>An expensive shirt you wear every day is worth more than a cheap one you wear twice.</p>
                     {scanButton && (
                         <Button variant='stage' size='lg' onClick={() => open(heroRef.current)} className='mt-1 w-full lg:w-auto lg:self-start'>
