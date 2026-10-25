@@ -1,5 +1,7 @@
 # Sift
 
+<p align="center"><img src="demo/branding/sift-logo.png" alt="Sift logo" width="200"></p>
+
 ## Inspiration
 
 We believe that everyone wants what's best for them and what's best for the environment. But in the current shopping landscape, both are ambiguous. Everything is sorted by price, so nobody can tell whether a purchase pays off over years of wear, or whether it just means buying more junk, and feeding the landfill, more often.
