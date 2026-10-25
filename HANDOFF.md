@@ -28,6 +28,18 @@ the contract; `CLAUDE.md` rules still apply (branch per feature, PR, TDD for dat
   `sift-index:/snapshots/sift-data-haram-2026-10-25.zip`. Not done: care-tag reads for 15,789 new listings (~$11 of
   Haiku, Anthony's call). Haram's 149 new runs live on Haram's second Apify account, so `cli.py sync` cannot see them:
   import the zip before scraping.
+- **Oct 24, 23:12 PT: care tags read.** 15,789 new listings sent to Haiku (~$11): 4,602 had a readable tag, 11,180 none;
+  12,543 listings now carry a `tag_image` fabric fact (29% of reads find one). Re-indexed and redeployed.
+- **Oct 25, 04:41 PT: Haram's mid-run batch is live.** 162,068 listings (Poshmark 63,152 · Depop 38,956 · Mercari
+  31,983 · eBay 23,463 · Grailed 4,514), index 162,065, the API serves 161,592 after dropping lots and bundles. The
+  58k new rows were embedded in 1h50 (one 4-CPU container, ~500 listings/min); colours took 7 min. All 12,543 tag facts
+  kept: the zip was imported with `cli.py import` (unions the caches) and the cached shipping/tags re-applied with
+  `--limit 0` before embedding, rather than embedding Haram's `listings.jsonl` directly (it only had 7,235 tag facts).
+  48,249 listings have had no care-tag read (fabric honestly "unknown"). Backups: zip at
+  `sift-index:/snapshots/sift-data-haram-2026-10-25-midrun2.zip`; the previous 103k index at
+  `sift-index:/snapshots/index-2026-10-25/` (copy its four files back to `/full/index/` and stop the warm container to
+  revert). Haram's 307 new runs are on the `tristanmarston` Apify account; `cli.py sync` cannot see them. A final zip
+  follows when the $311 scrape finishes.
 - Biggest open items: D1, the web items in `DIAGNOSTIC.md` (W1 accessories, W2 landing data), and the demo checklist.
 
 ## Overnight run (finished Oct 24)
