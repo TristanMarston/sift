@@ -1,4 +1,4 @@
-# Sift
+<p align="center"><img src="demo/branding/sift-logo.png" alt="Sift logo" width="200"></p>
 
 ## Inspiration
 
@@ -17,7 +17,7 @@ Take a photo of anyone or any garment. Sift searches through online marketplaces
 
 Calculating cost per wear requires prices, photos, material, condition, shipping, and more. No public dataset offers this kind of data across several marketplaces, so we built our catalog with Apify. We picked one Apify actor per marketplace with fallback actors ready.
 
-Our catalog currently holds almost **150,000 listings** from 5 marketplaces and 8 clothing categories. In total, it took nearly **2000 Apify runs** across over **12 hours**. We collected over **800,000 photos** and around **7000 distinct brands**.
+Our catalog currently holds almost **150,000 listings** from 5 marketplaces and 8 clothing categories. In total, it took nearly **2000 Apify runs** across over **12 hours**. We collected over **800,000 photo URLs** and around **7000 distinct brands**.
 
 ### Running at scale
 
@@ -25,7 +25,7 @@ We run actors on five marketplaces in parallel using all five concurrent slots o
 
 - Data volume is split by ratio and by price. For example, Grailed costs 12 times more per row than Depop, so it gets a much smaller share of the rows.
 - The planner reads our Apify balance and sizes the batch so that its worst case fits within the balance.
-- Every run goes into a shared Apify dataset so we don't scrape duplicate entries.
+- Every run goes into a shared Apify dataset to prevent duplicates.
 
 Every batch is validated for data integrity. If a marketplace starts returning error codes or empty data, the balancer will switch to a fallback actor and retry. If that actor also fails, it re-allocates rows to other marketplaces. With this system, we can let the load balancer run autonomously overnight.
 
@@ -35,7 +35,10 @@ Apify gives us a record of every photo, full description, and structured fields.
 
 ### Privacy and Transparency
 
-We do not store seller usernames, profile links, or account IDs. A scanner checks all data after every batch and stops collection if any identity information is found. We scrape only public listing data with no accounts needed. Original photos are shown and links go to the marketplace. User-uploaded photos are used only for search matching.
+- We collect only public listing data with no accounts needed (the same information any visitor sees in a browser).
+- All links go directly to the marketplace.
+- User-uploaded photos are used only for search matching.
+- We do not store seller usernames or profile information. A scanner checks all data after every batch and stops collection if any identity information is found.
 
 ## Image detection and matching
 
@@ -51,19 +54,15 @@ Every item is already secondhand, so we score how good it is for the planet by d
 
 ## Challenges we ran into
 
-- Our catalog had to come from five different marketplaces. We also needed the full description, every photo, condition, size, and shipping information. Writing and maintaining five scrapers that deal with proxies and layout changes would have taken most of our time. Apify actors handled that for us. We chose one actor per marketplace, and each one returns the full listing as structured data. That left our time for the interesting part of exploring the data and ranking items by cost per wear.
+- Our catalog had to come from five different marketplaces. We also needed the full description, every photo, condition, size, and shipping information. Writing and maintaining scrapers that deal with proxies and layout changes would have taken most of our time. Apify actors handled that for us. We chose one actor per marketplace, and each one returns the full listing as structured data. That left our time for the interesting part of exploring the data and ranking items by cost per wear.
 - Most listings don't include fabric data, and fabric is the biggest indicator to how long a garment lasts. Sellers usually include a photo of the care tag, so we send those photos to Claude Haiku to transcribe the printed text and fill in missing fields.
 - No single database covers eco facts for secondhand clothes either, so we built one from sources we checked ourselves. It includes brand repair programs, B Corp and bluesign certifications, and the EU's published wear baselines.
 
 ## What we learned
 
 - The state of sustainability data is very scattered. There's no single place to look up how long a garment lasts or how eco-friendly a brand is, so a lot of the work was compiling sources ourselves.
-- Data monitoring is extremely important. Our load balancer started out as a simple script to check for empty data, but building it into an automated system saved us from constantly monitoring every batch of data we scraped.
+- Data monitoring is extremely important. Our load balancer began as a simple script to check for empty data, but building it into an automated system saved us from constantly monitoring every batch of data.
 
 ## What's next
 
 We're looking to expand to personalized "fit" predictions and local pickup consideration to cut shipping emissions. We're also exploring verified reviews where users submit photos after one year of buying an item so we gather durability data. Our goal is to build Sift into a broader service that makes mindful shopping easy for everyone.
-
-## Built with
-
-Python, FastAPI, Modal, Apify, Claude Haiku, FashionSigLIP, ONNX, SegFormer, Pydantic, Next.js, Vercel
