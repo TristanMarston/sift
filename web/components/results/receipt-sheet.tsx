@@ -126,16 +126,32 @@ export function ReceiptSheet({ r, typical, count, onClose }: Props) {
 
                         <div className='mt-5 rounded-image bg-secondary p-3'>
                             <p className='type-callout font-semibold'>How we got {w.expected_wears.mid} wears</p>
-                            <ul className='mt-2 flex flex-col gap-2'>
-                                {wearReasons(r).map((s) => (
-                                    <li key={s.label} className='type-footnote text-pretty'>
-                                        <span className='text-muted-foreground'>{s.label}: </span>
-                                        {sentence(s.value)}
+                            {w.steps ? (
+                                // The API's steps are a little sum: typical wears, then the quality and condition multipliers.
+                                <ul className='mt-2 flex flex-col gap-1.5 type-footnote'>
+                                    {w.steps.map((s) => (
+                                        <li key={s.label} className='flex justify-between gap-3'>
+                                            <span className='text-muted-foreground'>{s.label}</span>
+                                            <span className='shrink-0 font-semibold tabular'>{s.value}</span>
+                                        </li>
+                                    ))}
+                                    <li className='flex justify-between gap-3 border-t border-border pt-1.5'>
+                                        <span className='text-muted-foreground'>Wears it should last</span>
+                                        <span className='shrink-0 font-semibold tabular'>= {w.expected_wears.mid}</span>
                                     </li>
-                                ))}
-                            </ul>
+                                </ul>
+                            ) : (
+                                <ul className='mt-2 flex flex-col gap-2'>
+                                    {wearReasons(r).map((s) => (
+                                        <li key={s.label} className='type-footnote text-pretty'>
+                                            <span className='text-muted-foreground'>{s.label}: </span>
+                                            {sentence(s.value)}
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
                             <p className='mt-2 type-footnote text-pretty text-muted-foreground'>
-                                So about {w.expected_wears.mid}, somewhere between {w.expected_wears.low} and {w.expected_wears.high}.
+                                About {w.expected_wears.mid}, somewhere between {w.expected_wears.low} and {w.expected_wears.high}.
                             </p>
                         </div>
 

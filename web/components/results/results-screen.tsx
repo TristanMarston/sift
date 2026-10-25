@@ -35,8 +35,9 @@ const fade = (delay = 0) => ({ initial: { opacity: 0 }, animate: { opacity: 1, t
 const rows = { show: { transition: { staggerChildren: 0.04, delayChildren: 0.15 } } };
 
 /**
- * Look-alikes for one garment, ranked by cost per wear. The backend sends every order; switching sorts only
- * picks another list, so the rows reshuffle instantly. Tap a row for its Wear Receipt.
+ * Look-alikes for one garment. The cost-per-wear tab starts with the slider halfway between better value and closer
+ * match. The backend sends every order; moving the slider or switching tabs only picks another list, so the rows
+ * reshuffle instantly. Tap a row for the breakdown of its cost per wear.
  */
 export function ResultsScreen({ shot, garments, searches, view, onView, onSelect, onBack, onRetry, onDrawBox }: Props) {
     const { sort, mix, openId } = view; // mix: the match-to-value slider, 0 = best value
@@ -126,30 +127,31 @@ export function ResultsScreen({ shot, garments, searches, view, onView, onSelect
                                 </AnimatePresence>
                             </motion.div>
 
+                            {/* The headline describes pure cost per wear, so it shows only with the slider at Better value. */}
                             <AnimatePresence initial={false} mode='popLayout'>
                                 {head && (
-                                    <motion.div key={head.kind} layout initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={spring.ui} className='pt-3 pb-1'>
-                                        <p className='type-title-2 text-balance'>{head.kind === 'drops' ? `The cheapest match drops to #${head.rank}` : 'The cheapest match is also the best value per wear'}</p>
-                                        {resp.typical && (
-                                            <div className='mt-1 type-footnote text-muted-foreground'>
-                                                <p className='flex items-center gap-1'>
-                                                    A typical look-alike costs {priceText(resp.typical.price_cents)}, about {perWearText(resp.typical.cpw_cents)} a wear.
-                                                    <button type='button' aria-expanded={why} aria-label='What is a typical look-alike?' onClick={() => setWhy((w) => !w)} className='-m-2 grid size-8 shrink-0 place-items-center rounded-full outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring'>
-                                                        <Info className='size-4' strokeWidth={1.75} />
-                                                    </button>
-                                                </p>
-                                                <AnimatePresence initial={false}>
-                                                    {why && (
-                                                        <motion.p key='why' className='overflow-hidden text-pretty' initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={spring.ui}>
-                                                            {typicalText(resp.typical, resp.results.length)}
-                                                        </motion.p>
-                                                    )}
-                                                </AnimatePresence>
-                                            </div>
-                                        )}
-                                    </motion.div>
+                                    <motion.p key={head.kind} layout initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={spring.ui} className='pt-3 type-title-2 text-balance'>
+                                        {head.kind === 'drops' ? `The cheapest match drops to #${head.rank}` : 'The cheapest match is also the best value per wear'}
+                                    </motion.p>
                                 )}
                             </AnimatePresence>
+                            {sort === 'cpw' && resp.typical && (
+                                <motion.div layout transition={spring.ui} className='mt-2 type-footnote text-muted-foreground'>
+                                    <p className='flex items-center gap-1'>
+                                        A typical look-alike costs {priceText(resp.typical.price_cents)}, about {perWearText(resp.typical.cpw_cents)} a wear.
+                                        <button type='button' aria-expanded={why} aria-label='What is a typical look-alike?' onClick={() => setWhy((w) => !w)} className='-m-2 grid size-8 shrink-0 place-items-center rounded-full outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring'>
+                                            <Info className='size-4' strokeWidth={1.75} />
+                                        </button>
+                                    </p>
+                                    <AnimatePresence initial={false}>
+                                        {why && (
+                                            <motion.p key='why' className='overflow-hidden text-pretty' initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={spring.ui}>
+                                                {typicalText(resp.typical, resp.results.length)}
+                                            </motion.p>
+                                        )}
+                                    </AnimatePresence>
+                                </motion.div>
+                            )}
 
                             <motion.ol key={garment.id} initial='hidden' animate='show' variants={rows} className='mt-3 grid gap-3 lg:grid-cols-2'>
                                 {list.map((r, i) => (
