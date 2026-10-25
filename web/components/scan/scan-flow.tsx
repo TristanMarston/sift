@@ -18,7 +18,8 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const COUNTER_AT_LEAST = 1600; // the count rolls up and the market names light before results take over
 const RESULTS = '/results';
 const SCAN = '/scan';
-const FRESH: View = { selected: '', sort: 'cpw', mix: 0, openId: null };
+// New scans start with the slider halfway, so the first rows are close matches that are also good value.
+const FRESH: View = { selected: '', sort: 'cpw', mix: 5, openId: null };
 
 type Props = {
     onClose: () => void;
