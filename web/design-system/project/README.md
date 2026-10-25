@@ -10,7 +10,7 @@ Write plain, warm and short. The product speaks; the user's things are "your" th
 - **No em dashes.** Use a period, a comma or a middle dot (`·`). "Chore coat · navy".
 - **No "It's not X, it's Y" lines** and no slogans built on contrast. Say what it does.
 - **No exclamation marks**, no "please", "simply" or "just".
-- **Sell the idea, then the product.** Lead with cost per wear ("Buy it once."), not with Sift. The product shows up in the actions.
+- **Sell the idea, then the product.** Lead with cost per wear ("Just buy once."), not with Sift. The product shows up in the actions.
 - **Never claim virtue.** Banned: "eco-friendly", "sustainable", "green", "guilt-free", "planet-positive". Longer wear is why cost per wear matters, so the environmental side is welcome, but only as a specific, sourced fact ("Wearing clothes 9 months longer cuts their carbon, water and waste footprint by about 20–30%. WRAP") or a count ("Tees bought · 6 vs 1"). Never the headline, and never shown with leaf icons or a green "eco" signal.
 - **Cost per wear is always an estimate.** Show it with an `EstTag` and the wear count it assumes ("÷ 150 wears", "150 wears · est."). Expected wears are ranges; when there's room, show the range.
 - **Label durability by evidence, never by price.** Price alone doesn't predict how long clothes last. Say "Pills after ~25 wears", not "Cheap tee".

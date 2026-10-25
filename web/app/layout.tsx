@@ -11,7 +11,7 @@ const figtree = Figtree({ subsets: ['latin'], variable: '--font-figtree' });
 const dmMono = DM_Mono({ subsets: ['latin'], variable: '--font-dm-mono', weight: ['300', '400', '500'] });
 
 export const metadata: Metadata = {
-    title: 'Sift: buy it once',
+    title: 'Sift: just buy once',
     description: 'Find look-alikes for the clothes you like, ranked by cost per wear.',
 };
 
