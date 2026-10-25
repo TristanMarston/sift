@@ -116,10 +116,10 @@ export function ResultsScreen({ shot, garments, searches, view, onView, onSelect
                     {resp && list.length > 0 && (
                         <>
                             <motion.div {...fade(0.2)} className='sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-10 -mx-4 bg-background/85 px-4 py-2 backdrop-blur-md lg:-mx-8 lg:px-8'>
-                                <SortControl value={sort} onChange={setSort} className='lg:max-w-xl' />
+                                <SortControl value={sort} onChange={setSort} />
                                 <AnimatePresence initial={false}>
                                     {sort === 'cpw' && (
-                                        <motion.div key='slider' className='overflow-hidden lg:max-w-xl' initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={spring.ui}>
+                                        <motion.div key='slider' className='overflow-hidden' initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={spring.ui}>
                                             <MatchSlider value={mix} onChange={(m) => onView({ mix: m })} className='pt-1' />
                                         </motion.div>
                                     )}
@@ -151,7 +151,7 @@ export function ResultsScreen({ shot, garments, searches, view, onView, onSelect
                                 )}
                             </AnimatePresence>
 
-                            <motion.ol key={garment.id} initial='hidden' animate='show' variants={rows} className='mt-3 grid gap-3 lg:grid-cols-2'>
+                            <motion.ol key={garment.id} initial='hidden' animate='show' variants={rows} className='mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2'>
                                 {list.map((r, i) => (
                                     <ResultRow key={r.id} r={r} rank={i + 1} sort={sort} cheapest={r.id === resp.headline.cheapest_id} open={r.id === openId} onOpen={() => setOpenId(r.id)} />
                                 ))}
@@ -165,7 +165,7 @@ export function ResultsScreen({ shot, garments, searches, view, onView, onSelect
                     )}
 
                     {(!current || current.status === 'loading') && (
-                        <ol className='mt-3 grid gap-3 lg:grid-cols-2' aria-hidden>
+                        <ol className='mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2' aria-hidden>
                             {Array.from({ length: 6 }, (_, i) => (
                                 <RowSkeleton key={i} />
                             ))}
