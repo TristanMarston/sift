@@ -1,5 +1,3 @@
-# Sift
-
 <p align="center"><img src="demo/branding/sift-logo.png" alt="Sift logo" width="200"></p>
 
 ## Inspiration
