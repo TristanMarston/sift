@@ -79,7 +79,7 @@ export function ResultsScreen({ shot, garments, searches, view, onView, onSelect
                         <ChevronLeft data-icon='inline-start' strokeWidth={1.75} />
                         Photo
                     </Button>
-                    {shaken && <span className='rounded-pill bg-secondary px-2.5 py-1 type-footnote font-semibold text-muted-foreground'>Test order</span>}
+                    {/* {shaken && <span className='rounded-pill bg-secondary px-2.5 py-1 type-footnote font-semibold text-muted-foreground'>Test order</span>} */}
                     {!shaken && resp?.sample && <span className='rounded-pill bg-secondary px-2.5 py-1 type-footnote font-semibold text-muted-foreground'>Sample results</span>}
                     <ThemeToggle />
                 </motion.header>
