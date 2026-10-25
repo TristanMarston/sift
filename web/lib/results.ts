@@ -42,8 +42,7 @@ export type Headline = { kind: 'drops'; rank: number } | { kind: 'best' } | null
 export function headline(resp: SearchResponse): Headline {
     const rank = resp.headline.cheapest_rank_by_cpw;
     if (rank === null) return null;
-    if (rank >= 3) return { kind: 'drops', rank };
-    return rank === 1 ? { kind: 'best' } : null;
+    return rank >= 2 ? { kind: 'drops', rank } : { kind: 'best' };
 }
 
 const dollars = (cents: number) => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
