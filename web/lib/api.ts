@@ -42,6 +42,9 @@ async function call(path: string, init: RequestInit, timeoutMs: number): Promise
     throw last;
 }
 
+/** A cold API loads its 160k-listing index first: ~25s before the first answer, then ~7s more for the first detection. */
+export const COLD_START_MS = 45000;
+
 let healthCheck: Promise<number | null> | null = null;
 
 /**
@@ -50,7 +53,7 @@ let healthCheck: Promise<number | null> | null = null;
  */
 export function health(): Promise<number | null> {
     if (!hasBackend) return Promise.resolve(null);
-    healthCheck ??= call('/health', {}, 15000)
+    healthCheck ??= call('/health', {}, COLD_START_MS)
         .then(async (res) => ((await res.json()) as { index_size?: number }).index_size ?? null)
         .catch(() => {
             healthCheck = null; // let a later caller try again
@@ -65,8 +68,8 @@ export async function indexSize(): Promise<number> {
     return (await health()) ?? 0;
 }
 
-/** Detection is ~3s warm and 10–14s when the API has been asleep, so it gets 15 seconds before the whole-photo fallback. */
-export const DETECT_TIMEOUT_MS = 15000;
+/** Detection is ~4s warm and ~30s when the API has been asleep, so it waits out a cold start before the whole-photo fallback. */
+export const DETECT_TIMEOUT_MS = COLD_START_MS;
 
 /** POST /detect: finds the garments in a photo. null when there's no backend, it errors, or it takes too long. */
 export async function detect(photo: Blob): Promise<DetectResponse | null> {
@@ -87,7 +90,7 @@ export async function toJpeg(photo: Blob): Promise<Blob | null> {
     try {
         const body = new FormData();
         body.append('image', photo, 'photo');
-        return await (await call('/jpeg', { method: 'POST', body }, 15000)).blob();
+        return await (await call('/jpeg', { method: 'POST', body }, COLD_START_MS)).blob();
     } catch {
         return null;
     }
@@ -106,6 +109,6 @@ export async function search(crop: Blob, category: string, brand: string | null 
     const body = new FormData();
     body.append('image', crop, 'garment.jpg');
     body.append('params', JSON.stringify({ ...(category ? { category } : {}), ...(brand ? { brand } : {}) }));
-    const res = await call('/search', { method: 'POST', body }, 20000);
+    const res = await call('/search', { method: 'POST', body }, COLD_START_MS);
     return (await res.json()) as SearchResponse;
 }

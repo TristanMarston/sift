@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { CameraScreen, type SearchState } from '@/components/camera/camera-screen';
 import { cropShot, type Shot } from '@/components/camera/capture';
 import { ResultsScreen } from '@/components/results/results-screen';
-import { indexSize, search } from '@/lib/api';
+import { health, indexSize, search } from '@/lib/api';
 import type { Box } from '@/lib/detect';
 import { categoryLabel } from '@/lib/results';
 import { finished, resumed, type GarmentSearch, type SavedScan, type View } from '@/lib/resume';
@@ -49,6 +49,7 @@ export function ScanFlow({ onClose, initialFile, resume }: Props) {
     const run = useRef(0); // ignores searches that finish after a Retake
     const canReturn = useRef(false); // read by the Forward handler below
     useEffect(() => void (canReturn.current = seen && !!scan), [seen, scan]);
+    useEffect(() => void health(), []); // wake the API while the photo is framed: a cold start takes ~25s
 
     // Back (button or swipe) from /results returns to the frozen photo; Forward goes back to the results.
     useEffect(() => {

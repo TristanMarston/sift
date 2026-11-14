@@ -21,7 +21,7 @@ import { useCamera } from './use-camera';
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const SCAN_AT_LEAST = 1400; // the scan line gets one full pass even when detection is instant
-const SLOW_AFTER = 5000; // a cold API takes ~10s to find garments: say so instead of looking stuck
+const SLOW_AFTER = 5000; // a cold API takes ~30s to find garments: say so instead of looking stuck
 const MARKETS = Object.values(MARKET);
 
 export type SearchState = { total: number; elapsedMs?: number; lifted: boolean; selectedId: string; label?: string | null };

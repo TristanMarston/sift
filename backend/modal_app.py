@@ -10,6 +10,7 @@ speed, and only listings.jsonl / a photo / the results cross our own connection.
 Deploy settings come from your shell: SIFT_INDEX_NAME (default full), SIFT_CORS_ORIGINS, SIFT_CORS_ORIGIN_REGEX
 (default: the team's Vercel URLs), SIFT_MIN_CONTAINERS (1 keeps one warm for a demo; it bills while idle) and
 SIFT_HAIKU=1 (Claude Haiku in /detect; needs the `sift-anthropic` Modal secret).
+SIFT_REGION (e.g. us-west) pins the region; unset runs anywhere, which costs less.
 
 The index lives on the `sift-index` volume at /vol/<name>/ (name = test | full | ...)."""
 import importlib
@@ -138,8 +139,9 @@ def query(photo: str, name: str = "test", k: int = 10, category: str = ""):
         print(f"{sim:.3f}  ${cents / 100:>7.2f}  {mp:<8} {title[:60]}  {url}")
 
 
-@app.function(image=api_image, volumes={"/vol": vol}, cpu=2, memory=4096, timeout=60, scaledown_window=600,
-              region="us-west", routing_region="us-west",   # the demo is in Berkeley; the volume is read once per cold start
+@app.function(image=api_image, volumes={"/vol": vol}, cpu=2, memory=8192, timeout=60, scaledown_window=600,   # ~6 GB in use (160k listings)
+              # SIFT_REGION=us-west pins the API near the demo (Berkeley). Off by default: Modal bills pinned regions extra.
+              region=os.getenv("SIFT_REGION") or None, routing_region=os.getenv("SIFT_REGION") or None,
               min_containers=int(os.getenv("SIFT_MIN_CONTAINERS", "0")),
               # SIFT_HAIKU=1: /detect names and splits garments with Claude Haiku. Needs the Modal secret once:
               #   modal secret create sift-anthropic ANTHROPIC_API_KEY=...

@@ -7,6 +7,7 @@ SIFT_INDEX: the step-05 index folder (default pipeline/data/index). SIFT_CORS_OR
 import io
 import json
 import os
+import threading
 from functools import cache
 from pathlib import Path
 from typing import Literal
@@ -91,10 +92,16 @@ def _params(raw: str | None) -> SearchParams:
 def create_app(index=None, cfg=None, embed=None, detect=None, categorize=None, origins=None,
                origin_regex=None) -> FastAPI:
     """Pass the index, ranking config and models to test; otherwise each loads on first use."""
+    loading = threading.Lock()   # overlapping first requests on a cold container wait for one load, not one each
+
     @cache
-    def deps():
+    def load():
         from backend.index import Index
         return (index if index is not None else Index.load(INDEX), cfg or ranker.load_config())
+
+    def deps():
+        with loading:
+            return load()
 
     def embed_fn(im):
         if embed is not None:
