@@ -40,3 +40,52 @@ uv run python pipeline/run/cli.py import sift-data-YYYY-MM-DD.zip     # rebuilds
 ```
 
 Scraping itself (one runner at a time, budgets, checks, stopping): `pipeline/run/README.md`.
+
+## Moving the API to another Modal account
+
+The live API died in Nov 2026 when the original Modal app went away. To host it on a new account, run everything from
+`backend/`.
+
+**1. On the old account:** copy out the index (the four files the API serves) and the latest snapshot.
+
+```bash
+uv run modal volume ls sift-index /full/index        # embeddings.npy, rows.jsonl, manifest.json, colors.npy
+uv run modal volume get sift-index /full/index ./sift-index-full
+uv run modal volume get sift-index /snapshots/sift-data-haram-2026-10-25.zip .
+```
+
+**2. On the new account:** log in, upload the index, and check the files sit at `/full/index/`.
+
+```bash
+uv run modal token new                                # opens the browser to log in
+uv run modal volume create sift-index
+uv run modal volume put sift-index ./sift-index-full /full/index
+uv run modal volume ls sift-index /full/index         # the same four files, not a nested folder
+```
+
+**3. Optional, Claude Haiku in /detect.** Without it, detection still works with simpler labels (deploy with `SIFT_HAIKU=0`).
+
+```bash
+uv run modal secret create sift-anthropic ANTHROPIC_API_KEY=<your key>
+```
+
+**4. Deploy and check.** The deploy prints the new URL (like `https://<workspace>--sift-api.us-east.modal.run`).
+`PYTHONPATH=src` lets Modal find the `backend` package even when macOS hides the venv's `.pth` file. A new account
+needs Modal client 1.6.4 or later (`uv.lock` has it).
+
+```bash
+PYTHONPATH=src SIFT_HAIKU=1 SIFT_INDEX_NAME=full uv run modal deploy modal_app.py
+curl https://<workspace>--sift-api.us-east.modal.run/health   # {"status":"ok","index_size":161592, ...}
+```
+
+**5. Point the web app at it.** Set `NEXT_PUBLIC_API_URL` to the new URL in Vercel (all environments) and in
+`web/.env.local`, then redeploy on Vercel: the address is built into the site, so a new value needs a new build.
+
+A cold start (first request after 10 idle minutes) takes about 25 s to load the index; the web app waits up to 45 s.
+
+Cost: containers scale to zero, and an idle API costs nothing. Leave `SIFT_MIN_CONTAINERS` at 0 and `SIFT_REGION`
+unset (Modal bills a pinned region extra), and set a spending limit in the Modal dashboard.
+
+**Only have the snapshot zip?** Rebuild the index from it: `cli.py import` (above), then `modal run modal_app.py::embed
+--listings pipeline/data/listings.jsonl --name full` and `::colors --name full`. That re-downloads every listing photo,
+and listings sold since October may have lost theirs, so expect fewer listings.

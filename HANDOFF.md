@@ -1,5 +1,9 @@
 # Sift handoff — backend, night of Oct 23–24, 2026
 
+> **Nov 13, 2026: the API moved.** The old URL below is off for good. The API now runs on Tristan's Modal account at
+> <https://tristanmarston--sift-api.us-east.modal.run>, serving the Oct 25 index (161,592 listings). How it was moved:
+> `backend/DATA.md`, "Moving the API to another Modal account". The rest of this file is the record from Oct 24.
+
 Written for teammates **and their coding agents**. Read this before starting work. `schema/api.schema.json` is still
 the contract; `CLAUDE.md` rules still apply (branch per feature, PR, TDD for data/ML code).
 

@@ -252,3 +252,25 @@ def test_search_takes_the_brand_haiku_read_and_lifts_it():
     body = valid("SearchResponse", search(c, {"category": "jackets_outerwear", "brand": "GAP"}).json())
     assert body["orders"]["match"] == ["depop:gap", "depop:other"] and body["query"]["brand"] == "GAP"
     assert search(c, {"brand": 5}).status_code == 400
+
+
+def test_index_loads_once_when_first_requests_overlap(monkeypatch):
+    """A cold container gets /health and /detect at once, and the web app retries: the 6 GB index must load once."""
+    import threading
+    import time
+    loads = []
+
+    def slow_load(path):
+        loads.append(path)
+        time.sleep(0.3)
+        return Index(np.zeros((0, 3), np.float32), [])
+    monkeypatch.setattr(Index, "load", staticmethod(slow_load))
+    client = TestClient(A.create_app(cfg=CFG))
+    codes = []
+    threads = [threading.Thread(target=lambda: codes.append(client.get("/health").status_code)) for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert codes == [200] * 4
+    assert len(loads) == 1

@@ -7,7 +7,7 @@ help most. Items marked **Decide** need a team call before anyone builds them.
 ## 1. How the web app calls the API
 
 - **Address:** `NEXT_PUBLIC_API_URL`, set in Vercel and in `web/.env.local`. Next.js bakes it in at build time, so
-  changing it means a redeploy. Current: `https://lu-anthony-73--sift-api.us-west.modal.run`. If the hostname
+  changing it means a redeploy. Current: `https://tristanmarston--sift-api.us-east.modal.run`. If the hostname
   changes again, tell Tristan: Vercel needs the new value and a redeploy.
 - **Routes:** in production the app calls the API directly and falls back to `/api/sift/*` (a Next.js rewrite to the
   same address) when the direct call is blocked. In development it only uses the rewrite. Code: `web/lib/api.ts`,
@@ -129,7 +129,7 @@ them: shrink to 1024 px, `/detect`, crop the top garment with 4% padding, `/sear
 - **Live probe:**
 
 ```bash
-API=https://lu-anthony-73--sift-api.us-west.modal.run
+API=https://tristanmarston--sift-api.us-east.modal.run
 curl -s -F image=@photo.jpg $API/detect
 curl -s -F image=@crop.jpg -F 'params={"category":"hoodies_sweatshirts"}' $API/search | head -c 600
 ```
